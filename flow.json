@@ -1,0 +1,62 @@
+{
+  "contracts": {
+    "FlowTokenHelper": "./cadence/contracts/FlowTokenHelper.cdc",
+    "FlowWager": "./cadence/contracts/FlowWager.cdc",
+    "MarketFactory": "./cadence/contracts/MarketFactory.cdc",
+    "UserRegistry": "./cadence/contracts/UserRegistry.cdc"
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "mainnet": "access.mainnet.nodes.onflow.org:9000",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": "2eae2f31cb5b756151fa11d82949c634b8f28796a711d7eb1e52cc301ed11111"
+    },
+    "flow-wager-test": {
+      "address": "ccbddeb49edabf2d",
+      "key": {
+        "type": "file",
+        "location": "flow-wager test.pkey"
+      }
+    },
+    "mainnet-account": {
+      "address": "6c1b12e35dca8863",
+      "key": {
+        "type": "hex",
+        "index": 0,
+        "signatureAlgorithm": "ECDSA_secp256k1",
+        "hashAlgorithm": "SHA2_256",
+        "privateKey": "fc70ba19eb6aefe4546cb04cd6a817ee188890df7660d25c43b29b336258f488"
+      }
+    }
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": [
+        "FlowWager",
+        "MarketFactory",
+        "UserRegistry",
+        "FlowTokenHelper"
+      ]
+    },
+    "mainnet": {
+      "mainnet-account": [
+        "FlowWager",
+        "MarketFactory",
+        "UserRegistry",
+        "FlowTokenHelper"
+      ]
+    },
+    "testnet": {
+      "flow-wager-test": [
+        "FlowWager",
+        "MarketFactory",
+        "UserRegistry",
+        "FlowTokenHelper"
+      ]
+    }
+  }
+}
