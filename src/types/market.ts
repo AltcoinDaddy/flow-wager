@@ -1,25 +1,24 @@
-// src/types/market.ts
-// Market-related type definitions
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Market-related type definitions aligned with FlowWager contract
 export interface Market {
-  id: number | any;
-  creator: string;
-  question: string;
-  description?: string
-  optionA: string;
-  optionB: string;
-  category: MarketCategory | string;
-  imageURI: string;
-  endTime: number;
-  creationTime: number;
-  outcome: MarketOutcome | string;
-  totalOptionAShares: number;
-  totalOptionBShares: number;
-  resolved: boolean;
-  status: MarketStatus | string;
-  totalPool: number;
-  isBreakingNews: boolean;
-  minBet: number;
-  maxBet: number;
+  id: string;                    // UInt64 from contract (as string for precision)
+  title: string;                 // Contract uses 'title' not 'question'
+  description: string;           // Contract field
+  category: MarketCategory;      // Enum from contract
+  optionA: string;              // ✓ Matches contract
+  optionB: string;              // ✓ Matches contract
+  creator: string;              // ✓ Address from contract
+  createdAt: string;            // UFix64 timestamp from contract
+  endTime: string;              // UFix64 timestamp from contract (not number)
+  minBet: string;               // UFix64 from contract (not number)
+  maxBet: string;               // UFix64 from contract (not number)
+  status: MarketStatus;         // Enum from contract
+  outcome: MarketOutcome | null; // Optional enum from contract
+  resolved: boolean;            // ✓ Bool from contract
+  totalOptionAShares: string;   // UFix64 from contract (not number)
+  totalOptionBShares: string;   // UFix64 from contract (not number)
+  totalPool: string;            // UFix64 from contract (not number)
 }
 
 export interface MarketMetadata {
@@ -29,58 +28,82 @@ export interface MarketMetadata {
   additionalInfo?: string;
 }
 
+// Contract-aligned enums (using numbers to match UInt8 values)
 export enum MarketStatus {
-  Active = "Active",
-  Closed = "Closed", 
-  Resolved = "Resolved",
-  Cancelled = "Cancelled"
+  Active = 0,
+  Paused = 1,
+  Resolved = 2,
+  Cancelled = 3
 }
 
 export enum MarketOutcome {
-  Unresolved = "Unresolved",
-  OptionA = "OptionA",
-  OptionB = "OptionB",
-  Cancelled = "Cancelled"
+  OptionA = 0,
+  OptionB = 1,
+  Draw = 2,
+  Cancelled = 3
 }
 
 export enum MarketCategory {
-  Sports = "Sports",
-  Politics = "Politics", 
-  Entertainment = "Entertainment",
-  Technology = "Technology",
-  Economics = "Economics",
-  Science = "Science",
-  Other = "Other"
+  Sports = 0,
+  Entertainment = 1,
+  Technology = 2,
+  Economics = 3,
+  Weather = 4,
+  Crypto = 5,
+  Politics = 6,
+  BreakingNews = 7,
+  Other = 8
 }
 
+// String mappings for display purposes
+export const MarketStatusLabels = {
+  [MarketStatus.Active]: "Active",
+  [MarketStatus.Paused]: "Paused",
+  [MarketStatus.Resolved]: "Resolved",
+  [MarketStatus.Cancelled]: "Cancelled"
+} as const;
+
+export const MarketOutcomeLabels = {
+  [MarketOutcome.OptionA]: "Option A",
+  [MarketOutcome.OptionB]: "Option B",
+  [MarketOutcome.Draw]: "Draw",
+  [MarketOutcome.Cancelled]: "Cancelled"
+} as const;
+
+export const MarketCategoryLabels = {
+  [MarketCategory.Sports]: "Sports",
+  [MarketCategory.Entertainment]: "Entertainment",
+  [MarketCategory.Technology]: "Technology",
+  [MarketCategory.Economics]: "Economics",
+  [MarketCategory.Weather]: "Weather",
+  [MarketCategory.Crypto]: "Crypto",
+  [MarketCategory.Politics]: "Politics",
+  [MarketCategory.BreakingNews]: "Breaking News",
+  [MarketCategory.Other]: "Other"
+} as const;
+
+// Position interface aligned with contract UserPosition struct
 export interface Position {
-  id: string;
-  marketId: number;
-  user: string;
-  side: "optionA" | "optionB";
-  shares: number;
-  averagePrice: number;
-  totalCost: number;
-  currentValue: number;
-  pnl: number;
-  createdAt: number;
+  marketId: string;              // UInt64 as string
+  optionAShares: string;         // UFix64 as string
+  optionBShares: string;         // UFix64 as string
+  totalInvested: string;         // UFix64 as string
+  averagePrice: string;          // UFix64 as string
+  claimed: boolean;              // Bool from contract
 }
 
 export interface MarketFilter {
   category?: MarketCategory;
   status?: MarketStatus;
   search?: string;
-  sortBy?: "volume" | "endTime" | "creationTime" | "activity";
+  sortBy?: "volume" | "endTime" | "createdAt" | "activity";
   sortOrder?: "asc" | "desc";
-  isBreakingNews?: boolean;
 }
 
 export interface BetParams {
-  marketId: number;
-  side: "optionA" | "optionB";
-  amount: number;
-  expectedShares?: number;
-  slippage?: number;
+  marketId: string;              // UInt64 as string
+  option: number;                // 0 for optionA, 1 for optionB (UInt8)
+  amount: string;                // UFix64 as string
 }
 
 export interface MarketOdds {
@@ -92,7 +115,6 @@ export interface MarketFilters {
   category?: MarketCategory | 'ALL';
   status?: MarketStatus;
   search?: string;
-  isBreakingNews?: boolean;
   sortBy?: 'newest' | 'ending_soon' | 'popular' | 'pool_size';
   sortOrder?: 'asc' | 'desc';
 }
@@ -110,27 +132,19 @@ export interface MarketResponse {
 }
 
 export interface CreateMarketRequest {
-  question: string;
+  title: string;                 // Contract uses 'title'
+  description: string;           // Contract field
   optionA: string;
   optionB: string;
   category: MarketCategory;
-  imageFile?: File;
-  imageURI?: string;
-  duration: number; // in hours
-  isBreakingNews: boolean;
-  minBet: number;
-  maxBet: number;
+  endTime: string;               // UFix64 timestamp
+  minBet: string;                // UFix64
+  maxBet: string;                // UFix64
 }
 
 export interface ResolveMarketRequest {
-  marketId: number;
+  marketId: string;              // UInt64 as string
   outcome: MarketOutcome;
-  reason?: string;
-}
-
-export interface CancelMarketRequest {
-  marketId: number;
-  reason: string;
 }
 
 // Market chart data for visualizations
@@ -146,14 +160,21 @@ export interface MarketChartData {
 // Market activity/events
 export interface MarketActivity {
   id: string;
-  marketId: number;
-  type: 'bet_placed' | 'market_created' | 'market_resolved' | 'winnings_claimed';
+  marketId: string;              // UInt64 as string
+  type: 'shares_purchased' | 'market_created' | 'market_resolved' | 'winnings_claimed';
   user: string;
   timestamp: number;
   data: {
-    amount?: number;
-    option?: 'A' | 'B';
+    amount?: string;             // UFix64 as string
+    option?: number;             // 0 or 1
     outcome?: MarketOutcome;
+    shares?: string;             // UFix64 as string
     [key: string]: any;
   };
 }
+
+// Utility type helpers
+export type MarketId = string;
+export type Address = string;
+export type UFix64String = string;
+export type UInt64String = string;

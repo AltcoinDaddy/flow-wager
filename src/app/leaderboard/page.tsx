@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, TrendingUp, Target, DollarSign, Calendar, Medal, Crown, Star, Users, Zap } from 'lucide-react';
-// import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Trophy, TrendingUp, Target, DollarSign, Calendar, Medal, Crown, Star, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserStats } from '@/types/user';
 
-interface LeaderboardUser extends UserStats {
+// Define the interface to match your actual UserStats type
+interface LeaderboardUser {
   id: string;
   username: string;
   avatar?: string;
@@ -18,13 +17,36 @@ interface LeaderboardUser extends UserStats {
   joinedAt: string;
   lastActive: string;
   badges: string[];
+  
+  // From UserStats (first definition in your types)
+  address: string;
+  totalWinnings: number;
+  totalBets: number;
+  winCount: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalFeesPaid: number;
+  totalInvested: number;
+  winRate: number;
+  roi: number;
+  rank?: number;
+  
+  // Additional leaderboard specific properties
+  totalVolume: string;
+  totalPnL: string;
+  totalTrades: number;
+  lossCount: number;
+  activePositions: number;
+  marketsCreated: number;
+  marketsResolved: number;
+  accuracy: number;
+  reputation: number;
   weeklyPnL: string;
   monthlyPnL: string;
-  streak: number;
   favoriteCategory: string;
 }
 
-// Mock leaderboard data
+// Mock leaderboard data with ALL required properties
 const mockLeaderboardData: LeaderboardUser[] = [
   {
     id: "1",
@@ -34,19 +56,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-01-15",
     lastActive: "2025-06-19",
     badges: ["Early Adopter", "High Roller", "Prediction Master"],
+    
+    // UserStats properties (first definition)
+    address: "0x1234567890abcdef",
+    totalWinnings: 67890,
+    totalBets: 22660,
+    winCount: 234,
+    currentStreak: 15,
+    longestStreak: 22,
+    totalFeesPaid: 450,
+    totalInvested: 22660,
+    winRate: 68.5,
+    roi: 199.2, // (totalWinnings - totalInvested) / totalInvested * 100
+    rank: 1,
+    
+    // Additional properties
     totalVolume: "125,430",
     totalPnL: "+45,230",
-    weeklyPnL: "+2,340",
-    monthlyPnL: "+12,450",
     totalTrades: 342,
-    winRate: 68.5,
+    lossCount: 108,
     activePositions: 12,
     marketsCreated: 8,
     marketsResolved: 156,
     accuracy: 72.1,
-    rank: 1,
     reputation: 2840,
-    streak: 15,
+    weeklyPnL: "+2,340",
+    monthlyPnL: "+12,450",
     favoriteCategory: "Crypto"
   },
   {
@@ -57,19 +92,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-02-03",
     lastActive: "2025-06-19",
     badges: ["Sports Expert", "Consistent Trader"],
+    
+    // UserStats properties
+    address: "0x2345678901bcdef0",
+    totalWinnings: 56720,
+    totalBets: 17810,
+    winCount: 198,
+    currentStreak: 22,
+    longestStreak: 28,
+    totalFeesPaid: 356,
+    totalInvested: 17810,
+    winRate: 71.2,
+    roi: 218.4,
+    rank: 2,
+    
+    // Additional properties
     totalVolume: "98,720",
     totalPnL: "+38,910",
-    weeklyPnL: "+1,890",
-    monthlyPnL: "+9,230",
     totalTrades: 278,
-    winRate: 71.2,
+    lossCount: 80,
     activePositions: 8,
     marketsCreated: 15,
     marketsResolved: 189,
     accuracy: 69.8,
-    rank: 2,
     reputation: 2590,
-    streak: 22,
+    weeklyPnL: "+1,890",
+    monthlyPnL: "+9,230",
     favoriteCategory: "Sports"
   },
   {
@@ -80,19 +128,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-01-28",
     lastActive: "2025-06-18",
     badges: ["Tech Savvy", "Rising Star"],
+    
+    // UserStats properties
+    address: "0x3456789012cdef01",
+    totalWinnings: 45680,
+    totalBets: 13500,
+    winCount: 146,
+    currentStreak: 8,
+    longestStreak: 15,
+    totalFeesPaid: 270,
+    totalInvested: 13500,
+    winRate: 74.8,
+    roi: 238.4,
+    rank: 3,
+    
+    // Additional properties
     totalVolume: "87,340",
     totalPnL: "+32,180",
-    weeklyPnL: "+1,450",
-    monthlyPnL: "+7,890",
     totalTrades: 195,
-    winRate: 74.8,
+    lossCount: 49,
     activePositions: 6,
     marketsCreated: 22,
     marketsResolved: 134,
     accuracy: 76.3,
-    rank: 3,
     reputation: 2210,
-    streak: 8,
+    weeklyPnL: "+1,450",
+    monthlyPnL: "+7,890",
     favoriteCategory: "Technology"
   },
   {
@@ -103,19 +164,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-03-10",
     lastActive: "2025-06-19",
     badges: ["Political Expert", "Debate Champion"],
+    
+    // UserStats properties
+    address: "0x456789013def012",
+    totalWinnings: 38950,
+    totalBets: 10480,
+    winCount: 110,
+    currentStreak: 5,
+    longestStreak: 12,
+    totalFeesPaid: 209,
+    totalInvested: 10480,
+    winRate: 66.2,
+    roi: 271.6,
+    rank: 4,
+    
+    // Additional properties
     totalVolume: "76,890",
     totalPnL: "+28,470",
-    weeklyPnL: "+890",
-    monthlyPnL: "+6,120",
     totalTrades: 167,
-    winRate: 66.2,
+    lossCount: 57,
     activePositions: 9,
     marketsCreated: 31,
     marketsResolved: 98,
     accuracy: 68.9,
-    rank: 4,
     reputation: 1980,
-    streak: 5,
+    weeklyPnL: "+890",
+    monthlyPnL: "+6,120",
     favoriteCategory: "Politics"
   },
   {
@@ -126,19 +200,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-04-22",
     lastActive: "2025-06-19",
     badges: ["Quick Learner", "Volume Trader"],
+    
+    // UserStats properties
+    address: "0x56789014ef01234",
+    totalWinnings: 34670,
+    totalBets: 10490,
+    winCount: 184,
+    currentStreak: 11,
+    longestStreak: 18,
+    totalFeesPaid: 209,
+    totalInvested: 10490,
+    winRate: 63.7,
+    roi: 230.5,
+    rank: 5,
+    
+    // Additional properties
     totalVolume: "69,230",
     totalPnL: "+24,180",
-    weeklyPnL: "+1,290",
-    monthlyPnL: "+5,670",
     totalTrades: 289,
-    winRate: 63.7,
+    lossCount: 105,
     activePositions: 14,
     marketsCreated: 5,
     marketsResolved: 203,
     accuracy: 65.4,
-    rank: 5,
     reputation: 1750,
-    streak: 11,
+    weeklyPnL: "+1,290",
+    monthlyPnL: "+5,670",
     favoriteCategory: "Entertainment"
   },
   {
@@ -149,19 +236,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-02-17",
     lastActive: "2025-06-18",
     badges: ["Math Wizard", "Data Driven"],
+    
+    // UserStats properties
+    address: "0x6789015f012345",
+    totalWinnings: 28340,
+    totalBets: 8450,
+    winCount: 115,
+    currentStreak: 18,
+    longestStreak: 25,
+    totalFeesPaid: 169,
+    totalInvested: 8450,
+    winRate: 79.3,
+    roi: 235.3,
+    rank: 6,
+    
+    // Additional properties
     totalVolume: "54,780",
     totalPnL: "+19,890",
-    weeklyPnL: "+780",
-    monthlyPnL: "+4,230",
     totalTrades: 145,
-    winRate: 79.3,
+    lossCount: 30,
     activePositions: 7,
     marketsCreated: 12,
     marketsResolved: 87,
     accuracy: 81.2,
-    rank: 6,
     reputation: 1640,
-    streak: 18,
+    weeklyPnL: "+780",
+    monthlyPnL: "+4,230",
     favoriteCategory: "Finance"
   },
   {
@@ -172,19 +272,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-05-08",
     lastActive: "2025-06-19",
     badges: ["Entertainment Expert"],
+    
+    // UserStats properties
+    address: "0x78901601234567",
+    totalWinnings: 22450,
+    totalBets: 6220,
+    winCount: 69,
+    currentStreak: 6,
+    longestStreak: 11,
+    totalFeesPaid: 124,
+    totalInvested: 6220,
+    winRate: 70.4,
+    roi: 260.9,
+    rank: 7,
+    
+    // Additional properties
     totalVolume: "43,120",
     totalPnL: "+16,230",
-    weeklyPnL: "+420",
-    monthlyPnL: "+3,450",
     totalTrades: 98,
-    winRate: 70.4,
+    lossCount: 29,
     activePositions: 5,
     marketsCreated: 18,
     marketsResolved: 56,
     accuracy: 73.2,
-    rank: 7,
     reputation: 1420,
-    streak: 6,
+    weeklyPnL: "+420",
+    monthlyPnL: "+3,450",
     favoriteCategory: "Entertainment"
   },
   {
@@ -195,19 +308,32 @@ const mockLeaderboardData: LeaderboardUser[] = [
     joinedAt: "2024-03-25",
     lastActive: "2025-06-17",
     badges: ["Economics PhD", "Market Analyst"],
+    
+    // UserStats properties
+    address: "0x89016123456789",
+    totalWinnings: 19340,
+    totalBets: 4560,
+    winCount: 59,
+    currentStreak: 12,
+    longestStreak: 16,
+    totalFeesPaid: 91,
+    totalInvested: 4560,
+    winRate: 77.6,
+    roi: 324.1,
+    rank: 8,
+    
+    // Additional properties
     totalVolume: "38,940",
     totalPnL: "+14,780",
-    weeklyPnL: "+320",
-    monthlyPnL: "+2,890",
     totalTrades: 76,
-    winRate: 77.6,
+    lossCount: 17,
     activePositions: 3,
     marketsCreated: 9,
     marketsResolved: 45,
     accuracy: 80.0,
-    rank: 8,
     reputation: 1290,
-    streak: 12,
+    weeklyPnL: "+320",
+    monthlyPnL: "+2,890",
     favoriteCategory: "Economics"
   }
 ];
@@ -218,7 +344,6 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<LeaderboardType>('profits');
-  const [timeframe, setTimeframe] = useState<'all' | 'weekly' | 'monthly'>('all');
 
   // Load leaderboard data
   useEffect(() => {
@@ -314,7 +439,7 @@ export default function LeaderboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        {/* <LoadingSpinner size="lg" /> */}
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
       </div>
     );
   }
@@ -447,15 +572,15 @@ export default function LeaderboardPage() {
                             {user.username}
                           </h3>
                           {user.verified && <Star className="h-4 w-4 text-blue-500" />}
-                          {user.streak > 10 && (
+                          {user.currentStreak > 10 && (
                             <Badge variant="outline" className="text-xs">
-                              🔥 {user.streak}
+                              🔥 {user.currentStreak}
                             </Badge>
                           )}
                         </div>
                         <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
                           <span>Trades: {user.totalTrades}</span>
-                          <span>Reputation: {user.reputation}</span>
+                          <span>ROI: {user.roi.toFixed(1)}%</span>
                           <span className="text-purple-600 dark:text-purple-400">
                             {user.favoriteCategory}
                           </span>
