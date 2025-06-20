@@ -1,50 +1,86 @@
 // src/types/market.ts
 // Market-related type definitions
-
-export enum MarketCategory {
-  BREAKING_NEWS = 'BREAKING_NEWS',
-  POLITICS = 'POLITICS',
-  SPORTS = 'SPORTS',
-  CRYPTO = 'CRYPTO',
-  TECH = 'TECH',
-  CULTURE = 'CULTURE',
-  WORLD = 'WORLD',
-  ECONOMY = 'ECONOMY',
-  ELECTIONS = 'ELECTIONS'
-}
-
-export enum MarketStatus {
-  ACTIVE = 'ACTIVE',
-  PENDING = 'PENDING',
-  RESOLVED = 'RESOLVED',
-  CANCELLED = 'CANCELLED'
-}
-
-export enum MarketOutcome {
-  UNRESOLVED = 'UNRESOLVED',
-  OPTION_A = 'OPTION_A',
-  OPTION_B = 'OPTION_B'
-}
-
 export interface Market {
-  id: number;
+  id: number | any;
   creator: string;
   question: string;
+  description?: string
   optionA: string;
   optionB: string;
-  category: MarketCategory;
+  category: MarketCategory | string;
   imageURI: string;
   endTime: number;
   creationTime: number;
-  outcome: MarketOutcome;
+  outcome: MarketOutcome | string;
   totalOptionAShares: number;
   totalOptionBShares: number;
   resolved: boolean;
-  status: MarketStatus;
+  status: MarketStatus | string;
   totalPool: number;
   isBreakingNews: boolean;
   minBet: number;
   maxBet: number;
+}
+
+export interface MarketMetadata {
+  ipfsHash?: string;
+  source?: string;
+  rules?: string;
+  additionalInfo?: string;
+}
+
+export enum MarketStatus {
+  Active = "Active",
+  Closed = "Closed", 
+  Resolved = "Resolved",
+  Cancelled = "Cancelled"
+}
+
+export enum MarketOutcome {
+  Unresolved = "Unresolved",
+  OptionA = "OptionA",
+  OptionB = "OptionB",
+  Cancelled = "Cancelled"
+}
+
+export enum MarketCategory {
+  Sports = "Sports",
+  Politics = "Politics", 
+  Entertainment = "Entertainment",
+  Technology = "Technology",
+  Economics = "Economics",
+  Science = "Science",
+  Other = "Other"
+}
+
+export interface Position {
+  id: string;
+  marketId: number;
+  user: string;
+  side: "optionA" | "optionB";
+  shares: number;
+  averagePrice: number;
+  totalCost: number;
+  currentValue: number;
+  pnl: number;
+  createdAt: number;
+}
+
+export interface MarketFilter {
+  category?: MarketCategory;
+  status?: MarketStatus;
+  search?: string;
+  sortBy?: "volume" | "endTime" | "creationTime" | "activity";
+  sortOrder?: "asc" | "desc";
+  isBreakingNews?: boolean;
+}
+
+export interface BetParams {
+  marketId: number;
+  side: "optionA" | "optionB";
+  amount: number;
+  expectedShares?: number;
+  slippage?: number;
 }
 
 export interface MarketOdds {

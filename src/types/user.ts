@@ -80,9 +80,12 @@ export interface LeaderboardUser {
   address: string;
   username?: string;
   avatar?: string;
-  stats: UserStats;
   rank: number;
-  change?: number; // Position change from previous period
+  totalPnL: string;
+  winRate: number;
+  totalVolume: string;
+  accuracy: number;
+  change: number; // rank change from previous period
 }
 
 export interface LeaderboardResponse {
@@ -167,4 +170,65 @@ export interface UpdatePreferencesRequest {
   notifications?: Partial<UserPreferences['notifications']>;
   privacy?: Partial<UserPreferences['privacy']>;
   display?: Partial<UserPreferences['display']>;
+}
+
+export interface User {
+  address: string;
+  username?: string;
+  avatar?: string;
+  createdAt: number;
+  stats: UserStats;
+  verified?: boolean;
+  bio?: string;
+  socialLinks?: SocialLinks;
+}
+
+export interface UserStats {
+  totalVolume: string;
+  totalPnL: string;
+  totalTrades: number;
+  winRate: number;
+  activePositions: number;
+  marketsCreated: number;
+  marketsResolved: number;
+  accuracy: number;
+  rank?: number;
+  reputation: number;
+}
+
+export interface SocialLinks {
+  twitter?: string;
+  discord?: string;
+  website?: string;
+}
+
+export interface LeaderboardUser {
+  address: string;
+  username?: string;
+  avatar?: string;
+  rank: number;
+  totalPnL: string;
+  winRate: number;
+  totalVolume: string;
+  accuracy: number;
+  change: number; // rank change from previous period
+}
+
+export interface UserActivity {
+  id: string;
+  type: ActivityType;
+  marketId?: string;
+  marketTitle?: string;
+  amount?: string;
+  side?: "yes" | "no";
+  timestamp: number;
+  txHash: string;
+}
+
+export enum ActivityType {
+  BuyShares = "BuyShares",
+  SellShares = "SellShares", 
+  CreateMarket = "CreateMarket",
+  ResolveMarket = "ResolveMarket",
+  ClaimWinnings = "ClaimWinnings"
 }

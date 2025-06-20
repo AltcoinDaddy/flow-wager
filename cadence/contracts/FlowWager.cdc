@@ -1,5 +1,5 @@
-// cadence/contracts/FlowWager.cdc
-// Main FlowWager Prediction Market Contract - Clean Working Version
+
+
 
 access(all) contract FlowWager {
     
