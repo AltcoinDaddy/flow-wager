@@ -28,78 +28,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 // Mock markets pending resolution - properly typed to match Market interface
 const pendingMarkets: Market[] = [
-  // {
-  //   id: "2",
-  //   creator: "0xabcdef1234567890",
-  //   title: "Will the next US Presidential Election be held in 2028?",
-  //   optionA: "Yes, in 2028",
-  //   optionB: "No, different year",
-  //   category: 2,
-  //   endTime: (Date.now() - 86400000).toString(), // Ended yesterday
-  //   outcome: null,
-  //   totalOptionAShares: "89000",
-  //   totalOptionBShares: "11000",
-  //   resolved: false,
-  //   status: "Closed" as unknown as MarketStatus,
-  //   totalPool: "123456.78",
-  //   minBet: "5",
-  //   maxBet: "500",
-  //   description: "Presidential election timing prediction",
-  // },
-  // {
-  //   id: "5",
-  //   creator: "0x9876543210fedcba",
-  //   title: "Will Bitcoin close above $50,000 on January 31st, 2025?",
-  //   optionA: "Yes",
-  //   optionB: "No",
-  //   category: 3,
-  //   endTime: (Date.now() - 3600000).toString(), // Ended 1 hour ago
-  //   outcome: null,
-  //   totalOptionAShares: "45000",
-  //   totalOptionBShares: "35000",
-  //   resolved: false,
-  //   status: "Closed" as unknown as MarketStatus,
-  //   totalPool: "67890.12",
-  //   minBet: "1",
-  //   maxBet: "1000",
-  //   description: "Bitcoin price prediction for end of January",
-  //   tags: ["bitcoin", "cryptocurrency", "price"],
-  //   volume: "67890.12",
-  //   priceA: 0.56,
-  //   priceB: 0.44,
-  //   creatorFee: 0.02,
-  //   platformFee: 0.01,
-  //   liquidityPool: "5000"
-  // },
-  // {
-  //   id: "8",
-  //   creator: "0x1122334455667788",
-  //   title: "Will Apple announce a new iPhone in September 2025?",
-  //   optionA: "Yes",
-  //   optionB: "No",
-  //   category: 5,
-  //   endTime: (Date.now() - 7200000).toString(), // Ended 2 hours ago
-  //   outcome: null,
-  //   totalOptionAShares: "78000",
-  //   totalOptionBShares: "22000",
-  //   resolved: false,
-  //   status: "Closed" as unknown as MarketStatus,
-  //   totalPool: "89234.56",
-  //   minBet: "2",
-  //   maxBet: "750",
-  //   description: "Apple's annual iPhone announcement prediction",
-  //   tags: ["apple", "iphone", "technology"],
-  //   volume: "89234.56",
-  //   priceA: 0.78,
-  //   priceB: 0.22,
-  //   creatorFee: 0.02,
-  //   platformFee: 0.01,
-  //   liquidityPool: "7500"
-  // }
+  // Commented out for now since the array is empty
 ];
 
 // Category mapping
@@ -121,7 +54,7 @@ interface ResolutionData {
   adminNotes: string;
 }
 
-export default function AdminResolvePage() {
+function AdminResolveContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const marketIdParam = searchParams.get("id");
@@ -639,5 +572,52 @@ export default function AdminResolvePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Loading fallback component
+function AdminResolveLoading() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center space-x-4 mb-8">
+        <Button variant="outline" size="sm" disabled>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Admin
+        </Button>
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold">Resolve Markets</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Loading Markets...</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-muted rounded w-3/4"></div>
+              <div className="h-4 bg-muted rounded w-1/2"></div>
+              <div className="h-4 bg-muted rounded w-5/6"></div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h3 className="text-xl font-medium mb-2">Loading...</h3>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Main component with Suspense boundary
+export default function AdminResolvePage() {
+  return (
+    <Suspense fallback={<AdminResolveLoading />}>
+      <AdminResolveContent />
+    </Suspense>
   );
 }
