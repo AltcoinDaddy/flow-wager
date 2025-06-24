@@ -54,16 +54,13 @@ export const GET_USER_BALANCE = `
 import FungibleToken from ${
   process.env.NEXT_PUBLIC_FLOW_FUNGIBLE_MAINNET_TOKEN || ""
 }
-import FlowToken from ${
-  process.env.NEXT_PUBLIC_FLOW_MAINNET_TOKEN || ""
-}
+import FlowToken from ${process.env.NEXT_PUBLIC_FLOW_MAINNET_TOKEN || ""}
 
-access(all) fun main(address: Address): UFix64 {
-    let account = getAccount(address)
-    
-    let vaultRef = account.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
-        ?? panic("Could not borrow Balance reference to the Vault")
-    
-    return vaultRef.balance
-}
+ access(all) fun main(address: Address): UFix64 {
+          let account = getAccount(address)
+          let vaultRef = account.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
+            ?? panic("Could not borrow Balance reference to the Vault")
+          
+          return vaultRef.balance
+        }
 `;

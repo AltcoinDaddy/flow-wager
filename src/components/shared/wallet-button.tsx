@@ -42,7 +42,6 @@ export function WalletButton() {
     walletAddress,
     balance,
     isLoadingBalance,
-    balanceError,
     refreshBalance,
     sessionTimeRemaining
   } = useAuth();
@@ -109,11 +108,7 @@ export function WalletButton() {
               <Badge variant="secondary" className="text-xs">
                 {isLoadingBalance ? "Loading..." : `${balance} FLOW`}
               </Badge>
-              {balanceError && (
-                <Badge variant="destructive" className="text-xs">
-                  Error
-                </Badge>
-              )}
+
             </div>
           </div>
         </div>

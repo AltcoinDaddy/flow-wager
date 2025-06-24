@@ -10,9 +10,7 @@ import { WalletButton } from "./wallet-button";
 import { SearchBar } from "./search-bar";
 import { 
   BarChart3, 
-  Trophy, 
-  User, 
-  Settings,
+  Trophy,
   Menu,
   X,
   TrendingUp
