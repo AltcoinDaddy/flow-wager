@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, Users, Star, ArrowRight, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { MarketCard } from '@/components/market/market-card';
-import { StatsCards } from '@/components/dashboard/stat-cards';
 import { OwnerOnly } from '@/components/auth/owner-only';
-import { useAuth } from '@/providers/auth-provider';
+import { StatsCards } from '@/components/dashboard/stat-cards';
+import { MarketCard } from '@/components/market/market-card';
+import { Button } from '@/components/ui/button';
 import { useAllMarkets } from '@/hooks/use-all-markets';
+import { useAuth } from '@/providers/auth-provider';
 import { Market, MarketStatus } from '@/types/market';
 import { UserStats } from '@/types/user';
+import { ArrowRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import React, { useEffect, useState } from 'react';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -119,61 +118,94 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 px-4">
-        <div className="container mx-auto text-center">
-          <div className="max-w-4xl mx-auto">
-            <Badge variant="outline" className="mb-6 bg-blue-100 text-blue-700 border-blue-200">
-              🚀 Powered by Flow Blockchain
-            </Badge>
-            <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-              Predict the Future,
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                {" "}Earn Rewards
-              </span>
+    <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
+      {/* Hero Section - Banner Style */}
+      <section className="w-full h-[500px] relative overflow-hidden bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fillRule='evenodd'%3E%3Cg fill='%239b87f5' fillOpacity='0.4'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundRepeat: 'repeat'
+          }}></div>
+        </div>
+        
+        {/* Hero Content */}
+        <div className="relative z-10 h-full flex items-center justify-center px-4">
+          <div className="text-center max-w-4xl mx-auto">
+            {/* Main Heading */}
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
+              Predict. <span className="text-[#9b87f5]">Win.</span> Repeat.
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-              Trade on real-world events with our decentralized prediction markets. 
-              Put your knowledge to work and earn FLOW tokens.
+            
+            {/* Subheading */}
+            <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+              Join the ultimate prediction platform where your prediction knowledge pays off. 
+              Trade shares on real events and win big.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3">
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Button 
+                asChild 
+                size="lg" 
+                style={{ 
+                  backgroundColor: "#9b87f5", 
+                  color: "white",
+                  fontSize: '16px',
+                  height: 'fit-content',
+                  padding: '12px 32px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#8b5cf6";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#9b87f5";
+                }}
+              >
                 <Link href="/markets">
                   Explore Markets
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
               
-              <OwnerOnly showFallback={false}>
-                <Button asChild variant="outline" size="lg" className="text-lg px-8 py-3">
-                  <Link href="/markets/create">
-                    <Plus className="mr-2 h-5 w-5" />
-                    Create Market
-                  </Link>
-                </Button>
-              </OwnerOnly>
+              <button 
+                className="border border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200"
+                onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+              >
+                Learn More
+              </button>
             </div>
+          </div>
+        </div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-10 left-10 w-20 h-20 bg-[#9b87f5]/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-10 right-10 w-32 h-32 bg-[#7c3aed]/10 rounded-full blur-xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-[#9b87f5]/5 rounded-full blur-lg animate-bounce delay-500"></div>
+        
+        {/* Bottom Gradient Fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#0A0C14] to-transparent"></div>
+      </section>
 
-            {/* Platform Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <div className="text-2xl font-bold text-gray-900">{platformStats.totalMarkets}</div>
-                <div className="text-sm text-gray-600">Total Markets</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <div className="text-2xl font-bold text-gray-900">{platformStats.activeMarkets}</div>
-                <div className="text-sm text-gray-600">Active Now</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <div className="text-2xl font-bold text-gray-900">{platformStats.totalVolume}</div>
-                <div className="text-sm text-gray-600">FLOW Volume</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                <div className="text-2xl font-bold text-gray-900">{platformStats.totalUsers}+</div>
-                <div className="text-sm text-gray-600">Traders</div>
-              </div>
+      {/* Platform Stats */}
+      <section className="py-16 px-4 bg-[#0A0C14]">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            <div className="bg-[#1A1F2C] rounded-lg p-6 shadow-lg border border-gray-800">
+              <div className="text-3xl font-bold text-white mb-2">{platformStats.totalMarkets}</div>
+              <div className="text-sm text-gray-400">Total Markets</div>
+            </div>
+            <div className="bg-[#1A1F2C] rounded-lg p-6 shadow-lg border border-gray-800">
+              <div className="text-3xl font-bold text-white mb-2">{platformStats.activeMarkets}</div>
+              <div className="text-sm text-gray-400">Active Now</div>
+            </div>
+            <div className="bg-[#1A1F2C] rounded-lg p-6 shadow-lg border border-gray-800">
+              <div className="text-3xl font-bold text-[#9b87f5] mb-2">{platformStats.totalVolume}</div>
+              <div className="text-sm text-gray-400">FLOW Volume</div>
+            </div>
+            <div className="bg-[#1A1F2C] rounded-lg p-6 shadow-lg border border-gray-800">
+              <div className="text-3xl font-bold text-white mb-2">{platformStats.totalUsers}+</div>
+              <div className="text-sm text-gray-400">Traders</div>
             </div>
           </div>
         </div>
@@ -181,16 +213,32 @@ export default function HomePage() {
 
       {/* User Dashboard Section (only show if logged in) */}
       {user?.loggedIn && (
-        <section className="py-16 px-4 bg-white">
+        <section className="py-16 px-4 bg-[#1A1F2C]">
           <div className="container mx-auto">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                <h2 className="text-3xl font-bold text-white mb-2">
                   Welcome back, {user.addr?.slice(0, 8)}...
                 </h2>
-                <p className="text-gray-600">Here&lsquo;s your trading overview</p>
+                <p className="text-gray-400">Here&lsquo;s your trading overview</p>
               </div>
-              <Button asChild variant="outline">
+              <Button 
+                asChild 
+                variant="outline" 
+                style={{ 
+                  borderColor: "#9b87f5", 
+                  color: "#9b87f5",
+                  backgroundColor: "transparent"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#9b87f5";
+                  e.currentTarget.style.color = "white";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.color = "#9b87f5";
+                }}
+              >
                 <Link href="/profile">View Full Profile</Link>
               </Button>
             </div>
@@ -201,14 +249,30 @@ export default function HomePage() {
       )}
 
       {/* Featured Markets Section */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-[#0A0C14]">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Markets</h2>
-              <p className="text-gray-600">Most popular and trending prediction markets</p>
+              <h2 className="text-3xl font-bold text-white mb-2">Featured Markets</h2>
+              <p className="text-gray-400">Most popular and trending prediction markets</p>
             </div>
-            <Button asChild variant="outline">
+            <Button 
+              asChild 
+              variant="outline"
+              style={{ 
+                borderColor: "#9b87f5", 
+                color: "#9b87f5",
+                backgroundColor: "transparent"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#9b87f5";
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#9b87f5";
+              }}
+            >
               <Link href="/markets">View All Markets</Link>
             </Button>
           </div>
@@ -217,27 +281,36 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse">
-                  <div className="bg-gray-200 rounded-lg h-64"></div>
+                  <div className="bg-[#1A1F2C] rounded-lg h-64"></div>
                 </div>
               ))}
             </div>
           ) : error ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <div className="text-center py-12 bg-[#1A1F2C] rounded-lg">
               <div className="text-gray-400 mb-4">
                 <TrendingUp className="h-12 w-12 mx-auto" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Unable to load markets</h3>
-              <p className="text-gray-600">{error}</p>
+              <h3 className="text-lg font-medium text-white mb-2">Unable to load markets</h3>
+              <p className="text-gray-400">{error}</p>
             </div>
           ) : featuredMarkets.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <div className="text-center py-12 bg-[#1A1F2C] rounded-lg">
               <div className="text-gray-400 mb-4">
                 <TrendingUp className="h-12 w-12 mx-auto" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No markets yet</h3>
-              <p className="text-gray-600 mb-4">Be the first to create a prediction market!</p>
+              <h3 className="text-lg font-medium text-white mb-2">No markets yet</h3>
+              <p className="text-gray-400 mb-4">Be the first to create a prediction market!</p>
               <OwnerOnly showFallback={false}>
-                <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  asChild 
+                  style={{ backgroundColor: "#9b87f5", color: "white" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#8b5cf6";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#9b87f5";
+                  }}
+                >
                   <Link href="/markets/create">Create First Market</Link>
                 </Button>
               </OwnerOnly>
@@ -252,75 +325,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 px-4 bg-gray-50">
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose FlowWager?</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Experience the future of prediction markets with cutting-edge blockchain technology
-            </p>
-          </div>
+  
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Decentralized</h3>
-              <p className="text-gray-600">
-                Built on Flow blockchain for transparent, trustless trading
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Users className="h-8 w-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Community Driven</h3>
-              <p className="text-gray-600">
-                Markets created and resolved by the community
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                <Star className="h-8 w-8 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Earn Rewards</h3>
-              <p className="text-gray-600">
-                Get rewarded for accurate predictions with FLOW tokens
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-16 px-4 bg-gradient-to-r from-blue-600 to-purple-600">
-        <div className="container mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Ready to Start Trading?
-          </h2>
-          <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of traders making predictions on real-world events. 
-            Connect your wallet and start earning today.
-          </p>
-          
-          {user?.loggedIn ? (
-            <Button asChild size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
-              <Link href="/markets">
-                Explore Markets
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          ) : (
-            <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
-              Connect Wallet to Get Started
-            </Button>
-          )}
-        </div>
-      </section>
+    
     </div>
   );
 }

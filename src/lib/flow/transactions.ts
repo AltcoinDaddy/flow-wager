@@ -1,4 +1,3 @@
-
 export const buySharesTransaction = (
   marketId: number, 
   isOptionA: boolean, 
@@ -7,31 +6,28 @@ export const buySharesTransaction = (
   // This would use @onflow/fcl in a real implementation
   return {
     cadence: `
-      import FlowWager from 0xFLOWWAGER_ADDRESS
-      import FungibleToken from 0xFUNGIBLE_TOKEN_ADDRESS
-      import FlowToken from 0xFLOW_TOKEN_ADDRESS
-      
-      transaction(marketId: UInt64, isOptionA: Bool, amount: UFix64) {
-        let signerVault: &FlowToken.Vault
+      import FlowWager from 0xFlowWager
+      import FlowToken from 0x1654653399040a61
+      import FungibleToken from 0xf233dcee88fe0abe
+
+      transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
+        let flowVault: &FlowToken.Vault
         
         prepare(signer: AuthAccount) {
-          self.signerVault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow FlowToken.Vault reference")
+          // Get reference to signer's FlowToken vault
+          self.flowVault = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            ?? panic("Could not borrow FlowToken vault reference")
         }
         
         execute {
-          let vault <- self.signerVault.withdraw(amount: amount)
-          FlowWager.buyShares(
-            marketId: marketId,
-            isOptionA: isOptionA,
-            vault: <-vault
-          )
+          // Call the contract function to buy shares
+          FlowWager.buyShares(marketId: marketId, option: option, amount: amount)
         }
       }
     `,
     args: [
       { value: marketId, type: 'UInt64' },
-      { value: isOptionA, type: 'Bool' },
+      { value: isOptionA ? 1 : 2, type: 'UInt8' },
       { value: amount.toFixed(8), type: 'UFix64' }
     ],
     limit: 100
@@ -49,37 +45,37 @@ export const createMarketTransaction = (
 ) => {
   return {
     cadence: `
-      import FlowWager from 0xFLOWWAGER_ADDRESS
-      
+      import FlowWager from 0xFlowWager
+
       transaction(
-        question: String,
+        title: String,
+        description: String,
+        category: UInt8,
         optionA: String,
         optionB: String,
-        category: UInt8,
-        imageURI: String,
-        duration: UFix64,
-        isBreakingNews: Bool
+        endTime: UFix64,
+        minBet: UFix64,
+        maxBet: UFix64
       ) {
         let adminRef: &FlowWager.Admin
         
         prepare(signer: AuthAccount) {
-          self.adminRef = signer.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+          // Get reference to Admin resource
+          self.adminRef = signer.borrow<&FlowWager.Admin>(from: /storage/FlowWagerAdmin)
             ?? panic("Could not borrow Admin reference")
         }
         
         execute {
-          let categoryEnum = FlowWager.MarketCategory(rawValue: category)!
           let marketId = self.adminRef.createMarket(
-            question: question,
+            title: title,
+            description: description,
+            category: FlowWager.MarketCategory(rawValue: category)!,
             optionA: optionA,
             optionB: optionB,
-            category: categoryEnum,
-            imageURI: imageURI,
-            duration: duration,
-            isBreakingNews: isBreakingNews
+            endTime: endTime,
+            minBet: minBet,
+            maxBet: maxBet
           )
-          
-          log("Market created with ID: ".concat(marketId.toString()))
         }
       }
     `,

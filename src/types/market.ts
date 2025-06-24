@@ -178,3 +178,12 @@ export type MarketId = string;
 export type Address = string;
 export type UFix64String = string;
 export type UInt64String = string;
+
+// Platform statistics interface
+export interface PlatformStats {
+  totalMarkets: number;
+  activeMarkets: number;
+  totalUsers: number;
+  totalVolume: string;
+  totalFees: string;
+}

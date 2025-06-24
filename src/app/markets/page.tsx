@@ -21,6 +21,7 @@ export default function MarketsPage() {
     filteredAndSortedMarkets,
     marketStats,
     marketCounts,
+    platformStats,
     loading,
     error,
     
@@ -37,8 +38,8 @@ export default function MarketsPage() {
     setActiveTab,
     setShowFilters,
     setSortBy,
-    setSelectedCategory,
-    setSelectedStatus,
+    handleCategoryChange,
+    handleStatusChange,
     
     // Actions
     refetch,
@@ -56,207 +57,263 @@ export default function MarketsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Prediction Markets
-            </h1>
-            <p className="text-gray-600">
-              Trade on the outcomes of real-world events
-            </p>
-          </div>
-          
-          {/* Contract Owner Only Create Market Button */}
-          <OwnerOnly
-            fallback={
-              <div className="text-center">
-                <Button disabled variant="outline" className="text-gray-500">
+    <div className="min-h-screen bg-[#0A0C14]">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-gray-300 to-white bg-clip-text text-transparent mb-2">
+                Prediction Markets
+              </h1>
+              <p className="text-gray-400 text-lg">
+                Trade on the outcomes of real-world events with FLOW tokens
+              </p>
+            </div>
+            
+            {/* Contract Owner Only Create Market Button */}
+            <OwnerOnly
+              fallback={
+                <div className="text-center">
+                  <Button 
+                    disabled 
+                    variant="outline" 
+                    className="text-gray-500 border-gray-700 bg-[#1A1F2C] hover:bg-[#1A1F2C]"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Owner Only
+                  </Button>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Only contract owner can create markets
+                  </p>
+                </div>
+              }
+            >
+              <Button 
+                asChild 
+                className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg border-0"
+              >
+                <Link href="/markets/create">
                   <Plus className="h-4 w-4 mr-2" />
-                  Owner Only
-                </Button>
-                <p className="text-xs text-gray-400 mt-1">
-                  Only contract owner can create markets
-                </p>
+                  Create Market
+                </Link>
+              </Button>
+            </OwnerOnly>
+          </div>
+
+          {/* Platform Statistics from Smart Contract */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-[#9b87f5]" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">Active Markets</span>
               </div>
-            }
-          >
-            <Button asChild className="bg-blue-600 hover:bg-blue-700">
-              <Link href="/markets/create">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Market
-              </Link>
-            </Button>
-          </OwnerOnly>
-        </div>
-
-        {/* Market Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium text-gray-600">Active Markets</span>
+              <p className="text-3xl font-bold text-white">
+                {platformStats?.activeMarkets || marketStats.active}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                From smart contract
+              </p>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{marketStats.active}</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium text-gray-600">Total Volume</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {marketStats.totalVolume.toFixed(0)} FLOW
-            </p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium text-gray-600">Avg Volume</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {Math.round(marketStats.avgVolume)} FLOW
-            </p>
-          </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-medium text-gray-600">Ending Soon</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{marketStats.endingSoon}</p>
-          </div>
-        </div>
 
-        {/* Search and Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search markets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-gray-200"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant={showFilters ? "default" : "outline"}
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'newest' | 'ending' | 'volume' | 'popular')}
-              className="px-3 py-2 border border-gray-200 rounded-md bg-white text-gray-900 text-sm"
-            >
-              <option value="newest">Newest</option>
-              <option value="ending">Ending Soon</option>
-              <option value="volume">Highest Volume</option>
-              <option value="popular">Most Popular</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Filters Panel */}
-        {showFilters && (
-          <MarketFilters
-            selectedCategory={selectedCategory}
-            selectedStatus={selectedStatus}
-            onCategoryChange={setSelectedCategory}
-            onStatusChange={setSelectedStatus}
-            onReset={() => {
-              setSelectedCategory('all');
-              setSelectedStatus('all');
-            }}
-          />
-        )}
-      </div>
-
-      {/* Market Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-gray-50">
-          <TabsTrigger value="all" className="data-[state=active]:bg-white">
-            All Markets
-            <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700">
-              {marketCounts.all}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="active" className="data-[state=active]:bg-white">
-            Active
-            <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700">
-              {marketCounts.active}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="ending" className="data-[state=active]:bg-white">
-            Ending Soon
-            <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700">
-              {marketCounts.ending}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="resolved" className="data-[state=active]:bg-white">
-            Resolved
-            <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700">
-              {marketCounts.resolved}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="trending" className="data-[state=active]:bg-white">
-            Trending
-            <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700">
-              {marketCounts.trending}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value={activeTab} className="mt-6">
-          {filteredAndSortedMarkets.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <Search className="h-8 w-8 text-gray-400" />
+            <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-[#9b87f5]" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">Total Volume</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No markets found
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {markets.length === 0 
-                  ? "No markets have been created yet."
-                  : "Try adjusting your filters or search query"
+              <p className="text-3xl font-bold text-white">
+                {platformStats ? 
+                  `${parseFloat(platformStats.totalVolume).toFixed(0)} FLOW` : 
+                  `${marketStats.totalVolume.toFixed(0)} FLOW`
                 }
               </p>
-              {markets.length === 0 && (
-                <OwnerOnly showFallback={false}>
-                  <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                    <Link href="/markets/create">Create First Market</Link>
-                  </Button>
-                </OwnerOnly>
-              )}
-              {markets.length > 0 && (
-                <Button onClick={handleResetFilters}>
-                  Clear all filters
-                </Button>
-              )}
+              <p className="text-xs text-gray-500 mt-1">
+                All-time trading volume
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredAndSortedMarkets.map((market) => (
-                <MarketCard key={market.id} market={market} />
-              ))}
+
+            <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
+                  <Users className="h-5 w-5 text-[#9b87f5]" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">Total Users</span>
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {platformStats?.totalUsers || "0"}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Registered traders
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
+                  <Clock className="h-5 w-5 text-[#9b87f5]" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">Ending Soon</span>
+              </div>
+              <p className="text-3xl font-bold text-white">{marketStats.endingSoon}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Next 24 hours
+              </p>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                placeholder="Search markets by title, description, or options..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 h-12 bg-[#1A1F2C] border-gray-700 text-white placeholder-gray-400 focus:border-[#9b87f5] focus:ring-[#9b87f5]/20 rounded-xl"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                variant={showFilters ? "default" : "outline"}
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 h-12 px-6 rounded-xl font-medium transition-all ${
+                  showFilters 
+                    ? "bg-[#9b87f5] text-white hover:bg-[#8b5cf6] shadow-lg" 
+                    : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
+                }`}
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+              </Button>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'ending' | 'volume' | 'popular')}
+                className="h-12 px-4 border border-gray-700 rounded-xl bg-[#1A1F2C] text-white text-sm focus:outline-none focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
+              >
+                <option value="newest">Newest First</option>
+                <option value="ending">Ending Soon</option>
+                <option value="volume">Highest Volume</option>
+                <option value="popular">Most Popular</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Enhanced Filters Panel */}
+          {showFilters && (
+            <div className="mb-6">
+              <MarketFilters
+                selectedCategory={selectedCategory}
+                selectedStatus={selectedStatus}
+                onCategoryChange={handleCategoryChange}
+                onStatusChange={handleStatusChange}
+                onReset={() => {
+                  handleCategoryChange('all');
+                  handleStatusChange('all');
+                }}
+              />
             </div>
           )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Refresh Button */}
-      {filteredAndSortedMarkets.length > 0 && (
-        <div className="text-center mt-8">
-          <Button variant="outline" onClick={refetch}>
-            Refresh Markets
-          </Button>
         </div>
-      )}
+
+        {/* Enhanced Market Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto">
+            {[
+              { value: 'all', label: 'All Markets', count: marketCounts.all },
+              { value: 'active', label: 'Active', count: marketCounts.active },
+              { value: 'ending', label: 'Ending Soon', count: marketCounts.ending },
+              { value: 'resolved', label: 'Resolved', count: marketCounts.resolved },
+              { value: 'trending', label: 'Trending', count: marketCounts.trending }
+            ].map((tab) => (
+              <TabsTrigger 
+                key={tab.value}
+                value={tab.value} 
+                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 px-4 font-medium"
+              >
+                <div className="flex items-center gap-2">
+                  <span>{tab.label}</span>
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-gray-700/50 text-gray-300 border-0 text-xs px-2 py-0.5"
+                  >
+                    {tab.count}
+                  </Badge>
+                </div>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value={activeTab} className="mt-8">
+            {filteredAndSortedMarkets.length === 0 ? (
+              <div className="text-center py-16 bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-2xl border border-gray-800/50">
+                <div className="mx-auto w-24 h-24 bg-gradient-to-br from-gray-800 to-gray-900 rounded-full flex items-center justify-center mb-6">
+                  <Search className="h-10 w-10 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-3">
+                  No markets found
+                </h3>
+                <p className="text-gray-400 mb-6 max-w-md mx-auto">
+                  {markets.length === 0 
+                    ? "No markets have been created yet"
+                    : "Try adjusting your filters or search query to find what you're looking for."
+                  }
+                </p>
+                {markets.length === 0 && (
+                  <OwnerOnly showFallback={false}>
+                    <Button 
+                      asChild 
+                      className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg"
+                    >
+                      <Link href="/markets/create">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create First Market
+                      </Link>
+                    </Button>
+                  </OwnerOnly>
+                )}
+                {markets.length > 0 && (
+                  <Button 
+                    onClick={handleResetFilters}
+                    variant="outline"
+                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
+                  >
+                    Clear all filters
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredAndSortedMarkets.map((market) => (
+                  <MarketCard key={market.id} market={market} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Enhanced Refresh Section */}
+        {filteredAndSortedMarkets.length > 0 && (
+          <div className="text-center mt-12 pt-8 border-t border-gray-800/50">
+            <div className="flex flex-col items-center gap-4">
+              <p className="text-gray-400 text-sm">
+                Showing {filteredAndSortedMarkets.length} of {markets.length} markets
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={refetch}
+                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 px-6 py-2"
+                disabled={loading}
+              >
+                {loading ? "Refreshing..." : "Refresh Markets"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

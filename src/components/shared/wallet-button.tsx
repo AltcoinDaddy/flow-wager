@@ -30,11 +30,8 @@ import {
 } from "@/utils/wallet";
 import { toast } from "sonner";
 
-
-
 export function WalletButton() {
   const { 
-
     login, 
     logout, 
     isLoading, 
@@ -63,8 +60,21 @@ export function WalletButton() {
         onClick={login} 
         disabled={isLoading}
         className="flex items-center space-x-2"
+        style={{ 
+          backgroundColor: "#9b87f5", 
+          color: "white",
+          borderColor: "#9b87f5"
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "#8b5cf6";
+          e.currentTarget.style.borderColor = "#8b5cf6";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "#9b87f5";
+          e.currentTarget.style.borderColor = "#9b87f5";
+        }}
       >
-        <Wallet className="h-4 w-4" />
+        <Wallet className="h-4 w-4" style={{ color: "white" }} />
         <span>{isLoading ? "Connecting..." : "Connect Wallet"}</span>
       </Button>
     );
@@ -73,42 +83,68 @@ export function WalletButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="flex items-center space-x-2 h-9">
+        <Button 
+          variant="outline" 
+          className="flex items-center space-x-2 h-9"
+          style={{ 
+            backgroundColor: "#9b87f5", 
+            color: "white",
+            borderColor: "#9b87f5"
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#8b5cf6";
+            e.currentTarget.style.borderColor = "#8b5cf6";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#9b87f5";
+            e.currentTarget.style.borderColor = "#9b87f5";
+          }}
+        >
           <Avatar className="h-6 w-6">
-            <AvatarFallback className="text-xs">
+            <AvatarFallback 
+              className="text-xs"
+              style={{ backgroundColor: "#a78bfa", color: "white" }}
+            >
               {getAvatarFallback(walletAddress)}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start">
-            <span className="text-sm font-medium">
+            <span className="text-sm font-medium" style={{ color: "white" }}>
               {truncateAddress(walletAddress)}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs" style={{ color: "#e9d5ff" }}>
               {isLoadingBalance ? "Loading..." : `${balance} FLOW`}
             </span>
           </div>
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="h-4 w-4" style={{ color: "white" }} />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="w-64" align="end">
+      <DropdownMenuContent 
+        className="w-64" 
+        align="end"
+        style={{ backgroundColor: "#9b87f5", borderColor: "#8b5cf6" }}
+      >
         {/* User Info */}
         <div className="flex items-center space-x-3 p-3">
           <Avatar className="h-10 w-10">
-            <AvatarFallback>
+            <AvatarFallback style={{ backgroundColor: "#a78bfa", color: "white" }}>
               {getAvatarFallback(walletAddress)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">Flow Wallet</p>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-sm font-medium" style={{ color: "white" }}>Flow Wallet</p>
+            <p className="text-xs truncate" style={{ color: "#e9d5ff" }}>
               {walletAddress}
             </p>
             <div className="flex items-center space-x-1 mt-1">
-              <Badge variant="secondary" className="text-xs">
+              <Badge 
+                variant="secondary" 
+                className="text-xs"
+                style={{ backgroundColor: "#a78bfa", color: "white" }}
+              >
                 {isLoadingBalance ? "Loading..." : `${balance} FLOW`}
               </Badge>
-
             </div>
           </div>
         </div>
@@ -117,22 +153,50 @@ export function WalletButton() {
         {sessionTimeRemaining > 0 && (
           <>
             <div className="px-3 pb-2">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: "#e9d5ff" }}>
                 Session expires in: {formatTime(sessionTimeRemaining)}
               </p>
             </div>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator style={{ backgroundColor: "#8b5cf6" }} />
           </>
         )}
 
         {/* Actions */}
-        <DropdownMenuItem onClick={handleCopyAddress}>
-          <Copy className="h-4 w-4 mr-2" />
+        <DropdownMenuItem 
+          onClick={handleCopyAddress}
+          className="cursor-pointer"
+          style={{ color: "white" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#8b5cf6";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <Copy className="h-4 w-4 mr-2" style={{ color: "white" }} />
           <span>{copied ? "Copied!" : "Copy Address"}</span>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={refreshBalance} disabled={isLoadingBalance}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingBalance ? "animate-spin" : ""}`} />
+        <DropdownMenuItem 
+          onClick={refreshBalance} 
+          disabled={isLoadingBalance}
+          className="cursor-pointer"
+          style={{ 
+            color: isLoadingBalance ? "#e9d5ff" : "white"
+          }}
+          onMouseEnter={(e) => {
+            if (!isLoadingBalance) {
+              e.currentTarget.style.backgroundColor = "#8b5cf6";
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }}
+        >
+          <RefreshCw 
+            className={`h-4 w-4 mr-2 ${isLoadingBalance ? "animate-spin" : ""}`} 
+            style={{ color: "white" }}
+          />
           <span>Refresh Balance</span>
         </DropdownMenuItem>
 
@@ -141,24 +205,53 @@ export function WalletButton() {
             href={getFlowscanUrl(walletAddress)}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center"
+            className="flex items-center cursor-pointer"
+            style={{ color: "white" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#8b5cf6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
           >
-            <ExternalLink className="h-4 w-4 mr-2" />
+            <ExternalLink className="h-4 w-4 mr-2" style={{ color: "white" }} />
             <span>View on Flowscan</span>
           </a>
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <a href={`/profile/${walletAddress}`} className="flex items-center">
-            <User className="h-4 w-4 mr-2" />
+          <a 
+            href={`/profile/${walletAddress}`} 
+            className="flex items-center cursor-pointer"
+            style={{ color: "white" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#8b5cf6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <User className="h-4 w-4 mr-2" style={{ color: "white" }} />
             <span>View Profile</span>
           </a>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator style={{ backgroundColor: "#8b5cf6" }} />
 
-        <DropdownMenuItem onClick={logout} className="text-red-600">
-          <LogOut className="h-4 w-4 mr-2" />
+        <DropdownMenuItem 
+          onClick={logout} 
+          className="cursor-pointer"
+          style={{ color: "#fecaca" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#ef4444";
+            e.currentTarget.style.color = "white";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "#fecaca";
+          }}
+        >
+          <LogOut className="h-4 w-4 mr-2" style={{ color: "white" }} />
           <span>Disconnect</span>
         </DropdownMenuItem>
       </DropdownMenuContent>

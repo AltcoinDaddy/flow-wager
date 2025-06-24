@@ -2,7 +2,7 @@
 
 // src/components/market/bet-dialog.tsx
 
-import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,37 +11,37 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  TrendingUp, 
-  TrendingDown,
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Market } from "@/types/market";
+import {
   AlertTriangle,
   Calculator,
+  TrendingDown,
+  TrendingUp,
   Wallet
 } from "lucide-react";
-import type { Market } from "@/types/market";
+import { useEffect, useState } from "react";
 
 interface BetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   market: Market;
   initialSide?: "optionA" | "optionB";
+  onBetSuccess?: () => void;
 }
 
-export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" }: BetDialogProps) {
+export function BetDialog({ open, onOpenChange, market, initialSide = "optionA", onBetSuccess }: BetDialogProps) {
   const [side, setSide] = useState<"optionA" | "optionB">(initialSide);
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [userBalance] = useState(1234.56); // Mock balance
 
   // Calculate market percentages and prices
-  const totalShares = market.totalOptionAShares + market.totalOptionBShares;
-  const optionAPercentage = totalShares > 0 ? (market.totalOptionAShares / totalShares) * 100 : 50;
+  const totalShares = parseFloat(market.totalOptionAShares) + parseFloat(market.totalOptionBShares);
+  const optionAPercentage = totalShares > 0 ? (parseFloat(market.totalOptionAShares) / totalShares) * 100 : 50;
   const optionBPercentage = 100 - optionAPercentage;
   
   // Simple price calculation (can be made more sophisticated)
@@ -52,7 +52,6 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
   const shares = amount ? (parseFloat(amount) / currentPrice) : 0;
   const maxPayout = shares * 1; // Each share pays 1 FLOW if correct
   const potentialProfit = maxPayout - parseFloat(amount || "0");
-  const impliedProbability = currentPrice * 100;
 
   // Preset amounts
   const presetAmounts = ["10", "25", "50", "100"];
@@ -66,8 +65,11 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
     
     // Check betting limits
     const betAmount = parseFloat(amount);
-    if (betAmount < market.minBet || betAmount > market.maxBet) {
-      alert(`Bet amount must be between ${market.minBet} and ${market.maxBet} FLOW`);
+    const minBet = parseFloat(market.minBet);
+    const maxBet = parseFloat(market.maxBet);
+    
+    if (betAmount < minBet || betAmount > maxBet) {
+      alert(`Bet amount must be between ${minBet} and ${maxBet} FLOW`);
       return;
     }
     
@@ -81,6 +83,11 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
       setAmount("");
       onOpenChange(false);
       
+      // Call success callback
+      if (onBetSuccess) {
+        onBetSuccess();
+      }
+      
       // Show success message (you'd replace this with actual toast)
       console.log("Bet placed successfully!");
     } catch (error) {
@@ -90,9 +97,12 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
     }
   };
 
+  const minBet = parseFloat(market.minBet);
+  const maxBet = parseFloat(market.maxBet);
+  
   const isValidAmount = amount && 
-    parseFloat(amount) >= market.minBet && 
-    parseFloat(amount) <= market.maxBet && 
+    parseFloat(amount) >= minBet && 
+    parseFloat(amount) <= maxBet && 
     parseFloat(amount) <= userBalance;
 
   const selectedOption = side === "optionA" ? market.optionA : market.optionB;
@@ -100,21 +110,21 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 text-white">
         <DialogHeader>
-          <DialogTitle>Place a Bet</DialogTitle>
-          <DialogDescription className="text-left">
-            {market.question}
+          <DialogTitle className="text-2xl font-bold text-white">Place a Bet</DialogTitle>
+          <DialogDescription className="text-gray-300 text-left">
+            {market.title}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Side Selection */}
           <Tabs value={side} onValueChange={(value) => setSide(value as "optionA" | "optionB")}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 bg-[#0A0C14] border border-gray-800/50">
               <TabsTrigger 
                 value="optionA" 
-                className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700 dark:data-[state=active]:bg-green-900 dark:data-[state=active]:text-green-300"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white text-gray-400"
               >
                 <div className="flex items-center space-x-2">
                   <TrendingUp className="h-4 w-4" />
@@ -124,7 +134,7 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
               </TabsTrigger>
               <TabsTrigger 
                 value="optionB"
-                className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700 dark:data-[state=active]:bg-blue-900 dark:data-[state=active]:text-blue-300"
+                className="data-[state=active]:bg-gray-700 data-[state=active]:text-white text-gray-400"
               >
                 <div className="flex items-center space-x-2">
                   <TrendingDown className="h-4 w-4" />
@@ -135,18 +145,18 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
             </TabsList>
 
             <TabsContent value="optionA" className="mt-4">
-              <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  You're betting on <strong>{market.optionA}</strong>.
+              <div className="p-4 rounded-lg bg-[#9b87f5]/10 border border-[#9b87f5]/30">
+                <p className="text-sm text-[#9b87f5]">
+                  You&lsquo;re betting on <strong>{market.optionA}</strong>.
                   Current probability: <strong>{optionAPercentage.toFixed(1)}%</strong>
                 </p>
               </div>
             </TabsContent>
 
             <TabsContent value="optionB" className="mt-4">
-              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  You're betting on <strong>{market.optionB}</strong>.
+              <div className="p-4 rounded-lg bg-gray-700/20 border border-gray-600/50">
+                <p className="text-sm text-gray-300">
+                  You&lsquo;re betting on <strong>{market.optionB}</strong>.
                   Current probability: <strong>{optionBPercentage.toFixed(1)}%</strong>
                 </p>
               </div>
@@ -156,8 +166,8 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
           {/* Amount Input */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label htmlFor="amount">Amount (FLOW)</Label>
-              <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+              <Label htmlFor="amount" className="text-white">Amount (FLOW)</Label>
+              <div className="flex items-center space-x-1 text-sm text-gray-400">
                 <Wallet className="h-4 w-4" />
                 <span>Balance: {userBalance.toFixed(2)} FLOW</span>
               </div>
@@ -170,21 +180,22 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               step="0.01"
-              min={market.minBet}
-              max={Math.min(market.maxBet, userBalance)}
+              min={minBet}
+              max={Math.min(maxBet, userBalance)}
+              className="bg-[#0A0C14] border-gray-800/50 text-white placeholder:text-gray-500 focus:border-[#9b87f5]/50 focus:ring-[#9b87f5]/20"
             />
 
             {/* Betting Limits */}
-            <div className="text-xs text-muted-foreground">
-              Limits: {market.minBet} - {market.maxBet} FLOW
+            <div className="text-xs text-gray-400">
+              Limits: {minBet} - {maxBet} FLOW
             </div>
 
             {/* Preset Amounts */}
             <div className="flex space-x-2">
               {presetAmounts.map((preset) => {
                 const presetNum = parseFloat(preset);
-                const isValidPreset = presetNum >= market.minBet && 
-                                   presetNum <= market.maxBet && 
+                const isValidPreset = presetNum >= minBet && 
+                                   presetNum <= maxBet && 
                                    presetNum <= userBalance;
                 return (
                   <Button
@@ -193,9 +204,9 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
                     size="sm"
                     onClick={() => setAmount(preset)}
                     disabled={!isValidPreset}
-                    className="flex-1"
+                    className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
                   >
-                    {preset} FLOW
+                    {preset}
                   </Button>
                 );
               })}
@@ -204,42 +215,42 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
 
           {/* Bet Summary */}
           {amount && parseFloat(amount) > 0 && (
-            <div className="space-y-3 p-4 rounded-lg bg-muted/50 border">
-              <h4 className="font-medium flex items-center space-x-2">
+            <div className="space-y-3 p-4 rounded-lg bg-[#0A0C14] border border-gray-800/50">
+              <h4 className="font-medium flex items-center space-x-2 text-white">
                 <Calculator className="h-4 w-4" />
                 <span>Bet Summary</span>
               </h4>
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">{amount} FLOW</span>
+                  <span className="text-gray-400">Amount:</span>
+                  <span className="font-medium text-white">{amount} FLOW</span>
                 </div>
                 
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Betting on:</span>
-                  <span className="font-medium">{selectedOption}</span>
+                  <span className="text-gray-400">Betting on:</span>
+                  <span className="font-medium text-white">{selectedOption}</span>
                 </div>
                 
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Current probability:</span>
-                  <span className="font-medium">{selectedPercentage.toFixed(1)}%</span>
+                  <span className="text-gray-400">Current probability:</span>
+                  <span className="font-medium text-white">{selectedPercentage.toFixed(1)}%</span>
                 </div>
                 
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Estimated shares:</span>
-                  <span className="font-medium">{shares.toFixed(2)}</span>
+                  <span className="text-gray-400">Estimated shares:</span>
+                  <span className="font-medium text-white">{shares.toFixed(2)}</span>
                 </div>
                 
-                <div className="border-t pt-2">
+                <div className="border-t border-gray-800/50 pt-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Max payout:</span>
-                    <span className="font-medium">{maxPayout.toFixed(2)} FLOW</span>
+                    <span className="text-gray-400">Max payout:</span>
+                    <span className="font-medium text-white">{maxPayout.toFixed(2)} FLOW</span>
                   </div>
                   
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Potential profit:</span>
-                    <span className={`font-medium ${potentialProfit > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className="text-gray-400">Potential profit:</span>
+                    <span className={`font-medium ${potentialProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {potentialProfit > 0 ? '+' : ''}{potentialProfit.toFixed(2)} FLOW
                     </span>
                   </div>
@@ -251,28 +262,28 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
           {/* Validation Messages */}
           {amount && parseFloat(amount) > 0 && (
             <>
-              {parseFloat(amount) < market.minBet && (
-                <div className="flex items-start space-x-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                    Minimum bet is {market.minBet} FLOW
+              {parseFloat(amount) < minBet && (
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-yellow-400">
+                    Minimum bet is {minBet} FLOW
                   </div>
                 </div>
               )}
               
-              {parseFloat(amount) > market.maxBet && (
-                <div className="flex items-start space-x-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-yellow-700 dark:text-yellow-300">
-                    Maximum bet is {market.maxBet} FLOW
+              {parseFloat(amount) > maxBet && (
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-yellow-400">
+                    Maximum bet is {maxBet} FLOW
                   </div>
                 </div>
               )}
               
               {parseFloat(amount) > userBalance && (
-                <div className="flex items-start space-x-2 p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
-                  <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-red-700 dark:text-red-300">
+                <div className="flex items-start space-x-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-400">
                     Insufficient balance
                   </div>
                 </div>
@@ -283,24 +294,37 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA" 
           {/* Current Market State */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Current market odds:</span>
+              <span className="text-gray-400">Current market odds:</span>
             </div>
-            <Progress value={optionAPercentage} className="h-2" />
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <Progress value={optionAPercentage} className="h-3 bg-gray-800">
+              <div 
+                className="h-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] transition-all duration-300 rounded-full"
+                style={{ width: `${optionAPercentage}%` }}
+              />
+            </Progress>
+            <div className="flex justify-between text-xs text-gray-400">
               <span>{optionAPercentage.toFixed(1)}% {market.optionA}</span>
               <span>{optionBPercentage.toFixed(1)}% {market.optionB}</span>
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="border-t border-gray-800/50 pt-4">
+          <Button 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white"
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleBet} 
             disabled={!isValidAmount || isLoading}
-            className={side === "optionA" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"}
+            className={`${
+              side === "optionA" 
+                ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed]" 
+                : "bg-gray-700 hover:bg-gray-600"
+            } text-white`}
           >
             {isLoading ? (
               "Placing Bet..."
