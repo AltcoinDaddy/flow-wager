@@ -1,3 +1,4 @@
+// src/app/markets/page.tsx
 "use client";
 
 import { OwnerOnly } from "@/components/auth/owner-only";
@@ -15,13 +16,11 @@ import {
   DollarSign,
   Filter,
   Plus,
-  RefreshCw,
   Search,
   TrendingUp,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 export default function MarketsPage() {
   const {
@@ -51,64 +50,17 @@ export default function MarketsPage() {
     handleStatusChange,
 
     // Actions
-    refetch,
     handleResetFilters,
   } = useMarketManagement();
 
-  // Auto-refresh state
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [nextRefresh, setNextRefresh] = useState<Date>(
-    new Date(Date.now() + 5 * 60 * 1000)
-  );
-  const [timeUntilRefresh, setTimeUntilRefresh] = useState<string>("5:00");
-  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
-
-  // Auto-refresh every 5 minutes
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      console.log("Auto-refreshing markets...");
-      setIsAutoRefreshing(true);
-      try {
-        await refetch();
-        setLastRefresh(new Date());
-        setNextRefresh(new Date(Date.now() + 5 * 60 * 1000));
-      } catch (error) {
-        console.error("Auto-refresh failed:", error);
-      } finally {
-        setIsAutoRefreshing(false);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval);
-  }, [refetch]);
-
-  // Update countdown timer
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const timeLeft = nextRefresh.getTime() - now.getTime();
-
-      if (timeLeft <= 0) {
-        setTimeUntilRefresh("0:00");
-        return;
-      }
-
-      const minutes = Math.floor(timeLeft / 60000);
-      const seconds = Math.floor((timeLeft % 60000) / 1000);
-      setTimeUntilRefresh(`${minutes}:${seconds.toString().padStart(2, "0")}`);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [nextRefresh]);
-
   // Loading state
-  if (loading && !isAutoRefreshing) {
+  if (loading) {
     return <MarketLoading />;
   }
 
   // Error state
   if (error) {
-    return <MarketError error={error} onRetry={refetch} />;
+    return <MarketError error={error} onRetry={() => {}} />;
   }
 
   return (
@@ -124,25 +76,6 @@ export default function MarketsPage() {
               <p className="text-gray-400 text-lg">
                 Trade on the outcomes of real-world events with FLOW tokens
               </p>
-
-              {/* Auto-refresh indicator */}
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <RefreshCw
-                    className={`h-3 w-3 ${
-                      isAutoRefreshing ? "animate-spin" : ""
-                    }`}
-                  />
-                  <span>
-                    {isAutoRefreshing
-                      ? "Refreshing..."
-                      : `Next refresh in ${timeUntilRefresh}`}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600">
-                  • Last updated: {lastRefresh.toLocaleTimeString()}
-                </div>
-              </div>
             </div>
 
             {/* Contract Owner Only Create Market Button */}
@@ -387,7 +320,7 @@ export default function MarketsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Enhanced Status Section with Manual Refresh */}
+        {/* Status Section without Auto-refresh */}
         {filteredAndSortedMarkets.length > 0 && (
           <div className="text-center mt-12 pt-8 border-t border-gray-800/50">
             <div className="flex flex-col items-center gap-4">
@@ -396,16 +329,6 @@ export default function MarketsPage() {
                   Showing {filteredAndSortedMarkets.length} of {markets.length}{" "}
                   markets
                 </span>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>Auto-refresh every 5 minutes</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-xs text-gray-500">
-                  Next auto-refresh: {timeUntilRefresh}
-                </div>
               </div>
             </div>
           </div>
