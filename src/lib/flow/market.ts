@@ -2,15 +2,17 @@
 "use client";
 
 import * as fcl from "@onflow/fcl";
-import flowConfig from "@/lib/flow/config"; // Use your existing config
-
-const GET_ALL_MARKETS = `
-import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT || ""}
-
-access(all) fun main(): [FlowWager.Market] {
-    return FlowWager.getAllMarkets()
-}
-`;
+// import * as t from "@onflow/types";
+import flowConfig from "@/lib/flow/config";
+import { 
+  GET_ALL_MARKETS, 
+  GET_MARKET_BY_ID, 
+  GET_ACTIVE_MARKETS, 
+  GET_MARKETS_BY_CATEGORY,
+  GET_PLATFORM_STATS,
+  getAllMarketsScript,
+  getMarketScript 
+} from "@/lib/flow/scripts";
 
 export interface RawMarketData {
   id: string;
@@ -50,11 +52,14 @@ export interface Market {
   totalOptionAShares: string;
   totalOptionBShares: string;
   totalPool: string;
+  // Additional calculated fields
+  totalBets?: number;
+  totalParticipants?: number;
 }
 
 const transformMarketData = (rawMarket: any): Market => {
   // Handle the contract data structure and ensure all fields are properly formatted
-  return {
+  const baseMarket: Market = {
     id: rawMarket.id?.toString() || "0",
     title: rawMarket.title || "",
     description: rawMarket.description || "",
@@ -76,13 +81,22 @@ const transformMarketData = (rawMarket: any): Market => {
     totalOptionBShares: rawMarket.totalOptionBShares?.toString() || "0",
     totalPool: rawMarket.totalPool?.toString() || "0",
   };
+
+  // Add calculated fields
+  const pool = parseFloat(baseMarket.totalPool);
+  const minBet = parseFloat(baseMarket.minBet);
+  const totalShares = parseFloat(baseMarket.totalOptionAShares) + parseFloat(baseMarket.totalOptionBShares);
+
+  baseMarket.totalBets = minBet > 0 ? Math.ceil(pool / minBet) : 0;
+  baseMarket.totalParticipants = Math.max(1, Math.ceil(totalShares / 100));
+
+  return baseMarket;
 };
 
+// Main function - getAllMarkets
 export const getAllMarkets = async (): Promise<Market[]> => {
   try {
-    // Initialize your FCL config
     flowConfig();
-
     console.log("Fetching markets from contract...");
 
     const rawMarkets = await fcl.query({
@@ -97,16 +111,13 @@ export const getAllMarkets = async (): Promise<Market[]> => {
       return [];
     }
 
-    // Transform the raw data to match our interface
     const transformedMarkets = rawMarkets.map(transformMarketData);
-
     console.log("Transformed markets:", transformedMarkets);
 
     return transformedMarkets;
   } catch (error) {
     console.error("Error fetching all markets:", error);
 
-    // More detailed error handling
     if (error instanceof Error) {
       if (error.message.includes("accessNode.api")) {
         throw new Error(
@@ -129,4 +140,178 @@ export const getAllMarkets = async (): Promise<Market[]> => {
   }
 };
 
+// Get single market
+export const getMarket = async (marketId: number): Promise<Market | null> => {
+  try {
+    flowConfig();
+    console.log(`Fetching market ${marketId} from contract...`);
+
+    const rawMarket = await fcl.query({
+      cadence: GET_MARKET_BY_ID,
+      args: (arg, type) => [arg(marketId.toString(), type.UInt64)],
+    });
+
+    if (!rawMarket) {
+      console.warn(`Market ${marketId} not found`);
+      return null;
+    }
+
+    const transformedMarket = transformMarketData(rawMarket);
+    console.log("Transformed market:", transformedMarket);
+
+    return transformedMarket;
+  } catch (error) {
+    console.error(`Error fetching market ${marketId}:`, error);
+    throw error;
+  }
+};
+
+// Get active markets
+export const getActiveMarkets = async (): Promise<Market[]> => {
+  try {
+    flowConfig();
+    console.log("Fetching active markets from contract...");
+
+    const rawMarkets = await fcl.query({
+      cadence: GET_ACTIVE_MARKETS,
+      args: () => [],
+    });
+
+    if (!rawMarkets || !Array.isArray(rawMarkets)) {
+      console.warn("No active markets returned");
+      return [];
+    }
+
+    const transformedMarkets = rawMarkets.map(transformMarketData);
+    console.log("Active markets:", transformedMarkets);
+
+    return transformedMarkets;
+  } catch (error) {
+    console.error("Error fetching active markets:", error);
+    throw error;
+  }
+};
+
+// Get markets by category
+export const getMarketsByCategory = async (category: number): Promise<Market[]> => {
+  try {
+    flowConfig();
+    console.log(`Fetching markets for category ${category}...`);
+
+    const rawMarkets = await fcl.query({
+      cadence: GET_MARKETS_BY_CATEGORY,
+      args: (arg, type) => [arg(category.toString(), type.UInt8)],
+    });
+
+    if (!rawMarkets || !Array.isArray(rawMarkets)) {
+      console.warn(`No markets found for category ${category}`);
+      return [];
+    }
+
+    const transformedMarkets = rawMarkets.map(transformMarketData);
+    console.log(`Category ${category} markets:`, transformedMarkets);
+
+    return transformedMarkets;
+  } catch (error) {
+    console.error(`Error fetching markets for category ${category}:`, error);
+    throw error;
+  }
+};
+
+// Get platform stats
+export const getPlatformStats = async () => {
+  try {
+    flowConfig();
+    console.log("Fetching platform stats...");
+
+    const stats = await fcl.query({
+      cadence: GET_PLATFORM_STATS,
+      args: () => [],
+    });
+
+    console.log("Platform stats:", stats);
+    return stats;
+  } catch (error) {
+    console.error("Error fetching platform stats:", error);
+    
+    // Fallback: calculate from getAllMarkets
+    try {
+      console.log("Falling back to calculate stats from markets...");
+      const allMarkets = await getAllMarkets();
+      const now = Date.now() / 1000;
+
+      const activeMarkets = allMarkets.filter(market => 
+        !market.resolved && parseFloat(market.endTime) > now
+      );
+
+      const totalVolume = allMarkets.reduce((sum, market) => 
+        sum + parseFloat(market.totalPool), 0
+      );
+
+      const totalParticipants = allMarkets.reduce((sum, market) => 
+        sum + (market.totalParticipants || 0), 0
+      );
+
+      return {
+        activeMarkets: activeMarkets.length.toString(),
+        totalVolume: totalVolume.toString(),
+        totalMarkets: allMarkets.length.toString(),
+        totalUsers: totalParticipants.toString(),
+        resolvedMarkets: allMarkets.filter(m => m.resolved).length.toString()
+      };
+    } catch (fallbackError) {
+      console.error("Fallback stats calculation failed:", fallbackError);
+      return {
+        activeMarkets: "0",
+        totalVolume: "0.0",
+        totalMarkets: "0",
+        totalUsers: "0",
+        resolvedMarkets: "0"
+      };
+    }
+  }
+};
+
+// Alternative method using script functions (for compatibility)
+export const getAllMarketsWithScript = async (): Promise<Market[]> => {
+  try {
+    flowConfig();
+    const script = getAllMarketsScript();
+    
+    const rawMarkets = await fcl.query({
+      cadence: script.cadence,
+      args: () => [],
+    });
+
+    if (!rawMarkets || !Array.isArray(rawMarkets)) {
+      return [];
+    }
+
+    return rawMarkets.map(transformMarketData);
+  } catch (error) {
+    console.error("Error with script method:", error);
+    throw error;
+  }
+};
+
+export const getMarketWithScript = async (marketId: number): Promise<Market | null> => {
+  try {
+    flowConfig();
+    const script = getMarketScript(marketId);
+    
+    const rawMarket = await fcl.query({
+      cadence: script.cadence,
+      args: (arg, type) => [arg(marketId.toString(), type.UInt64)],
+    });
+
+    if (!rawMarket) return null;
+
+    return transformMarketData(rawMarket);
+  } catch (error) {
+    console.error(`Error fetching market ${marketId} with script:`, error);
+    throw error;
+  }
+};
+
+// Export the main function as default
 export default getAllMarkets;

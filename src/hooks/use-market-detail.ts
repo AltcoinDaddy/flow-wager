@@ -1,46 +1,46 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
-import * as fcl from '@onflow/fcl';
-import { Market, MarketOutcome } from '@/types/market';
-import { 
-  GET_MARKET_BY_ID,
-  GET_MARKET_TRADES, 
-  GET_USER_POSITIONS,
-  GET_MARKET_COMMENTS,
-  GET_MARKET_PRICE_HISTORY 
-} from '@/lib/flow/scripts';
+import { Market } from '@/lib/flow/market';
+import { getMarket } from '@/lib/flow/market';
+import { getMarketTrades, getUserPosition, getMarketComments, getMarketPriceHistory } from '@/lib/flow/trading-queries';
 
-interface Trade {
+export interface Trade {
   id: string;
+  marketId: number;
   user: string;
   option: number;
   amount: string;
+  shares: string;
   price: string;
   timestamp: string;
 }
 
-interface Comment {
+export interface Comment {
   id: string;
+  marketId: number;
   user: string;
   content: string;
   timestamp: string;
   likes: number;
 }
 
-interface PricePoint {
+export interface PricePoint {
   timestamp: string;
   optionAPrice: string;
   optionBPrice: string;
   volume: string;
 }
 
-interface UserPosition {
+export interface UserPosition {
+  marketId: number;
   optionAShares: string;
   optionBShares: string;
   totalInvested: string;
+  currentValue: string;
+  profitLoss: string;
 }
 
-export function useMarketDetail(marketId: string, userAddress?: string) {
+export const useMarketDetail = (marketId: string, userAddress?: string) => {
   const [market, setMarket] = useState<Market | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -50,139 +50,85 @@ export function useMarketDetail(marketId: string, userAddress?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchMarketData = useCallback(async () => {
+    if (!marketId) return;
+
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch market details
-      const marketData = await fcl.query({
-        cadence: GET_MARKET_BY_ID,
-        args: (arg, t) => [arg(marketId, t.UInt64)]
-      });
+      console.log(`Fetching market ${marketId} details...`);
 
+      // Fetch market data from Flow contract
+      const marketData = await getMarket(parseInt(marketId));
       if (!marketData) {
-        throw new Error('Market not found');
+        setError('Market not found');
+        return;
       }
 
-      // Transform market data
-      const transformedMarket: Market = {
-        id: marketData.id.toString(),
-        title: marketData.title,
-        description: marketData.description,
-        category: parseInt(marketData.category.rawValue),
-        optionA: marketData.optionA,
-        optionB: marketData.optionB,
-        creator: marketData.creator,
-        createdAt: marketData.createdAt.toString(),
-        endTime: marketData.endTime.toString(),
-        minBet: marketData.minBet.toString(),
-        maxBet: marketData.maxBet.toString(),
-        status: parseInt(marketData.status.rawValue),
-        outcome: marketData.outcome ? parseInt(marketData.outcome.rawValue) as MarketOutcome : null,
-        resolved: marketData.resolved,
-        totalOptionAShares: marketData.totalOptionAShares.toString(),
-        totalOptionBShares: marketData.totalOptionBShares.toString(),
-        totalPool: marketData.totalPool.toString()
-      };
+      console.log('Market data fetched:', marketData);
+      setMarket(marketData);
 
-      setMarket(transformedMarket);
+      // Fetch additional data in parallel with error handling
+      const fetchPromises = [
+        getMarketTrades(parseInt(marketId), 50)
+          .then(trades => trades || [])
+          .catch(err => {
+            console.log('Trades fetch failed, using empty array:', err);
+            return [];
+          }),
+        
+        getMarketComments(parseInt(marketId))
+          .then(comments => comments || [])
+          .catch(err => {
+            console.log('Comments fetch failed, using empty array:', err);
+            return [];
+          }),
+        
+        getMarketPriceHistory(parseInt(marketId), 24)
+          .then(history => history || [])
+          .catch(err => {
+            console.log('Price history fetch failed, using empty array:', err);
+            return [];
+          })
+      ];
 
-      // Fetch trades
-      const tradesData = await fcl.query({
-        cadence: GET_MARKET_TRADES,
-        args: (arg, t) => [arg(marketId, t.UInt64), arg(50, t.UInt64)]
-      });
-
-      const transformedTrades: Trade[] = tradesData.map((trade: any) => ({
-        id: trade.id.toString(),
-        user: trade.user,
-        option: parseInt(trade.option),
-        amount: trade.amount.toString(),
-        price: trade.price.toString(),
-        timestamp: trade.timestamp.toString()
-      }));
-
-      setTrades(transformedTrades);
-
-      // Fetch comments if available
-      try {
-        const commentsData = await fcl.query({
-          cadence: GET_MARKET_COMMENTS,
-          args: (arg, t) => [arg(marketId, t.UInt64)]
-        });
-
-        const transformedComments: Comment[] = commentsData.map((comment: any) => ({
-          id: comment.id.toString(),
-          user: comment.user,
-          content: comment.content,
-          timestamp: comment.timestamp.toString(),
-          likes: parseInt(comment.likes.toString())
-        }));
-
-        setComments(transformedComments);
-      } catch {
-        console.warn('Comments not available for this market');
-        setComments([]);
-      }
-
-      // Fetch price history
-      try {
-        const priceData = await fcl.query({
-          cadence: GET_MARKET_PRICE_HISTORY,
-          args: (arg, t) => [arg(marketId, t.UInt64), arg(7, t.UInt64)] // 7 days
-        });
-
-        const transformedPriceHistory: PricePoint[] = priceData.map((point: any) => ({
-          timestamp: point.timestamp.toString(),
-          optionAPrice: point.optionAPrice.toString(),
-          optionBPrice: point.optionBPrice.toString(),
-          volume: point.volume.toString()
-        }));
-
-        setPriceHistory(transformedPriceHistory);
-      } catch {
-        console.warn('Price history not available for this market');
-        setPriceHistory([]);
-      }
-
-      // Fetch user position if user is logged in
+      // Add user position fetch if address is provided
       if (userAddress) {
-        try {
-          const positionData = await fcl.query({
-            cadence: GET_USER_POSITIONS,
-            args: (arg, t) => [arg(userAddress, t.Address), arg(marketId, t.UInt64)]
-          });
-
-          if (positionData) {
-            setUserPosition({
-              optionAShares: positionData.optionAShares.toString(),
-              optionBShares: positionData.optionBShares.toString(),
-              totalInvested: positionData.totalInvested.toString()
-            });
-          } else {
-            setUserPosition(null);
-          }
-        } catch {
-          console.warn('Could not fetch user position');
-          setUserPosition(null);
-        }
+        fetchPromises.push(
+          getUserPosition(userAddress, parseInt(marketId))
+            .then(position => position || null)
+            .catch(err => {
+              console.log('User position fetch failed:', err);
+              return null;
+            })
+        );
       }
 
-    } catch (err) {
-      console.error('Error fetching market data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+      const results = await Promise.all(fetchPromises);
+
+      setTrades(results[0]);
+      setComments(results[1]);
+      setPriceHistory(results[2]);
+      
+      if (userAddress && results[3]) {
+        setUserPosition(results[3]);
+      }
+
+      console.log('All market data loaded successfully');
+    } catch (err: any) {
+      console.error('Failed to fetch market details:', err);
+      setError(err.message || 'Failed to fetch market details');
     } finally {
       setLoading(false);
     }
   }, [marketId, userAddress]);
 
   useEffect(() => {
-    if (marketId) {
-      fetchMarketData();
-    }
-  }, [marketId, userAddress, fetchMarketData]);
+    fetchMarketData();
+  }, [fetchMarketData]);
 
   const refreshMarketData = useCallback(() => {
+    console.log('Refreshing market data...');
     fetchMarketData();
   }, [fetchMarketData]);
 
@@ -194,6 +140,6 @@ export function useMarketDetail(marketId: string, userAddress?: string) {
     userPosition,
     loading,
     error,
-    refreshMarketData
+    refreshMarketData,
   };
-}
+};

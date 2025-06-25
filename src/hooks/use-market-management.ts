@@ -217,7 +217,7 @@ export function useMarketManagement() {
     fetchMarkets();
     
     // Refresh data every 30 seconds
-    const interval = setInterval(fetchMarkets, 30000);
+    const interval = setInterval(fetchMarkets, 50000000);
     
     return () => clearInterval(interval);
   }, []);

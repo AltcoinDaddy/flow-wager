@@ -1,18 +1,27 @@
 "use client";
 
-import React from 'react';
-import { Search, Filter, TrendingUp, Clock, DollarSign, Users, Plus } from 'lucide-react';
-import { MarketCard } from '@/components/market/market-card';
-import { MarketFilters } from '@/components/market/market-filters';
-import { MarketLoading } from '@/components/market/market-loading';
-import { MarketError } from '@/components/market/market-error';
-import { OwnerOnly } from '@/components/auth/owner-only';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useMarketManagement } from '@/hooks/use-market-management';
-import Link from 'next/link';
+import { OwnerOnly } from "@/components/auth/owner-only";
+import { MarketCard } from "@/components/market/market-card";
+import { MarketError } from "@/components/market/market-error";
+import { MarketFilters } from "@/components/market/market-filters";
+import { MarketLoading } from "@/components/market/market-loading";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMarketManagement } from "@/hooks/use-market-management";
+import {
+  Clock,
+  DollarSign,
+  Filter,
+  Plus,
+  RefreshCw,
+  Search,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export default function MarketsPage() {
   const {
@@ -24,7 +33,7 @@ export default function MarketsPage() {
     platformStats,
     loading,
     error,
-    
+
     // Filter states
     searchQuery,
     activeTab,
@@ -32,7 +41,7 @@ export default function MarketsPage() {
     sortBy,
     selectedCategory,
     selectedStatus,
-    
+
     // Filter setters
     setSearchQuery,
     setActiveTab,
@@ -40,14 +49,60 @@ export default function MarketsPage() {
     setSortBy,
     handleCategoryChange,
     handleStatusChange,
-    
+
     // Actions
     refetch,
-    handleResetFilters
+    handleResetFilters,
   } = useMarketManagement();
 
+  // Auto-refresh state
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [nextRefresh, setNextRefresh] = useState<Date>(
+    new Date(Date.now() + 5 * 60 * 1000)
+  );
+  const [timeUntilRefresh, setTimeUntilRefresh] = useState<string>("5:00");
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+
+  // Auto-refresh every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      console.log("Auto-refreshing markets...");
+      setIsAutoRefreshing(true);
+      try {
+        await refetch();
+        setLastRefresh(new Date());
+        setNextRefresh(new Date(Date.now() + 5 * 60 * 1000));
+      } catch (error) {
+        console.error("Auto-refresh failed:", error);
+      } finally {
+        setIsAutoRefreshing(false);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [refetch]);
+
+  // Update countdown timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const timeLeft = nextRefresh.getTime() - now.getTime();
+
+      if (timeLeft <= 0) {
+        setTimeUntilRefresh("0:00");
+        return;
+      }
+
+      const minutes = Math.floor(timeLeft / 60000);
+      const seconds = Math.floor((timeLeft % 60000) / 1000);
+      setTimeUntilRefresh(`${minutes}:${seconds.toString().padStart(2, "0")}`);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [nextRefresh]);
+
   // Loading state
-  if (loading) {
+  if (loading && !isAutoRefreshing) {
     return <MarketLoading />;
   }
 
@@ -69,15 +124,34 @@ export default function MarketsPage() {
               <p className="text-gray-400 text-lg">
                 Trade on the outcomes of real-world events with FLOW tokens
               </p>
+
+              {/* Auto-refresh indicator */}
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <RefreshCw
+                    className={`h-3 w-3 ${
+                      isAutoRefreshing ? "animate-spin" : ""
+                    }`}
+                  />
+                  <span>
+                    {isAutoRefreshing
+                      ? "Refreshing..."
+                      : `Next refresh in ${timeUntilRefresh}`}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600">
+                  • Last updated: {lastRefresh.toLocaleTimeString()}
+                </div>
+              </div>
             </div>
-            
+
             {/* Contract Owner Only Create Market Button */}
             <OwnerOnly
               fallback={
                 <div className="text-center">
-                  <Button 
-                    disabled 
-                    variant="outline" 
+                  <Button
+                    disabled
+                    variant="outline"
                     className="text-gray-500 border-gray-700 bg-[#1A1F2C] hover:bg-[#1A1F2C]"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -89,8 +163,8 @@ export default function MarketsPage() {
                 </div>
               }
             >
-              <Button 
-                asChild 
+              <Button
+                asChild
                 className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg border-0"
               >
                 <Link href="/markets/create">
@@ -108,14 +182,14 @@ export default function MarketsPage() {
                 <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
                   <TrendingUp className="h-5 w-5 text-[#9b87f5]" />
                 </div>
-                <span className="text-sm font-medium text-gray-400">Active Markets</span>
+                <span className="text-sm font-medium text-gray-400">
+                  Active Markets
+                </span>
               </div>
               <p className="text-3xl font-bold text-white">
                 {platformStats?.activeMarkets || marketStats.active}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                From smart contract
-              </p>
+              <p className="text-xs text-gray-500 mt-1">From smart contract</p>
             </div>
 
             <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
@@ -123,13 +197,14 @@ export default function MarketsPage() {
                 <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
                   <DollarSign className="h-5 w-5 text-[#9b87f5]" />
                 </div>
-                <span className="text-sm font-medium text-gray-400">Total Volume</span>
+                <span className="text-sm font-medium text-gray-400">
+                  Total Volume
+                </span>
               </div>
               <p className="text-3xl font-bold text-white">
-                {platformStats ? 
-                  `${parseFloat(platformStats.totalVolume).toFixed(0)} FLOW` : 
-                  `${marketStats.totalVolume.toFixed(0)} FLOW`
-                }
+                {platformStats
+                  ? `${parseFloat(platformStats.totalVolume).toFixed(0)} FLOW`
+                  : `${marketStats.totalVolume.toFixed(0)} FLOW`}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 All-time trading volume
@@ -141,14 +216,14 @@ export default function MarketsPage() {
                 <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
                   <Users className="h-5 w-5 text-[#9b87f5]" />
                 </div>
-                <span className="text-sm font-medium text-gray-400">Total Users</span>
+                <span className="text-sm font-medium text-gray-400">
+                  Total Users
+                </span>
               </div>
               <p className="text-3xl font-bold text-white">
                 {platformStats?.totalUsers || "0"}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Registered traders
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Registered traders</p>
             </div>
 
             <div className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] rounded-xl p-6 border border-gray-800/50 shadow-xl backdrop-blur-sm">
@@ -156,12 +231,14 @@ export default function MarketsPage() {
                 <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
                   <Clock className="h-5 w-5 text-[#9b87f5]" />
                 </div>
-                <span className="text-sm font-medium text-gray-400">Ending Soon</span>
+                <span className="text-sm font-medium text-gray-400">
+                  Ending Soon
+                </span>
               </div>
-              <p className="text-3xl font-bold text-white">{marketStats.endingSoon}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Next 24 hours
+              <p className="text-3xl font-bold text-white">
+                {marketStats.endingSoon}
               </p>
+              <p className="text-xs text-gray-500 mt-1">Next 24 hours</p>
             </div>
           </div>
 
@@ -177,12 +254,12 @@ export default function MarketsPage() {
               />
             </div>
             <div className="flex gap-3">
-              <Button 
+              <Button
                 variant={showFilters ? "default" : "outline"}
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-2 h-12 px-6 rounded-xl font-medium transition-all ${
-                  showFilters 
-                    ? "bg-[#9b87f5] text-white hover:bg-[#8b5cf6] shadow-lg" 
+                  showFilters
+                    ? "bg-[#9b87f5] text-white hover:bg-[#8b5cf6] shadow-lg"
                     : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
                 }`}
               >
@@ -191,7 +268,11 @@ export default function MarketsPage() {
               </Button>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'newest' | 'ending' | 'volume' | 'popular')}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as "newest" | "ending" | "volume" | "popular"
+                  )
+                }
                 className="h-12 px-4 border border-gray-700 rounded-xl bg-[#1A1F2C] text-white text-sm focus:outline-none focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
               >
                 <option value="newest">Newest First</option>
@@ -211,8 +292,8 @@ export default function MarketsPage() {
                 onCategoryChange={handleCategoryChange}
                 onStatusChange={handleStatusChange}
                 onReset={() => {
-                  handleCategoryChange('all');
-                  handleStatusChange('all');
+                  handleCategoryChange("all");
+                  handleStatusChange("all");
                 }}
               />
             </div>
@@ -223,21 +304,33 @@ export default function MarketsPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto">
             {[
-              { value: 'all', label: 'All Markets', count: marketCounts.all },
-              { value: 'active', label: 'Active', count: marketCounts.active },
-              { value: 'ending', label: 'Ending Soon', count: marketCounts.ending },
-              { value: 'resolved', label: 'Resolved', count: marketCounts.resolved },
-              { value: 'trending', label: 'Trending', count: marketCounts.trending }
+              { value: "all", label: "All Markets", count: marketCounts.all },
+              { value: "active", label: "Active", count: marketCounts.active },
+              {
+                value: "ending",
+                label: "Ending Soon",
+                count: marketCounts.ending,
+              },
+              {
+                value: "resolved",
+                label: "Resolved",
+                count: marketCounts.resolved,
+              },
+              {
+                value: "trending",
+                label: "Trending",
+                count: marketCounts.trending,
+              },
             ].map((tab) => (
-              <TabsTrigger 
+              <TabsTrigger
                 key={tab.value}
-                value={tab.value} 
+                value={tab.value}
                 className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 px-4 font-medium"
               >
                 <div className="flex items-center gap-2">
                   <span>{tab.label}</span>
-                  <Badge 
-                    variant="secondary" 
+                  <Badge
+                    variant="secondary"
                     className="bg-gray-700/50 text-gray-300 border-0 text-xs px-2 py-0.5"
                   >
                     {tab.count}
@@ -257,15 +350,14 @@ export default function MarketsPage() {
                   No markets found
                 </h3>
                 <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                  {markets.length === 0 
+                  {markets.length === 0
                     ? "No markets have been created yet"
-                    : "Try adjusting your filters or search query to find what you're looking for."
-                  }
+                    : "Try adjusting your filters or search query to find what you're looking for."}
                 </p>
                 {markets.length === 0 && (
                   <OwnerOnly showFallback={false}>
-                    <Button 
-                      asChild 
+                    <Button
+                      asChild
                       className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg"
                     >
                       <Link href="/markets/create">
@@ -276,7 +368,7 @@ export default function MarketsPage() {
                   </OwnerOnly>
                 )}
                 {markets.length > 0 && (
-                  <Button 
+                  <Button
                     onClick={handleResetFilters}
                     variant="outline"
                     className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
@@ -295,21 +387,26 @@ export default function MarketsPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Enhanced Refresh Section */}
+        {/* Enhanced Status Section with Manual Refresh */}
         {filteredAndSortedMarkets.length > 0 && (
           <div className="text-center mt-12 pt-8 border-t border-gray-800/50">
             <div className="flex flex-col items-center gap-4">
-              <p className="text-gray-400 text-sm">
-                Showing {filteredAndSortedMarkets.length} of {markets.length} markets
-              </p>
-              <Button 
-                variant="outline" 
-                onClick={refetch}
-                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 px-6 py-2"
-                disabled={loading}
-              >
-                {loading ? "Refreshing..." : "Refresh Markets"}
-              </Button>
+              <div className="flex items-center gap-6 text-sm text-gray-400">
+                <span>
+                  Showing {filteredAndSortedMarkets.length} of {markets.length}{" "}
+                  markets
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span>Auto-refresh every 5 minutes</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="text-xs text-gray-500">
+                  Next auto-refresh: {timeUntilRefresh}
+                </div>
+              </div>
             </div>
           </div>
         )}
