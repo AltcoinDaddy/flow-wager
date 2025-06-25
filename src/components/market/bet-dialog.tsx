@@ -91,59 +91,50 @@ export function BetDialog({
       setError(null);
       flowConfig();
 
-      const transactionId = await fcl.mutate({
-        cadence: `
-          import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
-          import FungibleToken from 0xf233dcee88fe0abe
-          import FlowToken from 0x1654653399040a61
+      const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;  
+  const transactionId = await fcl.mutate({
+      cadence: `
+        import FlowWager from ${CONTRACT_ADDRESS}
+        import FungibleToken from 0xf233dcee88fe0abe
+        import FlowToken from 0x1654653399040a61
 
-          transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
-            let flowVault: @FungibleToken.Vault
-            let bettor: &FlowWager.Bettor
-
-            prepare(signer: AuthAccount) {
-              let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-                ?? panic("Could not borrow reference to the owner's Vault!")
-              
-              if vaultRef.balance < amount {
-                panic("Insufficient balance. Required: ".concat(amount.toString()).concat(", Available: ").concat(vaultRef.balance.toString()))
-              }
-              
-              self.flowVault <- vaultRef.withdraw(amount: amount)
-
-              if signer.borrow<&FlowWager.Bettor>(from: /storage/FlowWagerBettor) == nil {
-                signer.save(<-FlowWager.createBettor(), to: /storage/FlowWagerBettor)
-                signer.link<&FlowWager.Bettor{FlowWager.BettorPublic}>(
-                  /public/FlowWagerBettor,
-                  target: /storage/FlowWagerBettor
-                )
-              }
-
-              self.bettor = signer.borrow<&FlowWager.Bettor>(from: /storage/FlowWagerBettor)!
-            }
-
-            execute {
-              FlowWager.placeBet(
-                marketId: marketId,
-                option: option,
-                payment: <-self.flowVault,
-                bettor: self.bettor
-              )
+        transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
+          prepare(signer: auth(Storage, Capabilities) &Account) {
+            // Check balance
+            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+              ?? panic("Could not borrow FlowToken vault")
+            
+            if vaultRef.balance < amount {
+              panic("Insufficient balance")
             }
           }
-        `,
-        args: (arg, t) => [
-          arg(market.id, t.UInt64),
-          arg((side === "optionA" ? 0 : 1).toString(), t.UInt8),
-          arg(Number(amount).toFixed(8), t.UFix64), // <-- always 8 decimals
-        ],
-        payer: fcl.authz,
-        proposer: fcl.authz,
-        authorizations: [fcl.authz],
-        limit: 9999,
-      });
+
+          execute {
+            // Call the buyShares function from your contract
+            FlowWager.buyShares(
+              marketId: marketId,
+              option: option,
+              amount: amount
+            )
+          }
+        }
+      `,
+      args: (arg, t) => [
+        arg(market.id, t.UInt64),
+        arg(side === "optionA" ? 0 : 1, t.UInt8),
+        arg(betAmount.toFixed(8), t.UFix64),
+      ],
+      payer: fcl.authz,
+      proposer: fcl.authz,
+      authorizations: [fcl.authz],
+      limit: 9999,
+    });
+
 
       const transaction = await fcl.tx(transactionId).onceSealed();
+
+      console.log("Transaction result:", transaction);
+
 
       if (transaction.status === 4) {
         onBetSuccess?.();
@@ -172,6 +163,8 @@ export function BetDialog({
         }
       }
       setError(errorMessage);
+
+      console.log("Betting error:", error);
     } finally {
       setIsLoading(false);
     }
