@@ -38,6 +38,7 @@ const pendingMarkets: Market[] = [
 // Category mapping
 const CATEGORIES = {
   1: "Sports",
+  
   2: "Politics", 
   3: "Economics",
   4: "Entertainment",

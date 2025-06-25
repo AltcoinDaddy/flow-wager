@@ -311,7 +311,7 @@ export default function HomePage() {
                     e.currentTarget.style.backgroundColor = "#9b87f5";
                   }}
                 >
-                  <Link href="/markets/create">Create First Market</Link>
+                  <Link href="/admin/create">Create First Market</Link>
                 </Button>
               </OwnerOnly>
             </div>
