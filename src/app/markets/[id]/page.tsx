@@ -50,7 +50,9 @@ export default function MarketDetailPage() {
   } = useMarketDetail(marketId, user?.addr || "");
 
   const [betDialogOpen, setBetDialogOpen] = useState(false);
-  const [selectedSide, setSelectedSide] = useState<"optionA" | "optionB">("optionA");
+  const [selectedSide, setSelectedSide] = useState<"optionA" | "optionB">(
+    "optionA"
+  );
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -58,7 +60,7 @@ export default function MarketDetailPage() {
   useEffect(() => {
     if (!loading && market) {
       const interval = setInterval(() => {
-        console.log('Auto-refreshing market data...');
+        console.log("Auto-refreshing market data...");
         refreshMarketData();
       }, 5000000);
 
@@ -110,11 +112,11 @@ export default function MarketDetailPage() {
   };
 
   const getCategoryName = (category: number) => {
-    return Object.keys(MarketCategory)[category] || "Other";
+    return Object.values(MarketCategory)[category] || "Other";
   };
 
   const getStatusName = (status: number) => {
-    return Object.keys(MarketStatus)[status] || "Unknown";
+    return Object.values(MarketStatus)[status] || "Unknown";
   };
 
   const handleBet = (side: "optionA" | "optionB") => {
@@ -152,6 +154,8 @@ export default function MarketDetailPage() {
     await refreshMarketData();
   };
 
+  console.log("Market Data:", market);
+
   return (
     <div className="min-h-screen bg-[#0A0C14]">
       {/* Live Data Indicator */}
@@ -167,7 +171,10 @@ export default function MarketDetailPage() {
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Enhanced Breadcrumb */}
         <div className="flex items-center space-x-2 text-sm text-gray-400">
-          <Link href="/markets" className="hover:text-[#9b87f5] transition-colors">
+          <Link
+            href="/markets"
+            className="hover:text-[#9b87f5] transition-colors"
+          >
             Markets
           </Link>
           <span>/</span>
@@ -219,7 +226,9 @@ export default function MarketDetailPage() {
                   className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all"
                 >
                   <Bookmark
-                    className={`h-4 w-4 ${isBookmarked ? "fill-current text-[#9b87f5]" : ""}`}
+                    className={`h-4 w-4 ${
+                      isBookmarked ? "fill-current text-[#9b87f5]" : ""
+                    }`}
                   />
                 </Button>
                 <Button
@@ -344,7 +353,9 @@ export default function MarketDetailPage() {
                         <div className="text-white font-bold text-lg">
                           {formatCurrency(userPosition.totalInvested)} FLOW
                         </div>
-                        <div className="text-gray-500 text-xs">Total invested</div>
+                        <div className="text-gray-500 text-xs">
+                          Total invested
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -386,19 +397,25 @@ export default function MarketDetailPage() {
                     <div className="text-xl font-bold text-white">
                       {formatCurrency(market.totalPool)}
                     </div>
-                    <div className="text-xs text-gray-400 font-medium">Volume</div>
+                    <div className="text-xs text-gray-400 font-medium">
+                      Volume
+                    </div>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-gray-800/20">
                     <div className="text-xl font-bold text-white">
                       {formatCurrency(totalShares)}
                     </div>
-                    <div className="text-xs text-gray-400 font-medium">Shares</div>
+                    <div className="text-xs text-gray-400 font-medium">
+                      Shares
+                    </div>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-gray-800/20">
                     <div className="text-xl font-bold text-white">
                       {trades.length}
                     </div>
-                    <div className="text-xs text-gray-400 font-medium">Trades</div>
+                    <div className="text-xs text-gray-400 font-medium">
+                      Trades
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -538,7 +555,8 @@ export default function MarketDetailPage() {
                         <div className="text-center">
                           <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
                           <p className="text-lg font-medium mb-2">
-                            Price chart data: {priceHistory.length} points available
+                            Price chart data: {priceHistory.length} points
+                            available
                           </p>
                           <p className="text-sm">
                             Chart visualization coming soon
@@ -658,8 +676,10 @@ export default function MarketDetailPage() {
               disabled={isRefreshing}
               className="w-full h-12 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all font-medium"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Refreshing...' : 'Refresh Data'}
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              {isRefreshing ? "Refreshing..." : "Refresh Data"}
             </Button>
           </div>
         </div>

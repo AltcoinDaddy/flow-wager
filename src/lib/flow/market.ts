@@ -4,14 +4,14 @@
 import * as fcl from "@onflow/fcl";
 // import * as t from "@onflow/types";
 import flowConfig from "@/lib/flow/config";
-import { 
-  GET_ALL_MARKETS, 
-  GET_MARKET_BY_ID, 
-  GET_ACTIVE_MARKETS, 
+import {
+  GET_ALL_MARKETS,
+  GET_MARKET_BY_ID,
+  GET_ACTIVE_MARKETS,
   GET_MARKETS_BY_CATEGORY,
   GET_PLATFORM_STATS,
   getAllMarketsScript,
-  getMarketScript 
+  getMarketScript,
 } from "@/lib/flow/scripts";
 
 export interface RawMarketData {
@@ -57,13 +57,23 @@ export interface Market {
   totalParticipants?: number;
 }
 
+
+ const safeParseInt = (value: any, defaultValue: number = 0): number => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    
+    const parsed = parseInt(value.toString(), 10);
+    return isNaN(parsed) ? defaultValue : parsed;
+  };
+
 const transformMarketData = (rawMarket: any): Market => {
   // Handle the contract data structure and ensure all fields are properly formatted
   const baseMarket: Market = {
     id: rawMarket.id?.toString() || "0",
     title: rawMarket.title || "",
     description: rawMarket.description || "",
-    category: parseInt(rawMarket.category?.toString() || "0"),
+    category: safeParseInt(rawMarket.category, 0),
     optionA: rawMarket.optionA || "",
     optionB: rawMarket.optionB || "",
     creator: rawMarket.creator || "",
@@ -71,10 +81,10 @@ const transformMarketData = (rawMarket: any): Market => {
     endTime: rawMarket.endTime?.toString() || "0",
     minBet: rawMarket.minBet?.toString() || "0",
     maxBet: rawMarket.maxBet?.toString() || "0",
-    status: parseInt(rawMarket.status?.toString() || "0"),
+    status: safeParseInt(rawMarket.status, 0),
     outcome:
       rawMarket.outcome !== null && rawMarket.outcome !== undefined
-        ? parseInt(rawMarket.outcome.toString())
+        ? safeParseInt(rawMarket.outcome)
         : null,
     resolved: Boolean(rawMarket.resolved),
     totalOptionAShares: rawMarket.totalOptionAShares?.toString() || "0",
@@ -85,7 +95,9 @@ const transformMarketData = (rawMarket: any): Market => {
   // Add calculated fields
   const pool = parseFloat(baseMarket.totalPool);
   const minBet = parseFloat(baseMarket.minBet);
-  const totalShares = parseFloat(baseMarket.totalOptionAShares) + parseFloat(baseMarket.totalOptionBShares);
+  const totalShares =
+    parseFloat(baseMarket.totalOptionAShares) +
+    parseFloat(baseMarket.totalOptionBShares);
 
   baseMarket.totalBets = minBet > 0 ? Math.ceil(pool / minBet) : 0;
   baseMarket.totalParticipants = Math.max(1, Math.ceil(totalShares / 100));
@@ -193,7 +205,9 @@ export const getActiveMarkets = async (): Promise<Market[]> => {
 };
 
 // Get markets by category
-export const getMarketsByCategory = async (category: number): Promise<Market[]> => {
+export const getMarketsByCategory = async (
+  category: number
+): Promise<Market[]> => {
   try {
     flowConfig();
     console.log(`Fetching markets for category ${category}...`);
@@ -233,23 +247,25 @@ export const getPlatformStats = async () => {
     return stats;
   } catch (error) {
     console.error("Error fetching platform stats:", error);
-    
+
     // Fallback: calculate from getAllMarkets
     try {
       console.log("Falling back to calculate stats from markets...");
       const allMarkets = await getAllMarkets();
       const now = Date.now() / 1000;
 
-      const activeMarkets = allMarkets.filter(market => 
-        !market.resolved && parseFloat(market.endTime) > now
+      const activeMarkets = allMarkets.filter(
+        (market) => !market.resolved && parseFloat(market.endTime) > now
       );
 
-      const totalVolume = allMarkets.reduce((sum, market) => 
-        sum + parseFloat(market.totalPool), 0
+      const totalVolume = allMarkets.reduce(
+        (sum, market) => sum + parseFloat(market.totalPool),
+        0
       );
 
-      const totalParticipants = allMarkets.reduce((sum, market) => 
-        sum + (market.totalParticipants || 0), 0
+      const totalParticipants = allMarkets.reduce(
+        (sum, market) => sum + (market.totalParticipants || 0),
+        0
       );
 
       return {
@@ -257,7 +273,7 @@ export const getPlatformStats = async () => {
         totalVolume: totalVolume.toString(),
         totalMarkets: allMarkets.length.toString(),
         totalUsers: totalParticipants.toString(),
-        resolvedMarkets: allMarkets.filter(m => m.resolved).length.toString()
+        resolvedMarkets: allMarkets.filter((m) => m.resolved).length.toString(),
       };
     } catch (fallbackError) {
       console.error("Fallback stats calculation failed:", fallbackError);
@@ -266,7 +282,7 @@ export const getPlatformStats = async () => {
         totalVolume: "0.0",
         totalMarkets: "0",
         totalUsers: "0",
-        resolvedMarkets: "0"
+        resolvedMarkets: "0",
       };
     }
   }
@@ -277,7 +293,7 @@ export const getAllMarketsWithScript = async (): Promise<Market[]> => {
   try {
     flowConfig();
     const script = getAllMarketsScript();
-    
+
     const rawMarkets = await fcl.query({
       cadence: script.cadence,
       args: () => [],
@@ -294,11 +310,13 @@ export const getAllMarketsWithScript = async (): Promise<Market[]> => {
   }
 };
 
-export const getMarketWithScript = async (marketId: number): Promise<Market | null> => {
+export const getMarketWithScript = async (
+  marketId: number
+): Promise<Market | null> => {
   try {
     flowConfig();
     const script = getMarketScript(marketId);
-    
+
     const rawMarket = await fcl.query({
       cadence: script.cadence,
       args: (arg, type) => [arg(marketId.toString(), type.UInt64)],

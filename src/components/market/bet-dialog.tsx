@@ -1,8 +1,5 @@
- 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
-// src/components/market/bet-dialog.tsx
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,15 +18,15 @@ import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
 import type { Market } from "@/types/market";
 import * as fcl from "@onflow/fcl";
-import { 
-  ArrowUpRight, 
-  Calculator, 
-  Coins, 
-  DollarSign, 
-  Loader2, 
+import {
+  ArrowUpRight,
+  Calculator,
+  Coins,
+  DollarSign,
+  Loader2,
   TrendingUp,
   Wallet,
-  Zap
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -41,24 +38,35 @@ interface BetDialogProps {
   onBetSuccess?: () => void;
 }
 
-export function BetDialog({ open, onOpenChange, market, initialSide = "optionA", onBetSuccess }: BetDialogProps) {
-  const { user } = useAuth();
+export function BetDialog({
+  open,
+  onOpenChange,
+  market,
+  initialSide = "optionA",
+  onBetSuccess,
+}: BetDialogProps) {
+  const { user, balance } = useAuth();
   const [side, setSide] = useState<"optionA" | "optionB">(initialSide);
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Calculate market percentages and prices
-  const totalShares = parseFloat(market.totalOptionAShares) + parseFloat(market.totalOptionBShares);
-  const optionAPercentage = totalShares > 0 ? (parseFloat(market.totalOptionAShares) / totalShares) * 100 : 50;
+  const totalShares =
+    parseFloat(market.totalOptionAShares) +
+    parseFloat(market.totalOptionBShares);
+  const optionAPercentage =
+    totalShares > 0
+      ? (parseFloat(market.totalOptionAShares) / totalShares) * 100
+      : 50;
   const optionBPercentage = 100 - optionAPercentage;
-  
+
   // Simple price calculation (can be made more sophisticated)
   const optionAPrice = optionAPercentage / 100;
   const optionBPrice = optionBPercentage / 100;
-  
+
   const currentPrice = side === "optionA" ? optionAPrice : optionBPrice;
-  const shares = amount ? (parseFloat(amount) / currentPrice) : 0;
+  const shares = amount ? parseFloat(amount) / currentPrice : 0;
   const maxPayout = shares * 1; // Each share pays 1 FLOW if correct
   const potentialProfit = maxPayout - (parseFloat(amount) || 0);
 
@@ -69,14 +77,20 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
   const handleBet = async () => {
     if (!user || !amount) return;
 
+    const betAmount = parseFloat(amount);
+    const userBalanceNum = parseFloat(balance || "0");
+
+    // Validate sufficient balance
+    if (betAmount > userBalanceNum) {
+      setError(`Insufficient balance. You have ${balance} FLOW`);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
       flowConfig();
 
-      console.log('Placing bet:', { marketId: market.id, side, amount });
-
-      // Create the transaction
       const transactionId = await fcl.mutate({
         cadence: `
           import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
@@ -88,13 +102,15 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
             let bettor: &FlowWager.Bettor
 
             prepare(signer: AuthAccount) {
-              // Get Flow tokens from the signer's vault
               let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("Could not borrow reference to the owner's Vault!")
               
+              if vaultRef.balance < amount {
+                panic("Insufficient balance. Required: ".concat(amount.toString()).concat(", Available: ").concat(vaultRef.balance.toString()))
+              }
+              
               self.flowVault <- vaultRef.withdraw(amount: amount)
 
-              // Get or create bettor resource
               if signer.borrow<&FlowWager.Bettor>(from: /storage/FlowWagerBettor) == nil {
                 signer.save(<-FlowWager.createBettor(), to: /storage/FlowWagerBettor)
                 signer.link<&FlowWager.Bettor{FlowWager.BettorPublic}>(
@@ -119,31 +135,43 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
         args: (arg, t) => [
           arg(market.id, t.UInt64),
           arg((side === "optionA" ? 0 : 1).toString(), t.UInt8),
-          arg(amount, t.UFix64)
+          arg(Number(amount).toFixed(8), t.UFix64), // <-- always 8 decimals
         ],
         payer: fcl.authz,
         proposer: fcl.authz,
         authorizations: [fcl.authz],
-        limit: 9999
+        limit: 9999,
       });
 
-      console.log('Transaction sent:', transactionId);
-
-      // Wait for transaction to be sealed
       const transaction = await fcl.tx(transactionId).onceSealed();
-      console.log('Transaction sealed:', transaction);
 
       if (transaction.status === 4) {
-        console.log('Bet placed successfully!');
         onBetSuccess?.();
         setAmount("");
         onOpenChange(false);
       } else {
-        throw new Error('Transaction failed');
+        throw new Error(
+          `Transaction failed with status: ${transaction.status}`
+        );
       }
     } catch (error: any) {
-      console.error("Failed to place bet:", error);
-      setError(error.message || 'Failed to place bet');
+      let errorMessage = "Failed to place bet";
+      if (error.message) {
+        if (error.message.includes("Insufficient balance")) {
+          errorMessage = "Insufficient FLOW balance in your wallet";
+        } else if (error.message.includes("User rejected")) {
+          errorMessage = "Transaction was cancelled";
+        } else if (error.message.includes("Market not found")) {
+          errorMessage = "Market not found or inactive";
+        } else if (error.message.includes("Invalid option")) {
+          errorMessage = "Invalid betting option selected";
+        } else {
+          errorMessage =
+            error.message.substring(0, 100) +
+            (error.message.length > 100 ? "..." : "");
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -161,40 +189,64 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
   const minBet = parseFloat(market.minBet);
   const maxBet = parseFloat(market.maxBet);
   const currentAmount = parseFloat(amount || "0");
-  const isValidAmount = currentAmount >= minBet && currentAmount <= maxBet && currentAmount > 0;
+  const userBalanceNum = parseFloat(balance || "0");
+  const isValidAmount =
+    currentAmount >= minBet &&
+    currentAmount <= maxBet &&
+    currentAmount > 0 &&
+    currentAmount <= userBalanceNum;
 
   const quickAmounts = [
     minBet.toString(),
     (minBet * 5).toString(),
     (minBet * 10).toString(),
-    maxBet.toString()
-  ].filter((amt, index, arr) => arr.indexOf(amt) === index); // Remove duplicates
+    Math.min(maxBet, userBalanceNum).toString(),
+  ].filter(
+    (amt, index, arr) =>
+      arr.indexOf(amt) === index && parseFloat(amt) <= userBalanceNum
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-lg backdrop-blur-xl">
+      <DialogContent
+        className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-lg backdrop-blur-xl"
+        style={{ maxHeight: "500px", overflowY: "auto" }}
+      >
         <DialogHeader className="space-y-4 pb-2">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-[#9b87f5]/10 rounded-lg">
               <Zap className="h-5 w-5 text-[#9b87f5]" />
             </div>
-            <DialogTitle className="text-xl text-white">Place Your Bet</DialogTitle>
+            <DialogTitle className="text-xl text-white">
+              Place Your Bet
+            </DialogTitle>
           </div>
-          
+
           {/* Market Preview */}
           <div className="bg-gradient-to-r from-[#1A1F2C]/80 to-[#151923]/80 rounded-xl p-4 border border-gray-800/30">
-            <h3 className="font-semibold text-white mb-2 line-clamp-1">{market.title}</h3>
-            <p className="text-sm text-gray-400 line-clamp-2 mb-3">{market.description}</p>
-            
+            <h3 className="font-semibold text-white mb-2 line-clamp-1">
+              {market.title}
+            </h3>
+            <p className="text-sm text-gray-400 line-clamp-2 mb-3">
+              {market.description}
+            </p>
+
             {/* Market Odds Display */}
             <div className="flex items-center justify-between">
               <div className="text-xs text-gray-500">Current Odds</div>
               <div className="flex space-x-4 text-xs">
-                <span className="text-[#9b87f5]">{market.optionA}: {formatPercentage(optionAPercentage)}</span>
-                <span className="text-gray-400">{market.optionB}: {formatPercentage(optionBPercentage)}</span>
+                <span className="text-[#9b87f5]">
+                  {market.optionA}: {formatPercentage(optionAPercentage)}
+                </span>
+                <span className="text-gray-400">
+                  {market.optionB}: {formatPercentage(optionBPercentage)}
+                </span>
               </div>
             </div>
-            <Progress value={optionAPercentage} className="h-2 mt-2 bg-gray-800">
+            <Progress
+              value={optionAPercentage}
+              className="h-2 mt-2 bg-gray-800"
+            >
               <div
                 className="h-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] transition-all duration-300 rounded-full"
                 style={{ width: `${optionAPercentage}%` }}
@@ -202,7 +254,7 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
             </Progress>
           </div>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Side Selection */}
           <div className="space-y-4">
@@ -215,25 +267,29 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
                 variant={side === "optionA" ? "default" : "outline"}
                 onClick={() => setSide("optionA")}
                 className={`h-16 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
-                  side === "optionA" 
-                    ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105" 
+                  side === "optionA"
+                    ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105"
                     : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
                 }`}
               >
                 <span className="font-semibold text-sm">{market.optionA}</span>
-                <span className="text-xs opacity-80">{formatPercentage(optionAPercentage)}</span>
+                <span className="text-xs opacity-80">
+                  {formatPercentage(optionAPercentage)}
+                </span>
               </Button>
               <Button
                 variant={side === "optionB" ? "default" : "outline"}
                 onClick={() => setSide("optionB")}
                 className={`h-16 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
-                  side === "optionB" 
-                    ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105" 
+                  side === "optionB"
+                    ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105"
                     : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
                 }`}
               >
                 <span className="font-semibold text-sm">{market.optionB}</span>
-                <span className="text-xs opacity-80">{formatPercentage(optionBPercentage)}</span>
+                <span className="text-xs opacity-80">
+                  {formatPercentage(optionBPercentage)}
+                </span>
               </Button>
             </div>
           </div>
@@ -242,11 +298,14 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
 
           {/* Amount Input */}
           <div className="space-y-4">
-            <Label htmlFor="amount" className="text-gray-300 flex items-center space-x-2">
+            <Label
+              htmlFor="amount"
+              className="text-gray-300 flex items-center space-x-2"
+            >
               <Wallet className="h-4 w-4" />
               <span>Bet Amount (FLOW)</span>
             </Label>
-            
+
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
@@ -261,7 +320,7 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
                 className="pl-10 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-12 text-lg font-medium focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
               />
             </div>
-            
+
             {/* Quick Amount Buttons */}
             <div className="grid grid-cols-4 gap-2">
               {quickAmounts.map((quickAmount) => (
@@ -276,16 +335,17 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
                 </Button>
               ))}
             </div>
-            
+
             <div className="flex justify-between text-xs text-gray-400">
               <span>Min: {formatCurrency(market.minBet)} FLOW</span>
               <span>Max: {formatCurrency(market.maxBet)} FLOW</span>
             </div>
-            
+
             {amount && !isValidAmount && (
               <Alert className="border-red-500/50 bg-red-500/10">
                 <AlertDescription className="text-red-400 text-xs">
-                  Amount must be between {formatCurrency(market.minBet)} and {formatCurrency(market.maxBet)} FLOW
+                  Amount must be between {formatCurrency(market.minBet)} and{" "}
+                  {formatCurrency(market.maxBet)} FLOW
                 </AlertDescription>
               </Alert>
             )}
@@ -296,9 +356,11 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
             <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 rounded-xl p-4 border border-gray-800/50">
               <div className="flex items-center space-x-2 mb-3">
                 <Calculator className="h-4 w-4 text-[#9b87f5]" />
-                <span className="text-sm font-medium text-gray-300">Bet Summary</span>
+                <span className="text-sm font-medium text-gray-300">
+                  Bet Summary
+                </span>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">Betting on:</span>
@@ -306,33 +368,43 @@ export function BetDialog({ open, onOpenChange, market, initialSide = "optionA",
                     {side === "optionA" ? market.optionA : market.optionB}
                   </Badge>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm">Amount:</span>
-                  <span className="text-white font-medium">{formatCurrency(amount)} FLOW</span>
+                  <span className="text-white font-medium">
+                    {formatCurrency(amount)} FLOW
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400 text-sm">Shares received:</span>
-                  <span className="text-white font-medium">{formatCurrency(shares)}</span>
+                  <span className="text-gray-400 text-sm">
+                    Shares received:
+                  </span>
+                  <span className="text-white font-medium">
+                    {formatCurrency(shares)}
+                  </span>
                 </div>
-                
+
                 <Separator className="bg-gray-800/30" />
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm flex items-center space-x-1">
                     <Coins className="h-3 w-3" />
                     <span>Max payout:</span>
                   </span>
-                  <span className="text-green-400 font-bold">{formatCurrency(maxPayout)} FLOW</span>
+                  <span className="text-green-400 font-bold">
+                    {formatCurrency(maxPayout)} FLOW
+                  </span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400 text-sm flex items-center space-x-1">
                     <ArrowUpRight className="h-3 w-3" />
                     <span>Potential profit:</span>
                   </span>
-                  <span className="text-green-400 font-bold">+{formatCurrency(potentialProfit)} FLOW</span>
+                  <span className="text-green-400 font-bold">
+                    +{formatCurrency(potentialProfit)} FLOW
+                  </span>
                 </div>
               </div>
             </div>
