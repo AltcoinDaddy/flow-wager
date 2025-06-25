@@ -60,7 +60,7 @@ export default function MarketDetailPage() {
       const interval = setInterval(() => {
         console.log('Auto-refreshing market data...');
         refreshMarketData();
-      }, 30000);
+      }, 5000000);
 
       return () => clearInterval(interval);
     }
@@ -150,7 +150,6 @@ export default function MarketDetailPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshMarketData();
-    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   return (
