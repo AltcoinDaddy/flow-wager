@@ -24,7 +24,7 @@ import Link from "next/link";
 
 export default function MarketsPage() {
   const {
-    // Data
+    // Data 
     markets,
     filteredAndSortedMarkets,
     marketStats,
@@ -100,7 +100,7 @@ export default function MarketsPage() {
                 asChild
                 className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg border-0"
               >
-                <Link href="/markets/create">
+                <Link href="/admin/create">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Market
                 </Link>
@@ -293,7 +293,7 @@ export default function MarketsPage() {
                       asChild
                       className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg"
                     >
-                      <Link href="/markets/create">
+                      <Link href="/admin/create">
                         <Plus className="h-4 w-4 mr-2" />
                         Create First Market
                       </Link>
