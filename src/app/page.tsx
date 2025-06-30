@@ -11,11 +11,148 @@ import { UserStats } from '@/types/user';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
+import * as fcl from "@onflow/fcl";
+import flowConfig from "@/lib/flow/config";
 
 export default function HomePage() {
   const { user } = useAuth();
   const { markets: contractMarkets, isLoading, error } = useAllMarkets();
   const [featuredMarkets, setFeaturedMarkets] = useState<Market[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  // Flow script to get user's basic stats
+  const GET_USER_STATS_SCRIPT = `
+    import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace('0x', '')}
+    
+    access(all) fun main(address: Address): {String: AnyStruct} {
+      let allMarkets = FlowWager.getAllMarkets()
+      var marketsCreated = 0
+      var totalVolume = 0.0
+      var activeMarketsCreated = 0
+      var resolvedMarketsCreated = 0
+      
+      // Count markets created by user and calculate stats
+      for market in allMarkets {
+        if (market.creator == address) {
+          marketsCreated = marketsCreated + 1
+          totalVolume = totalVolume + market.totalPool
+          
+          if (market.status.rawValue == 0) { // Active
+            activeMarketsCreated = activeMarketsCreated + 1
+          } else if (market.status.rawValue == 2) { // Resolved
+            resolvedMarketsCreated = resolvedMarketsCreated + 1
+          }
+        }
+      }
+      
+      return {
+        "address": address.toString(),
+        "marketsCreated": marketsCreated,
+        "marketsResolved": resolvedMarketsCreated,
+        "totalVolume": totalVolume.toString(),
+        "activePositions": 0, // Would need position tracking in contract
+        "totalTrades": 0, // Would need trade tracking in contract
+        "winRate": 0.0, // Would need win/loss tracking in contract
+        "reputation": 0.0, // Would need reputation system in contract
+        "rank": 0 // Would need leaderboard in contract
+      } as {String: AnyStruct}
+    }
+  `;
+
+  // Initialize Flow configuration
+  const initConfig = async () => {
+    flowConfig();
+  };
+
+  // Fetch real user stats from blockchain
+  const fetchUserStats = async () => {
+    if (!user?.addr || !user.loggedIn) return;
+    
+    try {
+      setStatsLoading(true);
+      await initConfig();
+      
+      const stats = await fcl.query({
+        cadence: GET_USER_STATS_SCRIPT,
+        args: (arg, t) => [arg(user?.addr || "", t.Address)]
+      });
+
+      // Transform blockchain data to UserStats interface
+      const realUserStats: UserStats = {
+        // Basic user info
+        address: user.addr,
+
+        // Financial stats (from blockchain)
+        totalVolume: parseFloat(stats.totalVolume || "0").toFixed(2),
+        totalPnL: '0.00', // Would need P&L tracking in contract
+        totalWinnings: 0,
+        totalBets: 0,
+
+        // Trading stats (from blockchain where available)
+        totalTrades: parseInt(stats.totalTrades?.toString() || "0"),
+        winRate: parseFloat(stats.winRate?.toString() || "0"),
+        winCount: 0,
+
+        // Position stats
+        activePositions: parseInt(stats.activePositions?.toString() || "0"),
+
+        // Market creation stats (from blockchain)
+        marketsCreated: parseInt(stats.marketsCreated?.toString() || "0"),
+        marketsResolved: parseInt(stats.marketsResolved?.toString() || "0"),
+
+        // Performance metrics
+        accuracy: 0, // Would need accuracy tracking in contract
+        rank: parseInt(stats.rank?.toString() || "0"),
+        reputation: parseFloat(stats.reputation?.toString() || "0"),
+        currentStreak: 0,
+        longestStreak: 0,
+        totalFeesPaid: 0,
+        totalInvested: 0,
+        roi: 0
+      };
+
+      setUserStats(realUserStats);
+    } catch (err) {
+      console.error('Error fetching user stats:', err);
+      
+      // Fallback to basic stats if fetch fails
+      const fallbackStats: UserStats = {
+        address: user.addr,
+        totalVolume: '0.00',
+        totalPnL: '0.00',
+        totalWinnings: 0,
+        totalBets: 0,
+        totalTrades: 0,
+        winRate: 0,
+        winCount: 0,
+        activePositions: 0,
+        marketsCreated: 0,
+        marketsResolved: 0,
+        accuracy: 0,
+        rank: 0,
+        reputation: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalFeesPaid: 0,
+        totalInvested: 0,
+        roi: 0
+      };
+      
+      setUserStats(fallbackStats);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Fetch user stats when user logs in
+  useEffect(() => {
+    if (user?.loggedIn && user?.addr) {
+      fetchUserStats();
+    } else {
+      setUserStats(null);
+    }
+  }, [user?.loggedIn, user?.addr]);
 
   // Transform and filter markets for homepage
   useEffect(() => {
@@ -82,40 +219,6 @@ export default function HomePage() {
       totalUsers
     };
   }, [contractMarkets]);
-
-  // Mock user stats with all required properties
-  const userStats: UserStats = {
-    // Basic user info
-    address: user?.addr || '',
-
-    // Financial stats
-    totalVolume: '1,234.56',
-    totalPnL: '+456.78',
-    totalWinnings: Number('2,345.67'),
-    totalBets: Number('1,888.89'),
-
-    // Trading stats
-    totalTrades: 42,
-    winRate: 68.5,
-    winCount: 29,
-
-    // Position stats
-    activePositions: 8,
-
-    // Market creation stats
-    marketsCreated: 3,
-    marketsResolved: 2,
-
-    // Performance metrics
-    accuracy: 72.3,
-    rank: 156,
-    reputation: 847,
-    currentStreak: 0,
-    longestStreak: 0,
-    totalFeesPaid: 0,
-    totalInvested: 0,
-    roi: 0
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
@@ -211,7 +314,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* User Dashboard Section (only show if logged in) */}
+      {/* User Dashboard Section (only show if logged in and stats available) */}
       {user?.loggedIn && (
         <section className="py-16 px-4 bg-[#1A1F2C]">
           <div className="container mx-auto">
@@ -220,7 +323,9 @@ export default function HomePage() {
                 <h2 className="text-3xl font-bold text-white mb-2">
                   Welcome back, {user.addr?.slice(0, 8)}...
                 </h2>
-                <p className="text-gray-400">Here&lsquo;s your trading overview</p>
+                <p className="text-gray-400">
+                  {statsLoading ? 'Loading your trading overview...' : 'Here&lsquo;s your trading overview'}
+                </p>
               </div>
               <Button 
                 asChild 
@@ -239,11 +344,35 @@ export default function HomePage() {
                   e.currentTarget.style.color = "#9b87f5";
                 }}
               >
-                <Link href="/profile">View Full Profile</Link>
+                <Link href={`/dashboard/${user.addr}`}>View Full Dashboard</Link>
               </Button>
             </div>
             
-            <StatsCards stats={userStats} />
+            {statsLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="bg-gray-800 rounded-lg h-24 p-4">
+                      <div className="h-4 bg-gray-700 rounded mb-2"></div>
+                      <div className="h-6 bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : userStats ? (
+              <StatsCards stats={userStats} />
+            ) : (
+              <div className="text-center py-8 bg-gray-800/20 rounded-lg">
+                <p className="text-gray-400">Unable to load trading statistics at the moment.</p>
+                <Button 
+                  onClick={fetchUserStats}
+                  variant="outline"
+                  className="mt-4 border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white"
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -324,10 +453,6 @@ export default function HomePage() {
           )}
         </div>
       </section>
-
-  
-
-    
     </div>
   );
 }
