@@ -21,6 +21,7 @@ import {
   Clock,
   ExternalLink,
   Flag,
+  Lock,
   Pause,
   RefreshCw,
   Share2,
@@ -92,6 +93,31 @@ export default function MarketDetailPage() {
       : 50;
   const optionBPercentage = 100 - optionAPercentage;
 
+  // Compute the actual display status based on contract status and end time
+  const getActualMarketStatus = () => {
+    const now = Date.now();
+    const endTime = parseInt(market.endTime) * 1000;
+    
+    // If resolved, always show resolved
+    if (market.status === MarketStatus.Resolved || market.resolved) {
+      return MarketStatus.Resolved;
+    }
+    
+    // If past end time but not resolved, it's pending resolution
+    if (endTime <= now && market.status === MarketStatus.Active) {
+      return MarketStatus.Paused; // Using Paused to represent "Pending Resolution"
+    }
+    
+    // Otherwise use contract status
+    return market.status;
+  };
+
+  const actualStatus = getActualMarketStatus();
+
+  // Check if market allows betting
+  const isBettingDisabled = actualStatus !== MarketStatus.Active || 
+    (market.endTime && parseInt(market.endTime) * 1000 <= Date.now());
+
   const formatCurrency = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -116,10 +142,17 @@ export default function MarketDetailPage() {
   };
 
   const getStatusName = (status: number) => {
+    // Override status names for better UX
+    if (status === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()) {
+      return "Pending Resolution";
+    }
     return Object.values(MarketStatus)[status] || "Unknown";
   };
 
   const handleBet = (side: "optionA" | "optionB") => {
+    // Double check betting is allowed
+    if (isBettingDisabled) return;
+    
     setSelectedSide(side);
     setBetDialogOpen(true);
   };
@@ -152,6 +185,20 @@ export default function MarketDetailPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshMarketData();
+  };
+
+  // Get disabled message based on actual market status
+  const getDisabledMessage = () => {
+    if (actualStatus === MarketStatus.Resolved) {
+      return "Market has been resolved";
+    }
+    if (market.endTime && parseInt(market.endTime) * 1000 <= Date.now() && actualStatus !== MarketStatus.Resolved) {
+      return "Market has ended - awaiting resolution";
+    }
+    if (actualStatus === MarketStatus.Paused) {
+      return "Market is paused";
+    }
+    return "Betting not available";
   };
 
   console.log("Market Data:", market);
@@ -198,21 +245,31 @@ export default function MarketDetailPage() {
                 </Badge>
                 <Badge
                   variant={
-                    market.status === MarketStatus.Active
+                    actualStatus === MarketStatus.Active
                       ? "default"
                       : "secondary"
                   }
                   className={
-                    market.status === MarketStatus.Active
+                    actualStatus === MarketStatus.Active
                       ? "bg-green-500/20 text-green-400 border-green-500/30 font-medium"
+                      : actualStatus === MarketStatus.Resolved
+                      ? "bg-blue-500/20 text-blue-400 border-blue-500/30 font-medium"
+                      : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
+                      ? "bg-orange-500/20 text-orange-400 border-orange-500/30 font-medium"
                       : "font-medium"
                   }
                 >
                   <div className="flex items-center space-x-1">
-                    {market.status === MarketStatus.Active && (
+                    {actualStatus === MarketStatus.Active && (
+                      <TrendingUp className="h-3 w-3" />
+                    )}
+                    {actualStatus === MarketStatus.Paused && (
                       <Pause className="h-3 w-3" />
                     )}
-                    <span>{getStatusName(market.status)}</span>
+                    {actualStatus === MarketStatus.Resolved && (
+                      <CheckCircle className="h-3 w-3" />
+                    )}
+                    <span>{getStatusName(actualStatus)}</span>
                   </div>
                 </Badge>
               </div>
@@ -325,6 +382,19 @@ export default function MarketDetailPage() {
                   </Progress>
                 </div>
 
+                {/* Show resolved outcome if available */}
+                {actualStatus === MarketStatus.Resolved && market.outcome !== undefined && (
+                  <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <CheckCircle className="h-5 w-5 text-blue-400" />
+                      <span className="font-semibold text-blue-400">Market Resolved</span>
+                    </div>
+                    <p className="text-white font-bold text-lg">
+                      Winner: {market.outcome === 0 ? market.optionA : market.optionB}
+                    </p>
+                  </div>
+                )}
+
                 {/* Enhanced User Position Display */}
                 {userPosition && (
                   <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/30 rounded-xl p-4 border border-gray-800/50">
@@ -361,16 +431,33 @@ export default function MarketDetailPage() {
                   </div>
                 )}
 
+                {/* Show disabled message for non-active markets */}
+                {isBettingDisabled && (
+                  <div className="bg-gradient-to-r from-gray-700/10 to-gray-600/10 rounded-xl p-4 border border-gray-600/20">
+                    <div className="flex items-center space-x-2 text-gray-400">
+                      <Lock className="h-4 w-4" />
+                      <span className="text-sm font-medium">{getDisabledMessage()}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Enhanced Betting Buttons */}
                 <div className="grid grid-cols-2 gap-4">
                   <Button
                     size="lg"
                     onClick={() => handleBet("optionA")}
-                    className="h-20 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transform hover:scale-105 transition-all duration-200"
-                    disabled={market.status !== MarketStatus.Active}
+                    className={`h-20 transform transition-all duration-200 ${
+                      isBettingDisabled
+                        ? "bg-gray-700/50 text-gray-500 cursor-not-allowed hover:bg-gray-700/50 hover:scale-100 shadow-none"
+                        : "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 hover:scale-105"
+                    }`}
+                    disabled={!!isBettingDisabled}
                   >
                     <div className="text-center">
-                      <div className="text-lg font-bold">{market.optionA}</div>
+                      <div className="text-lg font-bold flex items-center justify-center space-x-2">
+                        {isBettingDisabled && <Lock className="h-4 w-4" />}
+                        <span>{market.optionA}</span>
+                      </div>
                       <div className="text-sm opacity-90">
                         {optionAPercentage.toFixed(0)}%
                       </div>
@@ -379,11 +466,18 @@ export default function MarketDetailPage() {
                   <Button
                     size="lg"
                     onClick={() => handleBet("optionB")}
-                    className="h-20 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white shadow-lg hover:shadow-gray-700/40 transform hover:scale-105 transition-all duration-200"
-                    disabled={market.status !== MarketStatus.Active}
+                    className={`h-20 transform transition-all duration-200 ${
+                      isBettingDisabled
+                        ? "bg-gray-700/50 text-gray-500 cursor-not-allowed hover:bg-gray-700/50 hover:scale-100 shadow-none"
+                        : "bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white shadow-lg hover:shadow-gray-700/40 hover:scale-105"
+                    }`}
+                    disabled={!!isBettingDisabled}
                   >
                     <div className="text-center">
-                      <div className="text-lg font-bold">{market.optionB}</div>
+                      <div className="text-lg font-bold flex items-center justify-center space-x-2">
+                        {isBettingDisabled && <Lock className="h-4 w-4" />}
+                        <span>{market.optionB}</span>
+                      </div>
                       <div className="text-sm opacity-90">
                         {optionBPercentage.toFixed(0)}%
                       </div>
@@ -576,13 +670,13 @@ export default function MarketDetailPage() {
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-white">
-                  {market.status === MarketStatus.Active && (
+                  {actualStatus === MarketStatus.Active && (
                     <TrendingUp className="h-5 w-5 text-green-400" />
                   )}
-                  {market.status === MarketStatus.Paused && (
-                    <Clock className="h-5 w-5 text-yellow-400" />
+                  {actualStatus === MarketStatus.Paused && (
+                    <Clock className="h-5 w-5 text-orange-400" />
                   )}
-                  {market.status === MarketStatus.Resolved && (
+                  {actualStatus === MarketStatus.Resolved && (
                     <CheckCircle className="h-5 w-5 text-blue-400" />
                   )}
                   <span>Market Status</span>
@@ -592,19 +686,23 @@ export default function MarketDetailPage() {
                 <div className="space-y-4">
                   <Badge
                     variant={
-                      market.status === MarketStatus.Active
+                      actualStatus === MarketStatus.Active
                         ? "default"
                         : "secondary"
                     }
                     className={`w-full justify-center py-3 text-sm font-semibold ${
-                      market.status === MarketStatus.Active
+                      actualStatus === MarketStatus.Active
                         ? "bg-green-500/20 text-green-400 border-green-500/30"
+                        : actualStatus === MarketStatus.Resolved
+                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                        : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
+                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
                         : "bg-gray-700/50 text-gray-300"
                     }`}
                   >
-                    {getStatusName(market.status)}
+                    {getStatusName(actualStatus)}
                   </Badge>
-                  {market.status === MarketStatus.Active && (
+                  {actualStatus === MarketStatus.Active && (
                     <div className="text-center bg-gray-800/30 rounded-lg p-4">
                       <CountdownTimer
                         endTime={parseInt(market.endTime) * 1000}
@@ -615,7 +713,14 @@ export default function MarketDetailPage() {
                       </p>
                     </div>
                   )}
-                  {market.resolved &&
+                  {actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now() && (
+                    <div className="text-center bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
+                      <p className="text-orange-400 font-semibold text-sm">
+                        Market has ended and is awaiting admin resolution
+                      </p>
+                    </div>
+                  )}
+                  {actualStatus === MarketStatus.Resolved &&
                     market.outcome !== undefined &&
                     market.outcome !== null && (
                       <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
@@ -684,9 +789,9 @@ export default function MarketDetailPage() {
           </div>
         </div>
 
-        {/* Bet Dialog */}
+        {/* Bet Dialog - Pass disabled state */}
         <BetDialog
-          open={betDialogOpen}
+          open={betDialogOpen && !isBettingDisabled}
           onOpenChange={setBetDialogOpen}
           market={market}
           initialSide={selectedSide}

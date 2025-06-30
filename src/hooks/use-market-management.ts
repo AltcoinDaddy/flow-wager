@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import * as fcl from '@onflow/fcl';
+import flowConfig from '@/lib/flow/config';
 import { Market, MarketCategory, MarketStatus, PlatformStats } from '@/types/market';
 import { 
   GET_ALL_MARKETS, 
@@ -16,19 +17,43 @@ export function useMarketManagement() {
   const [error, setError] = useState<string | null>(null);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
 
-  // Filter states with proper types
+  // Filter states with proper types - default to 'active' instead of 'all'
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<string>('active');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'newest' | 'ending' | 'volume' | 'popular'>('newest');
   const [selectedCategory, setSelectedCategory] = useState<'all' | MarketCategory>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | MarketStatus>('all');
+
+  // Initialize Flow configuration
+  const initConfig = async () => {
+    try {
+      flowConfig();
+      
+      // Debug: Log configuration status
+      console.log('Flow configuration initialized:', {
+        accessNode: 'https://rest-mainnet.onflow.org',
+        wallet: 'https://fcl-discovery.onflow.org/authn',
+        flowWagerContract: process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT,
+        userRegistryContract: process.env.NEXT_PUBLIC_USER_REGISTRY_CONTRACT,
+        marketFactoryContract: process.env.NEXT_PUBLIC_MARKET_FACTORY_CONTRACT,
+        flowToken: '0x1654653399040a61',
+        fungibleToken: '0xf233dcee88fe0abe'
+      });
+    } catch (error) {
+      console.error('Failed to initialize Flow configuration:', error);
+      throw error;
+    }
+  };
 
   // Fetch markets from smart contract
   const fetchMarkets = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Initialize Flow configuration before making queries
+      await initConfig();
 
       // Fetch all markets from smart contract
       const contractMarkets = await fcl.query({
@@ -59,7 +84,7 @@ export function useMarketManagement() {
 
       setMarkets(transformedMarkets);
 
-      // Fetch platform stats from smart contract
+      // Fetch platform stats from smart contract (FCL already configured above)
       const stats = await fcl.query({
         cadence: GET_PLATFORM_STATS,
         
@@ -75,7 +100,13 @@ export function useMarketManagement() {
 
     } catch (err) {
       console.error('Error fetching markets from smart contract:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch markets from blockchain');
+      
+      // Check if it's a configuration error
+      if (err instanceof Error && err.message.includes('accessNode.api')) {
+        setError('Flow network configuration error. Please check that NEXT_PUBLIC_FLOWWAGER_CONTRACT is set in your environment variables.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch markets from blockchain');
+      }
     } finally {
       setLoading(false);
     }
@@ -84,6 +115,7 @@ export function useMarketManagement() {
   // Filter and sort markets
   const filteredAndSortedMarkets = useMemo(() => {
     let filtered = markets;
+    const now = Date.now() / 1000;
 
     // Search filter
     if (searchQuery) {
@@ -95,31 +127,34 @@ export function useMarketManagement() {
       );
     }
 
-    // Tab filter
-    if (activeTab !== 'all') {
-      switch (activeTab) {
-        case 'active':
-          filtered = filtered.filter(market => market.status === MarketStatus.Active);
-          break;
-        case 'ending':
-          const now = Date.now() / 1000;
-          const oneDay = 24 * 60 * 60;
-          filtered = filtered.filter(market => 
-            market.status === MarketStatus.Active && 
-            parseFloat(market.endTime) - now <= oneDay && 
-            parseFloat(market.endTime) > now
-          );
-          break;
-        case 'resolved':
-          filtered = filtered.filter(market => market.status === MarketStatus.Resolved);
-          break;
-        case 'trending':
-          filtered = filtered.filter(market => 
-            market.status === MarketStatus.Active && 
-            parseFloat(market.totalPool) > 0
-          ).sort((a, b) => parseFloat(b.totalPool) - parseFloat(a.totalPool));
-          break;
-      }
+    // Tab filter - Updated logic
+    switch (activeTab) {
+      case 'active':
+        // Markets that are currently active (not ended and not resolved)
+        filtered = filtered.filter(market => 
+          market.status === MarketStatus.Active && 
+          parseFloat(market.endTime) > now
+        );
+        break;
+      case 'pending':
+        // Markets that have ended but not yet resolved
+        filtered = filtered.filter(market => 
+          market.status === MarketStatus.Active && 
+          parseFloat(market.endTime) <= now
+        );
+        break;
+      case 'resolved':
+        // Markets that have been resolved
+        filtered = filtered.filter(market => market.status === MarketStatus.Resolved);
+        break;
+      case 'trending':
+        // Popular active markets (currently running with volume)
+        filtered = filtered.filter(market => 
+          market.status === MarketStatus.Active && 
+          parseFloat(market.endTime) > now &&
+          parseFloat(market.totalPool) > 0
+        ).sort((a, b) => parseFloat(b.totalPool) - parseFloat(a.totalPool));
+        break;
     }
 
     // Category filter
@@ -132,43 +167,46 @@ export function useMarketManagement() {
       filtered = filtered.filter(market => market.status === selectedStatus);
     }
 
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return parseFloat(b.createdAt) - parseFloat(a.createdAt);
-        case 'ending':
-          return parseFloat(a.endTime) - parseFloat(b.endTime);
-        case 'volume':
-          return parseFloat(b.totalPool) - parseFloat(a.totalPool);
-        case 'popular':
-          const aShares = parseFloat(a.totalOptionAShares) + parseFloat(a.totalOptionBShares);
-          const bShares = parseFloat(b.totalOptionAShares) + parseFloat(b.totalOptionBShares);
-          return bShares - aShares;
-        default:
-          return 0;
-      }
-    });
+    // Sort (skip for trending as it's already sorted by volume)
+    if (activeTab !== 'trending') {
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case 'newest':
+            return parseFloat(b.createdAt) - parseFloat(a.createdAt);
+          case 'ending':
+            return parseFloat(a.endTime) - parseFloat(b.endTime);
+          case 'volume':
+            return parseFloat(b.totalPool) - parseFloat(a.totalPool);
+          case 'popular':
+            const aShares = parseFloat(a.totalOptionAShares) + parseFloat(a.totalOptionBShares);
+            const bShares = parseFloat(b.totalOptionAShares) + parseFloat(b.totalOptionBShares);
+            return bShares - aShares;
+          default:
+            return 0;
+        }
+      });
+    }
 
     return filtered;
   }, [markets, searchQuery, activeTab, selectedCategory, selectedStatus, sortBy]);
 
-  // Calculate market counts
+  // Calculate market counts - Updated logic
   const marketCounts = useMemo(() => {
     const now = Date.now() / 1000;
-    const oneDay = 24 * 60 * 60;
     
     return {
-      all: markets.length,
-      active: markets.filter(m => m.status === MarketStatus.Active).length,
-      ending: markets.filter(m => 
+      active: markets.filter(m => 
         m.status === MarketStatus.Active && 
-        parseFloat(m.endTime) - now <= oneDay && 
         parseFloat(m.endTime) > now
+      ).length,
+      pending: markets.filter(m => 
+        m.status === MarketStatus.Active && 
+        parseFloat(m.endTime) <= now
       ).length,
       resolved: markets.filter(m => m.status === MarketStatus.Resolved).length,
       trending: markets.filter(m => 
         m.status === MarketStatus.Active && 
+        parseFloat(m.endTime) > now &&
         parseFloat(m.totalPool) > 0
       ).length
     };
@@ -176,21 +214,24 @@ export function useMarketManagement() {
 
   // Calculate market stats
   const marketStats = useMemo(() => {
-    const activeMarkets = markets.filter(m => m.status === MarketStatus.Active);
+    const now = Date.now() / 1000;
+    const activeMarkets = markets.filter(m => 
+      m.status === MarketStatus.Active && 
+      parseFloat(m.endTime) > now
+    );
     const totalVolume = markets.reduce((sum, m) => sum + parseFloat(m.totalPool || '0'), 0);
     const avgVolume = markets.length > 0 ? totalVolume / markets.length : 0;
     
-    const now = Date.now() / 1000;
-    const oneDay = 24 * 60 * 60;
-    const endingSoon = activeMarkets.filter(m => 
-      parseFloat(m.endTime) - now <= oneDay && parseFloat(m.endTime) > now
+    const pendingMarkets = markets.filter(m => 
+      m.status === MarketStatus.Active && 
+      parseFloat(m.endTime) <= now
     ).length;
 
     return {
       active: activeMarkets.length,
       totalVolume,
       avgVolume,
-      endingSoon
+      endingSoon: pendingMarkets // Now represents pending markets
     };
   }, [markets]);
 
@@ -209,7 +250,7 @@ export function useMarketManagement() {
     setSelectedCategory('all');
     setSelectedStatus('all');
     setSortBy('newest');
-    setActiveTab('all');
+    setActiveTab('active'); // Default to active instead of all
   };
 
   // Fetch data on mount and setup interval for real-time updates

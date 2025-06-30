@@ -29,6 +29,7 @@ import {
   getAvatarFallback 
 } from "@/utils/wallet";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export function WalletButton() {
   const { 
@@ -220,8 +221,8 @@ export function WalletButton() {
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <a 
-            href={`/profile/${walletAddress}`} 
+          <Link 
+            href={`/dashboard/${walletAddress}`} 
             className="flex items-center cursor-pointer"
             style={{ color: "white" }}
             onMouseEnter={(e) => {
@@ -233,7 +234,7 @@ export function WalletButton() {
           >
             <User className="h-4 w-4 mr-2" style={{ color: "white" }} />
             <span>View Profile</span>
-          </a>
+          </Link>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator style={{ backgroundColor: "#8b5cf6" }} />

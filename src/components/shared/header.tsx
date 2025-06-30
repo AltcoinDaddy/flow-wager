@@ -6,13 +6,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "./wallet-button";
 import { SearchBar } from "./search-bar";
-import { 
-  BarChart3, 
-  Trophy,
-  Menu,
-  X,
-  TrendingUp
-} from "lucide-react";
+import { BarChart3, Trophy, Menu, X, TrendingUp } from "lucide-react";
 
 const navigation = [
   { name: "Markets", href: "/markets", icon: TrendingUp },
@@ -49,16 +43,16 @@ export function Header() {
                 </div>
               </Link>
 
-            
+              
             </div>
 
             {/* Right Section */}
             <div className="flex items-center space-x-4">
               {/* Mobile Search Toggle */}
               <div className="lg:hidden">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="text-gray-300 hover:text-white hover:bg-[#9b87f5]/20"
                 >
                   <svg
@@ -110,12 +104,12 @@ export function Header() {
               <div className="lg:hidden px-3 py-2 mb-4">
                 <SearchBar />
               </div>
-              
+
               {/* Mobile Navigation */}
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive = pathname.startsWith(item.href);
-                
+
                 return (
                   <Link
                     key={item.name}
