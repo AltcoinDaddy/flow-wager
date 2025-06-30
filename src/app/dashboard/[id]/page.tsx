@@ -1,7 +1,9 @@
 "use client";
 
-// User Dashboard Page - Only contract owner can create markets
-// Market creation and resolution buttons are restricted to the admin address
+// User Dashboard Page - Admin-only features
+// - Only contract owner can create markets (Quick Actions & Created Markets tab)
+// - Created Markets tab is hidden for regular users
+// - Market creation and resolution buttons are restricted to the admin address
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -88,7 +90,7 @@ interface Activity {
 
 // Flow scripts for user data (using working scripts)
 const GET_USER_BASIC_INFO = `
-  import FlowWager from 0xFlowWager
+  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace('0x', '')}
   
   access(all) fun main(address: Address): {String: AnyStruct} {
     let allMarkets = FlowWager.getAllMarkets()
@@ -117,7 +119,7 @@ const GET_USER_BASIC_INFO = `
 `;
 
 const GET_USER_CREATED_MARKETS = `
-  import FlowWager from 0xFlowWager
+  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace('0x', '')}
   
   access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
     let allMarkets = FlowWager.getAllMarkets()
@@ -483,7 +485,7 @@ export default function UserDashboardPage() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto">
+          <TabsList className={`grid w-full ${userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto`}>
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
@@ -502,12 +504,15 @@ export default function UserDashboardPage() {
             >
               Activity
             </TabsTrigger>
-            <TabsTrigger
-              value="markets"
-              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
-            >
-              Created Markets ({data.createdMarkets.length})
-            </TabsTrigger>
+            {/* Only show Created Markets tab for contract owner */}
+            {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
+              <TabsTrigger
+                value="markets"
+                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
+              >
+                Created Markets ({data.createdMarkets.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab */}
@@ -795,62 +800,52 @@ export default function UserDashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* Created Markets Tab */}
-          <TabsContent value="markets">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">Created Markets</h3>
-                  <p className="text-gray-400">Markets created by this user</p>
+          {/* Created Markets Tab - Only for contract owner */}
+          {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
+            <TabsContent value="markets">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Created Markets</h3>
+                    <p className="text-gray-400">Markets created by this user</p>
+                  </div>
+                  {/* Only show Create Market button for contract owner */}
+                  {isContractOwner && isOwnProfile && (
+                    <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
+                      <Link href="/admin/create">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Market
+                      </Link>
+                    </Button>
+                  )}
                 </div>
-                {/* Only show Create Market button for contract owner */}
-                {isContractOwner && isOwnProfile && (
-                  <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
-                    <Link href="/admin/create">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Market
-                    </Link>
-                  </Button>
+
+                {data.createdMarkets.length > 0 ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {data.createdMarkets.map((market) => (
+                      <MarketCard key={market.id} market={market} />
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+                    <CardContent className="text-center py-12">
+                      <Plus className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-50" />
+                      <h3 className="text-lg font-medium text-white mb-2">No markets created</h3>
+                      <p className="text-gray-400 mb-4">
+                        You haven't created any markets yet
+                      </p>
+                      {/* Only show Create Market button for contract owner viewing their own profile */}
+                      {isOwnProfile && isContractOwner && (
+                        <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
+                          <Link href="/admin/create">Create Your First Market</Link>
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
               </div>
-
-              {data.createdMarkets.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {data.createdMarkets.map((market) => (
-                    <MarketCard key={market.id} market={market} />
-                  ))}
-                </div>
-              ) : (
-                <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-                  <CardContent className="text-center py-12">
-                    <Plus className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium text-white mb-2">No markets created</h3>
-                    <p className="text-gray-400 mb-4">
-                      {isOwnProfile 
-                        ? (isContractOwner 
-                            ? "You haven't created any markets yet" 
-                            : "Only the contract owner can create markets")
-                        : "This user hasn't created any markets"}
-                    </p>
-                    {/* Only show Create Market button for contract owner viewing their own profile */}
-                    {isOwnProfile && isContractOwner && (
-                      <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
-                        <Link href="/admin/create">Create Your First Market</Link>
-                      </Button>
-                    )}
-                    {/* Show informational message for non-admin users */}
-                    {isOwnProfile && !isContractOwner && (
-                      <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <p className="text-sm text-yellow-400">
-                          Market creation is restricted to the contract administrator.
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
