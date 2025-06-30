@@ -1,5 +1,8 @@
 "use client";
 
+// User Dashboard Page - Only contract owner can create markets
+// Market creation and resolution buttons are restricted to the admin address
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -38,9 +41,6 @@ import {
 import type { Market, MarketCategory, MarketOutcome, MarketStatus } from "@/types/market";
 import * as fcl from "@onflow/fcl";
 import flowConfig from "@/lib/flow/config";
-
-
-const FLOWWAGER_CONTRACT = process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;
 
 // Types for user dashboard data
 interface UserDashboardData {
@@ -88,7 +88,7 @@ interface Activity {
 
 // Flow scripts for user data (using working scripts)
 const GET_USER_BASIC_INFO = `
-  import FlowWager from ${FLOWWAGER_CONTRACT}
+  import FlowWager from 0xFlowWager
   
   access(all) fun main(address: Address): {String: AnyStruct} {
     let allMarkets = FlowWager.getAllMarkets()
@@ -117,7 +117,7 @@ const GET_USER_BASIC_INFO = `
 `;
 
 const GET_USER_CREATED_MARKETS = `
-  import FlowWager from ${FLOWWAGER_CONTRACT}
+  import FlowWager from 0xFlowWager
   
   access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
     let allMarkets = FlowWager.getAllMarkets()
@@ -146,6 +146,9 @@ export default function UserDashboardPage() {
 
   // Check if viewing own profile
   const isOwnProfile = currentUser?.addr === userAddress;
+  
+  // Check if current user is the contract owner/admin
+  const isContractOwner = currentUser?.addr === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;
 
   // Initialize Flow configuration
   const initConfig = async () => {
@@ -363,6 +366,13 @@ export default function UserDashboardPage() {
                     <Star className="h-4 w-4 text-[#9b87f5]" />
                     <span>{data.profile.reputation.toFixed(1)} reputation</span>
                   </div>
+                  {/* Show admin badge for contract owner */}
+                  {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
+                    <div className="flex items-center space-x-1">
+                      <Settings className="h-4 w-4 text-green-400" />
+                      <span className="text-green-400 font-medium">Contract Admin</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -387,16 +397,6 @@ export default function UserDashboardPage() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export
-                  </Button>
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
-                  >
-                    <Link href="/dashboard/settings">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Settings
-                    </Link>
                   </Button>
                 </>
               )}
@@ -641,18 +641,27 @@ export default function UserDashboardPage() {
                         Browse Markets
                       </Link>
                     </Button>
-                    <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
-                      <Link href="/admin/create">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Market
-                      </Link>
-                    </Button>
-                    <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
-                      <Link href="/admin/resolve">
-                        <Settings className="h-4 w-4 mr-2" />
-                        Resolve Markets
-                      </Link>
-                    </Button>
+                    
+                    {/* Only show Create Market button for contract owner */}
+                    {isContractOwner && (
+                      <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
+                        <Link href="/admin/create">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create Market
+                        </Link>
+                      </Button>
+                    )}
+                    
+                    {/* Only show Resolve Markets button for contract owner */}
+                    {isContractOwner && (
+                      <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
+                        <Link href="/admin/resolve">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Resolve Markets
+                        </Link>
+                      </Button>
+                    )}
+                    
                     <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
                       <Link href="/leaderboard">
                         <Trophy className="h-4 w-4 mr-2" />
@@ -794,7 +803,8 @@ export default function UserDashboardPage() {
                   <h3 className="text-lg font-semibold text-white">Created Markets</h3>
                   <p className="text-gray-400">Markets created by this user</p>
                 </div>
-                {isOwnProfile && (
+                {/* Only show Create Market button for contract owner */}
+                {isContractOwner && isOwnProfile && (
                   <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
                     <Link href="/admin/create">
                       <Plus className="h-4 w-4 mr-2" />
@@ -816,12 +826,25 @@ export default function UserDashboardPage() {
                     <Plus className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-50" />
                     <h3 className="text-lg font-medium text-white mb-2">No markets created</h3>
                     <p className="text-gray-400 mb-4">
-                      {isOwnProfile ? "You haven't created any markets yet" : "This user hasn't created any markets"}
+                      {isOwnProfile 
+                        ? (isContractOwner 
+                            ? "You haven't created any markets yet" 
+                            : "Only the contract owner can create markets")
+                        : "This user hasn't created any markets"}
                     </p>
-                    {isOwnProfile && (
+                    {/* Only show Create Market button for contract owner viewing their own profile */}
+                    {isOwnProfile && isContractOwner && (
                       <Button asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
                         <Link href="/admin/create">Create Your First Market</Link>
                       </Button>
+                    )}
+                    {/* Show informational message for non-admin users */}
+                    {isOwnProfile && !isContractOwner && (
+                      <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                        <p className="text-sm text-yellow-400">
+                          Market creation is restricted to the contract administrator.
+                        </p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
