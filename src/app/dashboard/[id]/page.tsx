@@ -406,8 +406,8 @@ export default function UserDashboardPage() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {/* Statistics Cards - Only 4 cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3 mb-3">
@@ -455,30 +455,6 @@ export default function UserDashboardPage() {
                 <span className="text-sm font-medium text-gray-400">Win Rate</span>
               </div>
               <p className="text-2xl font-bold text-white">{data.profile.winRate.toFixed(1)}%</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="p-2 bg-yellow-500/20 rounded-lg">
-                  <Wallet className="h-5 w-5 text-yellow-400" />
-                </div>
-                <span className="text-sm font-medium text-gray-400">Active Positions</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{data.profile.activePositions}</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
-                  <Plus className="h-5 w-5 text-[#9b87f5]" />
-                </div>
-                <span className="text-sm font-medium text-gray-400">Markets Created</span>
-              </div>
-              <p className="text-2xl font-bold text-white">{data.profile.marketsCreated}</p>
             </CardContent>
           </Card>
         </div>
@@ -629,14 +605,14 @@ export default function UserDashboardPage() {
               </Card>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - Removed Leaderboard */}
             {isOwnProfile && (
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
                   <CardTitle className="text-white">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-4 gap-3">
+                  <div className="grid md:grid-cols-3 gap-3">
                     <Button 
                       className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white justify-start" 
                       asChild
@@ -666,13 +642,6 @@ export default function UserDashboardPage() {
                         </Link>
                       </Button>
                     )}
-                    
-                    <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start" asChild>
-                      <Link href="/leaderboard">
-                        <Trophy className="h-4 w-4 mr-2" />
-                        Leaderboard
-                      </Link>
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
