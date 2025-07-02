@@ -12,6 +12,7 @@ import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import * as fcl from "@onflow/fcl";
 import flowConfig from "@/lib/flow/config";
+import { extractImageFromMarket } from "@/lib/flow/market";
 
 // Constants for contract
 const FLOWWAGER_CONTRACT = `0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace('0x', '')}`;
@@ -24,90 +25,109 @@ access(all) fun main(): [FlowWager.Market] {
 }
 `;
 
-// Your getActiveMarkets function with enhanced debugging
+// Enhanced transform function with image extraction
+const transformMarketData = (rawMarket: any): Market => {
+  console.log('🔄 Transforming market data:', rawMarket);
+  
+  // Extract image URL from description field
+  const { cleanDescription, imageURI } = extractImageFromMarket(rawMarket.description || '');
+  
+  // Helper function to safely convert to string
+  const safeToString = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    return value.toString();
+  };
+
+  // Helper function to safely convert to number
+  const safeToNumber = (value: any, defaultValue: number = 0): number => {
+    if (value === null || value === undefined) return defaultValue;
+    const parsed = parseInt(safeToString(value));
+    return isNaN(parsed) ? defaultValue : parsed;
+  };
+  
+  const transformedMarket: Market = {
+    id: safeToString(rawMarket.id),
+    title: rawMarket.title || '',
+    description: cleanDescription, // ✅ Clean description without image URL
+    category: safeToNumber(rawMarket.category, 0),
+    optionA: rawMarket.optionA || '',
+    optionB: rawMarket.optionB || '',
+    creator: rawMarket.creator || '',
+    createdAt: safeToString(rawMarket.createdAt),
+    endTime: safeToString(rawMarket.endTime),
+    minBet: safeToString(rawMarket.minBet) || '0',
+    maxBet: safeToString(rawMarket.maxBet) || '0',
+    status: safeToNumber(rawMarket.status, 0),
+    outcome: (rawMarket.outcome !== null && rawMarket.outcome !== undefined) ? safeToNumber(rawMarket.outcome) : null,
+    resolved: Boolean(rawMarket.resolved),
+    totalOptionAShares: safeToString(rawMarket.totalOptionAShares) || '0',
+    totalOptionBShares: safeToString(rawMarket.totalOptionBShares) || '0',
+    totalPool: safeToString(rawMarket.totalPool) || '0',
+    imageURI, // ✅ Extracted image URL
+  };
+  
+  console.log('✅ Transformed market with image:', transformedMarket);
+  return transformedMarket;
+};
+
+// Enhanced getActiveMarkets function with image extraction
 const getActiveMarkets = async (): Promise<Market[]> => {
   try {
     flowConfig();
-    console.log("Fetching active markets from contract...");
+    console.log("🎯 Fetching active markets from contract...");
 
     const rawMarkets = await fcl.query({
       cadence: GET_ACTIVE_MARKETS,
       args: () => [],
     });
 
-    console.log("Raw markets returned from getActiveMarkets():", rawMarkets);
+    console.log("📊 Raw markets returned from getActiveMarkets():", rawMarkets);
 
     if (!rawMarkets || !Array.isArray(rawMarkets)) {
-      console.warn("No active markets returned");
+      console.warn("⚠️ No active markets returned from contract");
+      return [];
+    }
+
+    if (rawMarkets.length === 0) {
+      console.log("📭 Contract returned empty array - no active markets");
       return [];
     }
 
     const currentTime = Math.floor(Date.now() / 1000);
-    console.log("Current timestamp:", currentTime);
+    console.log("⏰ Current timestamp:", currentTime);
 
-    const transformedMarkets = rawMarkets.map((market: any) => {
-      const transformedMarket = {
-        id: market.id,
-        creator: market.creator,
-        title: market.title,
-        description: market.description,
-        optionA: market.optionA,
-        optionB: market.optionB,
-        category: market.category,
-        endTime: market.endTime,
-        createdAt: market.createdAt,
-        outcome: market.outcome,
-        totalOptionAShares: market.totalOptionAShares,
-        totalOptionBShares: market.totalOptionBShares,
-        resolved: market.resolved,
-        status: market.status,
-        totalPool: market.totalPool,
-        minBet: market.minBet,
-        maxBet: market.maxBet
-      };
+    // Transform all returned markets with image extraction
+    const transformedMarkets = rawMarkets.map(transformMarketData);
 
-      // Debug each market
-      console.log(`Market ${market.id}:`, {
-        title: market.title,
-        status: market.status,
-        statusRawValue: market.status?.rawValue,
-        endTime: market.endTime,
-        endTimeReadable: new Date(parseInt(market.endTime) * 1000).toLocaleString(),
-        currentTime: currentTime,
-        isExpired: parseInt(market.endTime) < currentTime,
-        resolved: market.resolved
-      });
+    console.log("🔄 Transformed markets:", transformedMarkets);
 
-      return transformedMarket;
-    });
-
-    // Client-side double-check for truly active markets
+    // ✅ SIMPLIFIED: Trust the smart contract's getActiveMarkets() function
+    // Only do basic validation to catch obvious issues
     const validActiveMarkets = transformedMarkets.filter(market => {
-      const isStatusActive = market.status === 0 || market.status?.rawValue === 0;
-      const isNotExpired = parseInt(market.endTime) > currentTime;
+      const hasBasicData = market.id && market.title && market.optionA && market.optionB;
       const isNotResolved = !market.resolved;
       
-      const shouldBeActive = isStatusActive && isNotExpired && isNotResolved;
-      
-      if (!shouldBeActive) {
-        console.warn(`Market ${market.id} (${market.title}) returned by getActiveMarkets() but should not be active:`, {
-          isStatusActive,
-          isNotExpired,
-          isNotResolved,
-          endTime: new Date(parseInt(market.endTime) * 1000).toLocaleString()
-        });
+      if (!hasBasicData) {
+        console.warn(`❌ Market ${market.id} missing basic data:`, market);
+        return false;
       }
       
-      return shouldBeActive;
+      if (isNotResolved) {
+        console.log(`✅ Market ${market.id} (${market.title}) is valid and active`);
+        return true;
+      } else {
+        console.log(`⚠️ Market ${market.id} (${market.title}) is resolved, skipping`);
+        return false;
+      }
     });
     
-    console.log("Active markets after client-side validation:", validActiveMarkets);
-    console.log(`Smart contract returned ${transformedMarkets.length} markets, client validated ${validActiveMarkets.length} as truly active`);
+    console.log(`📈 Smart contract returned ${rawMarkets.length} markets`);
+    console.log(`✅ Final active markets count: ${validActiveMarkets.length}`);
+    console.log("🎯 Final active markets:", validActiveMarkets);
 
-    // Return the client-side validated active markets for now to fix the display
     return validActiveMarkets;
   } catch (error) {
-    console.error("Error fetching active markets:", error);
+    console.error("❌ Error fetching active markets:", error);
     throw error;
   }
 };
@@ -140,31 +160,20 @@ export default function HomePage() {
         args: () => [],
       });
 
+      console.log("📊 All markets from contract:", rawMarkets);
+
       if (!rawMarkets || !Array.isArray(rawMarkets)) {
+        console.warn("⚠️ No markets returned from getAllMarkets");
         return [];
       }
 
-      return rawMarkets.map((market: any) => ({
-        id: market.id,
-        creator: market.creator,
-        title: market.title,
-        description: market.description,
-        optionA: market.optionA,
-        optionB: market.optionB,
-        category: market.category,
-        endTime: market.endTime,
-        createdAt: market.createdAt,
-        outcome: market.outcome,
-        totalOptionAShares: market.totalOptionAShares,
-        totalOptionBShares: market.totalOptionBShares,
-        resolved: market.resolved,
-        status: market.status,
-        totalPool: market.totalPool,
-        minBet: market.minBet,
-        maxBet: market.maxBet
-      }));
+      // Transform all markets with image extraction
+      const transformedMarkets = rawMarkets.map(transformMarketData);
+      console.log("✅ All markets transformed:", transformedMarkets);
+
+      return transformedMarkets;
     } catch (error) {
-      console.error("Error fetching all markets:", error);
+      console.error("❌ Error fetching all markets:", error);
       return [];
     }
   };
@@ -175,21 +184,29 @@ export default function HomePage() {
       setMarketsLoading(true);
       setMarketsError(null);
       
+      console.log("🚀 Starting to fetch markets data...");
+      
       // Fetch both active markets and all markets
       const [activeMarketsData, allMarketsData] = await Promise.all([
         getActiveMarkets(),
         getAllMarkets()
       ]);
       
+      console.log("📈 Markets fetched:", {
+        active: activeMarketsData.length,
+        total: allMarketsData.length
+      });
+      
       setActiveMarkets(activeMarketsData);
       setAllMarkets(allMarketsData);
     } catch (err) {
-      console.error("Error fetching markets:", err);
+      console.error("❌ Error fetching markets:", err);
       setMarketsError(err instanceof Error ? err.message : "Failed to fetch markets");
     } finally {
       setMarketsLoading(false);
     }
   };
+
   const GET_USER_STATS_SCRIPT = `
     import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace('0x', '')}
     
@@ -315,6 +332,7 @@ export default function HomePage() {
 
   // Fetch markets when component mounts
   useEffect(() => {
+    console.log("🔄 Component mounted, fetching markets...");
     fetchMarketsData();
   }, []);
 
@@ -329,19 +347,23 @@ export default function HomePage() {
 
   // Transform and filter active markets for featured section
   useEffect(() => {
+    console.log("🔄 Processing featured markets from active markets:", activeMarkets);
+    
     if (activeMarkets && activeMarkets.length > 0) {
       // Get featured markets (active markets sorted by engagement)
       const featured = activeMarkets
         .sort((a, b) => {
           // Sort by pool size first, then by creation time
-          const poolDiff = parseFloat(b.totalPool) - parseFloat(a.totalPool);
+          const poolDiff = parseFloat(b.totalPool || '0') - parseFloat(a.totalPool || '0');
           if (poolDiff !== 0) return poolDiff;
-          return parseFloat(b.createdAt) - parseFloat(a.createdAt);
+          return parseFloat(b.createdAt || '0') - parseFloat(a.createdAt || '0');
         })
         .slice(0, 6); // Show top 6 markets
 
+      console.log("✨ Featured markets set:", featured);
       setFeaturedMarkets(featured);
     } else {
+      console.log("📭 No active markets, clearing featured markets");
       setFeaturedMarkets([]);
     }
   }, [activeMarkets]);
@@ -365,6 +387,13 @@ export default function HomePage() {
     const uniqueCreators = new Set(allMarkets.map(m => m.creator)).size;
     const totalUsers = uniqueCreators // Rough estimate
 
+    console.log("📊 Platform stats calculated:", {
+      totalMarkets,
+      activeMarkets: activeMarketsCount,
+      totalVolume: totalVolume.toFixed(2),
+      totalUsers
+    });
+
     return {
       totalMarkets,
       activeMarkets: activeMarketsCount,
@@ -372,6 +401,14 @@ export default function HomePage() {
       totalUsers
     };
   }, [allMarkets, activeMarkets]);
+
+  console.log("🎯 Current state:", {
+    marketsLoading,
+    marketsError,
+    activeMarketsCount: activeMarkets.length,
+    featuredMarketsCount: featuredMarkets.length,
+    allMarketsCount: allMarkets.length
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
@@ -573,7 +610,8 @@ export default function HomePage() {
                 <TrendingUp className="h-12 w-12 mx-auto" />
               </div>
               <h3 className="text-lg font-medium text-white mb-2">Unable to load markets</h3>
-              <p className="text-gray-400">{marketsError}</p>
+              <p className="text-gray-400 mb-2">{marketsError}</p>
+              <p className="text-xs text-gray-500 mb-4">Check the console for detailed debugging info</p>
               <Button 
                 onClick={fetchMarketsData}
                 variant="outline"
@@ -587,8 +625,13 @@ export default function HomePage() {
               <div className="text-gray-400 mb-4">
                 <TrendingUp className="h-12 w-12 mx-auto" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">No markets yet</h3>
-              <p className="text-gray-400 mb-4">Be the first to create a prediction market!</p>
+              <h3 className="text-lg font-medium text-white mb-2">No active markets found</h3>
+              <p className="text-gray-400 mb-4">
+                {allMarkets.length === 0 
+                  ? "No markets have been created yet. Be the first to create a prediction market!" 
+                  : "All markets are currently inactive or resolved. Create a new market to get started!"
+                }
+              </p>
               <OwnerOnly showFallback={false}>
                 <Button 
                   asChild 
@@ -600,7 +643,7 @@ export default function HomePage() {
                     e.currentTarget.style.backgroundColor = "#9b87f5";
                   }}
                 >
-                  <Link href="/admin/create">Create First Market</Link>
+                  <Link href="/admin/create">Create New Market</Link>
                 </Button>
               </OwnerOnly>
             </div>

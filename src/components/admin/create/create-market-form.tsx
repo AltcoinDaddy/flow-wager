@@ -3,7 +3,7 @@
 
 // src/components/admin/create/create-market-form.tsx
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Check, Upload, Loader2 } from "lucide-react";
+import { AlertTriangle, Check, Upload, Loader2, X, Image as ImageIcon } from "lucide-react";
 import * as fcl from "@onflow/fcl";
 import { toast } from "sonner";
 
@@ -92,11 +92,65 @@ interface CreateMarketFormProps {
   isLoading?: boolean;
 }
 
+// Cloudinary upload function
+const uploadToCloudinary = async (file: File): Promise<string> => {
+  // Validate environment variables
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    console.error('Missing Cloudinary configuration:', {
+      cloudName: !!cloudName,
+      uploadPreset: !!uploadPreset
+    });
+    throw new Error('Cloudinary not configured. Please check environment variables.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+
+  try {
+    console.log('Uploading to Cloudinary:', {
+      cloudName,
+      uploadPreset,
+      fileSize: file.size,
+      fileType: file.type
+    });
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Cloudinary API error:', data);
+      throw new Error(data.error?.message || `Upload failed with status ${response.status}`);
+    }
+
+    console.log('Upload successful:', data.secure_url);
+    return data.secure_url;
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to upload image');
+  }
+};
+
 export function CreateMarketForm({
   onSubmit,
   isLoading: externalLoading = false,
 }: CreateMarketFormProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     question: "",
     optionA: "",
@@ -119,19 +173,109 @@ export function CreateMarketForm({
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string>("");
 
   // Check user authentication on component mount
-  useState(() => {
+  useEffect(() => {
     const checkAuth = async () => {
       const currentUser = await fcl.currentUser.snapshot();
       setUser(currentUser);
     };
+    
     checkAuth();
 
     // Subscribe to auth changes
     const unsubscribe = fcl.currentUser.subscribe(setUser);
-    return unsubscribe;
-  });
+    
+    // Return cleanup function
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Handle file selection and upload
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    // Check Cloudinary configuration
+    if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) {
+      toast.error('Cloudinary not configured. Please check environment variables.');
+      console.error('Missing Cloudinary environment variables:', {
+        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: !!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: !!process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+      });
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload to Cloudinary
+      const imageUrl = await uploadToCloudinary(file);
+      
+      setFormData(prev => ({ ...prev, imageURI: imageUrl }));
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload image. Please try again.';
+      toast.error(errorMessage);
+      setImagePreview("");
+      
+      // If it's a configuration error, provide helpful guidance
+      if (errorMessage.includes('not configured')) {
+        console.log(`
+📋 Cloudinary Setup Instructions:
+1. Sign up at https://cloudinary.com
+2. Get your Cloud Name from the dashboard
+3. Create an upload preset:
+   - Go to Settings → Upload presets
+   - Click "Add upload preset"
+   - Set to "Unsigned"
+   - Note the preset name
+4. Add to your .env.local:
+   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your_preset_name
+        `);
+      }
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Trigger file input
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Remove uploaded image
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, imageURI: "" }));
+    setImagePreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
@@ -228,130 +372,131 @@ export function CreateMarketForm({
   };
 
   // 🚨 THIS IS WHERE THE SMART CONTRACT IS CALLED 🚨
- const createMarketOnBlockchain = async (marketData: any): Promise<string> => {
-  if (!user?.addr) {
-    throw new Error("User not authenticated");
-  }
+  const createMarketOnBlockchain = async (marketData: any): Promise<string> => {
+    if (!user?.addr) {
+      throw new Error("User not authenticated");
+    }
 
-  try {
-    console.log("Creating market on blockchain with data:", marketData);
+    try {
+      console.log("Creating market on blockchain with data:", marketData);
 
-    const transactionId = await fcl.mutate({
-      cadence: `
-        import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
+      const transactionId = await fcl.mutate({
+        cadence: `
+          import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
 
-        transaction(
-          question: String,
-          optionA: String,
-          optionB: String,
-          category: UInt8,
-          minBet: UFix64,
-          maxBet: UFix64,
-          duration: UFix64
-        ) {
-          let adminRef: auth(Storage) &FlowWager.Admin
-          
-          prepare(signer: auth(Storage) &Account) {
-            self.adminRef = signer.storage.borrow<auth(Storage) &FlowWager.Admin>(from: /storage/FlowWagerAdmin)
-              ?? panic("Could not borrow Admin reference. Only admins can create markets.")
+          transaction(
+            question: String,
+            description: String,
+            optionA: String,
+            optionB: String,
+            category: UInt8,
+            minBet: UFix64,
+            maxBet: UFix64,
+            duration: UFix64
+          ) {
+            let adminRef: auth(Storage) &FlowWager.Admin
+            
+            prepare(signer: auth(Storage) &Account) {
+              self.adminRef = signer.storage.borrow<auth(Storage) &FlowWager.Admin>(from: /storage/FlowWagerAdmin)
+                ?? panic("Could not borrow Admin reference. Only admins can create markets.")
+            }
+            
+            execute {
+              let categoryEnum = FlowWager.MarketCategory(rawValue: category)
+                ?? panic("Invalid category value")
+              
+              let endTime = getCurrentBlock().timestamp + duration
+              
+              let marketId = self.adminRef.createMarket(
+                title: question,
+                description: description,
+                category: categoryEnum,
+                optionA: optionA,
+                optionB: optionB,
+                endTime: endTime,
+                minBet: minBet,
+                maxBet: maxBet
+              )
+              
+              log("Market created with ID: ".concat(marketId.toString()))
+            }
           }
-          
-          execute {
-            let categoryEnum = FlowWager.MarketCategory(rawValue: category)
-              ?? panic("Invalid category value")
-            
-            let endTime = getCurrentBlock().timestamp + duration
-            
-            let marketId = self.adminRef.createMarket(
-              title: question,
-              description: question,
-              category: categoryEnum,
-              optionA: optionA,
-              optionB: optionB,
-              endTime: endTime,
-              minBet: minBet,
-              maxBet: maxBet
-            )
-            
-            log("Market created with ID: ".concat(marketId.toString()))
-          }
+        `,
+        args: (arg, t) => [
+          arg(marketData.question, t.String),
+          arg(marketData.description, t.String), // ✅ This contains rules + hidden image URL
+          arg(marketData.optionA, t.String),
+          arg(marketData.optionB, t.String),
+          arg(marketData.category.toString(), t.UInt8),
+          arg(marketData.minBet.toFixed(8), t.UFix64),
+          arg(marketData.maxBet.toFixed(8), t.UFix64),
+          arg((marketData.duration * 3600).toFixed(1), t.UFix64)
+        ],
+        proposer: fcl.authz,
+        payer: fcl.authz,
+        authorizations: [fcl.authz],
+        limit: 1000
+      });
+
+      console.log("Transaction submitted:", transactionId);
+
+      // Wait for transaction to be sealed
+      const transaction = await fcl.tx(transactionId).onceSealed();
+      
+      console.log("Transaction result:", transaction);
+      console.log("Transaction status:", transaction.status);
+      console.log("Transaction events:", transaction.events);
+
+      // Check the correct status codes
+      if (transaction.status === 5) {
+        // Status 5 = EXPIRED (failed)
+        const errorMsg = transaction.errorMessage || "Transaction expired/failed";
+        console.error("Transaction failed with error:", errorMsg);
+        throw new Error(`Transaction failed: ${errorMsg}`);
+      }
+
+      if (transaction.status === 4) {
+        // Status 4 = SEALED (success!)
+        console.log("Transaction sealed successfully!");
+        
+        // Try to extract market ID from events if possible
+        const marketCreatedEvent = transaction.events?.find(
+          (event: any) => event.type.includes('MarketCreated')
+        );
+        
+        if (marketCreatedEvent) {
+          console.log("Market created event:", marketCreatedEvent);
         }
-      `,
-      args: (arg, t) => [
-        arg(marketData.question, t.String),
-        arg(marketData.optionA, t.String),
-        arg(marketData.optionB, t.String),
-        arg(marketData.category.toString(), t.UInt8),
-        arg(marketData.minBet.toFixed(8), t.UFix64),
-        arg(marketData.maxBet.toFixed(8), t.UFix64),
-        arg((marketData.duration * 3600).toFixed(1), t.UFix64)
-      ],
-      proposer: fcl.authz,
-      payer: fcl.authz,
-      authorizations: [fcl.authz],
-      limit: 1000
-    });
-
-    console.log("Transaction submitted:", transactionId);
-
-    // Wait for transaction to be sealed
-    const transaction = await fcl.tx(transactionId).onceSealed();
-    
-    console.log("Transaction result:", transaction);
-    console.log("Transaction status:", transaction.status);
-    console.log("Transaction events:", transaction.events);
-
-    // Check the correct status codes
-    if (transaction.status === 5) {
-      // Status 5 = EXPIRED (failed)
-      const errorMsg = transaction.errorMessage || "Transaction expired/failed";
-      console.error("Transaction failed with error:", errorMsg);
-      throw new Error(`Transaction failed: ${errorMsg}`);
-    }
-
-    if (transaction.status === 4) {
-      // Status 4 = SEALED (success!)
-      console.log("Transaction sealed successfully!");
-      
-      // Try to extract market ID from events if possible
-      const marketCreatedEvent = transaction.events?.find(
-        (event: any) => event.type.includes('MarketCreated')
-      );
-      
-      if (marketCreatedEvent) {
-        console.log("Market created event:", marketCreatedEvent);
+        
+        return transactionId;
       }
-      
+
+      // If we get here, something unexpected happened
+      console.warn("Unexpected transaction status:", transaction.status);
       return transactionId;
-    }
 
-    // If we get here, something unexpected happened
-    console.warn("Unexpected transaction status:", transaction.status);
-    return transactionId;
-
-  } catch (error: any) {
-    console.error("Market creation failed:", error);
-    
-    // Better error message extraction
-    let errorMessage = "Unknown error occurred";
-    
-    if (error.message) {
-      errorMessage = error.message;
-    }
-    
-    // If it's a Cadence runtime error, try to extract the panic message
-    if (error.message && error.message.includes('panic:')) {
-      const panicMatch = error.message.match(/panic: (.+?)(?:\n|$)/);
-      if (panicMatch) {
-        errorMessage = panicMatch[1];
+    } catch (error: any) {
+      console.error("Market creation failed:", error);
+      
+      // Better error message extraction
+      let errorMessage = "Unknown error occurred";
+      
+      if (error.message) {
+        errorMessage = error.message;
       }
+      
+      // If it's a Cadence runtime error, try to extract the panic message
+      if (error.message && error.message.includes('panic:')) {
+        const panicMatch = error.message.match(/panic: (.+?)(?:\n|$)/);
+        if (panicMatch) {
+          errorMessage = panicMatch[1];
+        }
+      }
+      
+      console.error("Processed error message:", errorMessage);
+      throw new Error(errorMessage);
     }
-    
-    console.error("Processed error message:", errorMessage);
-    throw new Error(errorMessage);
-  }
-};
-
+  };
 
   const handleSubmit = async () => {
     if (!validateStep3()) return;
@@ -370,17 +515,20 @@ export function CreateMarketForm({
       // Calculate duration in hours from end date/time
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
       const now = new Date();
-      const durationHours =
-        (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const durationHours = (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      // ✅ Store image URL hidden in rules field (hidden from users)
+      const rulesWithImage = formData.imageURI 
+        ? `${formData.rules}\n\n__IMG__:${formData.imageURI}`
+        : formData.rules;
 
       const marketCreationData = {
         question: formData.question.trim(),
+        description: rulesWithImage, // ✅ Image URL hidden in description field
         optionA: formData.optionA.trim(),
         optionB: formData.optionB.trim(),
         category: formData.category,
-        imageURI: formData.imageURI || "",
         duration: durationHours,
-        isBreakingNews: formData.isBreakingNews,
         minBet: parseFloat(formData.minBet),
         maxBet: parseFloat(formData.maxBet),
       };
@@ -418,6 +566,15 @@ export function CreateMarketForm({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 p-6 border-2 border-gray-700/50 rounded-xl bg-gradient-to-br from-[#0A0C14]/50 to-[#151923]/30 backdrop-blur-sm">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        accept="image/*"
+        className="hidden"
+      />
+
       {/* Wallet Connection Check */}
       {!user?.loggedIn && (
         <Alert className="bg-yellow-500/10 border-yellow-500/30">
@@ -425,6 +582,22 @@ export function CreateMarketForm({
           <AlertDescription className="text-yellow-400">
             Please connect your wallet to create markets. Only admin wallets can
             create markets.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Cloudinary Configuration Check */}
+      {(!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) && (
+        <Alert className="bg-orange-500/10 border-orange-500/30">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-orange-400">
+            <div>
+              <p className="font-medium">Cloudinary not configured</p>
+              <p className="text-sm mt-1">
+                Image upload will not work. Manual URL entry is still available.
+                Check console for setup instructions.
+              </p>
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -575,14 +748,39 @@ export function CreateMarketForm({
               )}
             </div>
 
+            {/* Enhanced Image Upload Section */}
             <div className="space-y-2">
               <Label htmlFor="imageURI" className="text-gray-300">
                 Market Image (Optional)
               </Label>
+              
+              {/* Image Preview */}
+              {(imagePreview || formData.imageURI) && (
+                <div className="relative">
+                  <div className="relative w-full h-48 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                    <img
+                      src={imagePreview || formData.imageURI}
+                      alt="Market preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveImage}
+                      className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 border-red-500 text-white"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Controls */}
               <div className="flex space-x-2">
                 <Input
                   id="imageURI"
-                  placeholder="https://example.com/image.jpg"
+                  placeholder="https://example.com/image.jpg or click upload"
                   value={formData.imageURI}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -593,12 +791,29 @@ export function CreateMarketForm({
                   className="bg-[#0A0C14] border-gray-700 text-white placeholder:text-gray-500 focus:border-[#9b87f5]"
                 />
                 <Button
+                  type="button"
                   variant="outline"
-                  size="icon"
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C]"
+                  onClick={handleUploadClick}
+                  disabled={isUploadingImage}
+                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5] min-w-[120px]"
                 >
-                  <Upload className="h-4 w-4" />
+                  {isUploadingImage ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload
+                    </>
+                  )}
                 </Button>
+              </div>
+              
+              <div className="flex items-center space-x-2 text-xs text-gray-400">
+                <ImageIcon className="h-3 w-3" />
+                <span>Supports JPG, PNG, GIF up to 5MB. Images will be hosted on Cloudinary.</span>
               </div>
             </div>
 
@@ -810,7 +1025,7 @@ export function CreateMarketForm({
         </Card>
       )}
 
-      {/* Step 4: Review & Confirm */}
+      {/* Step 4: Review & Confirm - Updated to not show hidden image URL in rules */}
       {step === 4 && (
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
@@ -855,6 +1070,19 @@ export function CreateMarketForm({
                 </Badge>
               </div>
 
+              {formData.imageURI && (
+                <div>
+                  <h4 className="font-semibold text-white">Market Image</h4>
+                  <div className="w-32 h-20 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
+                    <img
+                      src={formData.imageURI}
+                      alt="Market image"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="font-semibold text-white">Trading Period</h4>
                 <p className="text-sm text-gray-400">
@@ -864,6 +1092,14 @@ export function CreateMarketForm({
                   ).toLocaleString()}
                 </p>
               </div>
+
+              {/* ✅ Show clean resolution rules (without hidden image URL) */}
+              {formData.rules && (
+                <div>
+                  <h4 className="font-semibold text-white">Resolution Rules</h4>
+                  <p className="text-sm text-gray-400">{formData.rules}</p>
+                </div>
+              )}
 
               <div>
                 <h4 className="font-semibold text-white">Betting Limits</h4>
@@ -930,188 +1166,6 @@ export function CreateMarketForm({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Analytics Panel Component remains the same...
-export function AnalyticsPanel() {
-  const [timeRange, setTimeRange] = useState("7d");
-
-  const analyticsData = {
-    totalMarkets: 156,
-    activeMarkets: 89,
-    totalVolume: "2,847,293.45",
-    totalUsers: 12437,
-    avgMarketVolume: "18,251.24",
-    topCategory: "Economics",
-    resolutionAccuracy: 96.8,
-    avgResolutionTime: "2.3 days",
-  };
-
-  const topMarkets = [
-    {
-      title: "Will Bitcoin reach $100,000 by end of 2025?",
-      volume: "125,430.78",
-      traders: 1247,
-      category: "Economics",
-    },
-    {
-      title: "Next US Presidential Election Winner",
-      volume: "98,234.56",
-      traders: 892,
-      category: "Politics",
-    },
-    {
-      title: "Will ChatGPT-5 be released in 2025?",
-      volume: "76,543.21",
-      traders: 634,
-      category: "Technology",
-    },
-  ];
-
-  const categoryStats = [
-    { category: "Economics", markets: 45, volume: "1,234,567" },
-    { category: "Sports", markets: 38, volume: "876,543" },
-    { category: "Politics", markets: 24, volume: "654,321" },
-    { category: "Technology", markets: 31, volume: "543,210" },
-    { category: "Entertainment", markets: 18, volume: "321,098" },
-  ];
-
-  return (
-    <div className="space-y-6 bg-[#0A0C14] text-white">
-      {/* Time Range Selector */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Platform Analytics</h2>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger className="w-32 bg-[#1A1F2C] border-gray-700 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-[#1A1F2C] border-gray-700">
-            <SelectItem value="24h" className="text-white hover:bg-[#0A0C14]">
-              Last 24h
-            </SelectItem>
-            <SelectItem value="7d" className="text-white hover:bg-[#0A0C14]">
-              Last 7 days
-            </SelectItem>
-            <SelectItem value="30d" className="text-white hover:bg-[#0A0C14]">
-              Last 30 days
-            </SelectItem>
-            <SelectItem value="90d" className="text-white hover:bg-[#0A0C14]">
-              Last 90 days
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-white">
-              {analyticsData.totalMarkets}
-            </div>
-            <div className="text-sm text-gray-400">Total Markets</div>
-            <div className="text-xs text-green-400">+12 this week</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-white">
-              {analyticsData.totalVolume}
-            </div>
-            <div className="text-sm text-gray-400">Total Volume (FLOW)</div>
-            <div className="text-xs text-green-400">+15.3% vs last week</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-white">
-              {analyticsData.totalUsers.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-400">Total Users</div>
-            <div className="text-xs text-green-400">+234 new users</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-          <CardContent className="p-4">
-            <div className="text-2xl font-bold text-white">
-              {analyticsData.resolutionAccuracy}%
-            </div>
-            <div className="text-sm text-gray-400">Resolution Accuracy</div>
-            <div className="text-xs text-green-400">+0.2% vs last month</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Markets */}
-      <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-        <CardHeader>
-          <CardTitle className="text-white">Top Markets by Volume</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {topMarkets.map((market, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-[#0A0C14] transition-colors"
-              >
-                <div className="flex-1">
-                  <p className="font-medium line-clamp-1 text-white">
-                    {market.title}
-                  </p>
-                  <div className="flex items-center space-x-4 text-sm text-gray-400">
-                    <Badge
-                      variant="outline"
-                      className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30"
-                    >
-                      {market.category}
-                    </Badge>
-                    <span>{market.traders} traders</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-white">
-                    {market.volume} FLOW
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Category Breakdown */}
-      <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-        <CardHeader>
-          <CardTitle className="text-white">Markets by Category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {categoryStats.map((stat, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <span className="font-medium text-white">
-                    {stat.category}
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className="bg-gray-700/50 text-gray-300 border-gray-600"
-                  >
-                    {stat.markets} markets
-                  </Badge>
-                </div>
-                <span className="font-medium text-white">
-                  {stat.volume} FLOW
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

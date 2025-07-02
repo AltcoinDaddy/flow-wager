@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
 import { useAuth } from "@/providers/auth-provider";
 import { MarketCategory, MarketStatus } from "@/types/market";
+import { getOptimizedImageUrl, isValidImageUrl, extractImageFromMarket } from "@/lib/flow/market";
 import {
   BarChart3,
   Bookmark,
@@ -29,6 +30,8 @@ import {
   Users,
   Volume2,
   Zap,
+  Image as ImageIcon,
+  Flame
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -56,6 +59,8 @@ export default function MarketDetailPage() {
   );
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
 
   // Auto-refresh market data every 30 seconds
   useEffect(() => {
@@ -83,6 +88,11 @@ export default function MarketDetailPage() {
       />
     );
   }
+
+  // Extract image from market data
+  const finalImageURI = market.imageURI || (market.description ? extractImageFromMarket(market.description).imageURI : undefined);
+  const optimizedImageUrl = getOptimizedImageUrl(finalImageURI, 800, 400);
+  const hasValidImage = isValidImageUrl(optimizedImageUrl) && !imageError;
 
   const totalShares =
     parseFloat(market.totalOptionAShares) +
@@ -149,6 +159,38 @@ export default function MarketDetailPage() {
     return Object.values(MarketStatus)[status] || "Unknown";
   };
 
+  const getCategoryColor = (category: number) => {
+    switch (category) {
+      case 0: // Politics
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+      case 1: // Sports
+        return "bg-green-500/20 text-green-400 border-green-500/30";
+      case 2: // Economics
+        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+      case 3: // Technology
+        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+      case 4: // Entertainment
+        return "bg-pink-500/20 text-pink-400 border-pink-500/30";
+      case 5: // Crypto
+        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+      case 6: // Weather
+        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
+      case 7: // BreakingNews
+        return "bg-red-500/20 text-red-400 border-red-500/30";
+      default:
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+    }
+  };
+
+  const handleImageLoad = () => {
+    setImageLoading(false);
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
   const handleBet = (side: "optionA" | "optionB") => {
     // Double check betting is allowed
     if (isBettingDisabled) return;
@@ -201,6 +243,10 @@ export default function MarketDetailPage() {
     return "Betting not available";
   };
 
+  const volume = parseFloat(market.totalPool);
+  const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
+  const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
+
   console.log("Market Data:", market);
 
   return (
@@ -235,43 +281,79 @@ export default function MarketDetailPage() {
           <span className="text-white font-medium">{market.title}</span>
         </div>
 
-        {/* Enhanced Market Header */}
+        {/* ✅ Enhanced Market Header with Small Logo Image */}
         <div className="space-y-6">
           <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl">
             <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium">
-                  {getCategoryName(market.category)}
-                </Badge>
-                <Badge
-                  variant={
-                    actualStatus === MarketStatus.Active
-                      ? "default"
-                      : "secondary"
-                  }
-                  className={
-                    actualStatus === MarketStatus.Active
-                      ? "bg-green-500/20 text-green-400 border-green-500/30 font-medium"
-                      : actualStatus === MarketStatus.Resolved
-                      ? "bg-blue-500/20 text-blue-400 border-blue-500/30 font-medium"
-                      : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
-                      ? "bg-orange-500/20 text-orange-400 border-orange-500/30 font-medium"
-                      : "font-medium"
-                  }
-                >
-                  <div className="flex items-center space-x-1">
-                    {actualStatus === MarketStatus.Active && (
-                      <TrendingUp className="h-3 w-3" />
+              <div className="flex items-center space-x-4">
+                {/* ✅ Small logo-style image */}
+                {hasValidImage ? (
+                  <div className="relative w-16 h-16 flex-shrink-0">
+                    {imageLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-xl">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9b87f5]"></div>
+                      </div>
                     )}
-                    {actualStatus === MarketStatus.Paused && (
-                      <Pause className="h-3 w-3" />
-                    )}
-                    {actualStatus === MarketStatus.Resolved && (
-                      <CheckCircle className="h-3 w-3" />
-                    )}
-                    <span>{getStatusName(actualStatus)}</span>
+                    <img
+                      src={optimizedImageUrl}
+                      alt={market.title}
+                      className={`w-full h-full object-cover rounded-xl transition-all duration-300 ${
+                        imageLoading ? 'opacity-0' : 'opacity-100'
+                      }`}
+                      onLoad={handleImageLoad}
+                      onError={handleImageError}
+                      loading="lazy"
+                    />
                   </div>
-                </Badge>
+                ) : (
+                  // ✅ Placeholder logo
+                  <div className="w-16 h-16 flex-shrink-0 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl flex items-center justify-center border border-gray-700/50">
+                    <ImageIcon className="h-7 w-7 text-gray-600" />
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-3">
+                  <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium">
+                    {getCategoryName(market.category)}
+                  </Badge>
+                  <Badge
+                    variant={
+                      actualStatus === MarketStatus.Active
+                        ? "default"
+                        : "secondary"
+                    }
+                    className={
+                      actualStatus === MarketStatus.Active
+                        ? "bg-green-500/20 text-green-400 border-green-500/30 font-medium"
+                        : actualStatus === MarketStatus.Resolved
+                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30 font-medium"
+                        : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
+                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30 font-medium"
+                        : "font-medium"
+                    }
+                  >
+                    <div className="flex items-center space-x-1">
+                      {actualStatus === MarketStatus.Active && (
+                        <TrendingUp className="h-3 w-3" />
+                      )}
+                      {actualStatus === MarketStatus.Paused && (
+                        <Pause className="h-3 w-3" />
+                      )}
+                      {actualStatus === MarketStatus.Resolved && (
+                        <CheckCircle className="h-3 w-3" />
+                      )}
+                      <span>{getStatusName(actualStatus)}</span>
+                    </div>
+                  </Badge>
+
+                  {/* Hot indicator */}
+                  {isHot && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-sm">
+                      <Flame className="h-3 w-3" />
+                      <span className="text-xs font-medium">Hot</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Enhanced Action buttons */}
@@ -348,6 +430,7 @@ export default function MarketDetailPage() {
           </div>
         </div>
 
+        {/* Rest of the existing content remains the same... */}
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column - Trading & Details */}

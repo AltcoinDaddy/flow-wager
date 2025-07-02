@@ -2,23 +2,27 @@
 
 // Market-related type definitions aligned with FlowWager contract
 export interface Market {
-  id: string;                    // UInt64 from contract (as string for precision)
-  title: string;                 // Contract uses 'title' not 'question'
-  description: string;           // Contract field
-  category: MarketCategory;      // Enum from contract
-  optionA: string;              // ✓ Matches contract
-  optionB: string;              // ✓ Matches contract
-  creator: string;              // ✓ Address from contract
-  createdAt: string;            // UFix64 timestamp from contract
-  endTime: string;              // UFix64 timestamp from contract (not number)
-  minBet: string;               // UFix64 from contract (not number)
-  maxBet: string;               // UFix64 from contract (not number)
-  status: MarketStatus;         // Enum from contract
-  outcome: MarketOutcome | null; // Optional enum from contract
-  resolved: boolean;            // ✓ Bool from contract
-  totalOptionAShares: string;   // UFix64 from contract (not number)
-  totalOptionBShares: string;   // UFix64 from contract (not number)
-  totalPool: string;            // UFix64 from contract (not number)
+   id: string;
+  title: string;
+  description: string;
+  category: number;
+  optionA: string;
+  optionB: string;
+  creator: string;
+  createdAt: string;
+  endTime: string;
+  minBet: string;
+  maxBet: string;
+  status: number;
+  outcome: number | null;
+  resolved: boolean;
+  totalOptionAShares: string;
+  totalOptionBShares: string;
+  totalPool: string;
+  imageURI?: string; // ✅ Added image support
+  // Additional calculated fields
+  totalBets?: number;
+  totalParticipants?: number;       // UFix64 from contract (not number)
 }
 
 export interface MarketMetadata {

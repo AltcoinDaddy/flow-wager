@@ -7,9 +7,10 @@ import {
   MarketCategoryLabels,
   MarketStatus
 } from "@/types/market";
-import { Clock, ExternalLink, Flame, TrendingUp, Users2 } from "lucide-react";
+import { Clock, ExternalLink, Flame, TrendingUp, Users2, Image as ImageIcon } from "lucide-react";
 import Link from "next/link";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { getOptimizedImageUrl, isValidImageUrl, extractImageFromMarket } from "@/lib/flow/market";
 
 interface MarketCardProps {
   market: Market;
@@ -20,6 +21,30 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   market,
   className = "",
 }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [extractedImageURI, setExtractedImageURI] = useState<string | undefined>();
+
+  // Extract image from description field if not in imageURI
+  useEffect(() => {
+    // If no imageURI in market object, try extracting from description
+    if (!market.imageURI && market.description) {
+      const { imageURI } = extractImageFromMarket(market.description);
+      if (imageURI) {
+        setExtractedImageURI(imageURI);
+      }
+    } else {
+      setExtractedImageURI(market.imageURI);
+    }
+  }, [market]);
+
+  // Use extracted image URI or fallback to market.imageURI
+  const finalImageURI = extractedImageURI || market.imageURI;
+  
+  // Get optimized image URL - smaller size for compact display
+  const optimizedImageUrl = getOptimizedImageUrl(finalImageURI, 120, 120);
+  const hasValidImage = isValidImageUrl(optimizedImageUrl) && !imageError;
+
   // Calculate percentages for odds
   const totalShares =
     parseFloat(market.totalOptionAShares) +
@@ -87,6 +112,15 @@ export const MarketCard: React.FC<MarketCardProps> = ({
     }
   };
 
+  const handleImageLoad = () => {
+    setImageLoading(false);
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
   const isActive = market.status === MarketStatus.Active;
   const timeRemaining = getTimeRemaining();
   const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
@@ -100,23 +134,51 @@ export const MarketCard: React.FC<MarketCardProps> = ({
     >
       <CardContent className="p-0">
         <Link href={`/markets/${market.id}`} className="block">
-          {/* Header */}
+          {/* Header with compact image */}
           <div className="p-3 pb-2">
             <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-1">
-                <Badge
-                  variant="outline"
-                  className={`text-xs font-medium px-2 py-0.5 border ${getCategoryColor(market.category)}`}
-                >
-                  {MarketCategoryLabels[market.category]}
-                </Badge>
-                
-                {/* Hot indicator */}
-                {isHot && (
-                  <div className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-xs">
-                    <Flame className="h-2.5 w-2.5" />
+              <div className="flex items-center gap-2">
+                {/* Compact rounded image */}
+                {hasValidImage ? (
+                  <div className="relative w-12 h-12 flex-shrink-0">
+                    {imageLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#9b87f5]"></div>
+                      </div>
+                    )}
+                    <img
+                      src={optimizedImageUrl}
+                      alt={market.title}
+                      className={`w-full h-full object-cover rounded-lg transition-all duration-300 group-hover:scale-105 ${
+                        imageLoading ? 'opacity-0' : 'opacity-100'
+                      }`}
+                      onLoad={handleImageLoad}
+                      onError={handleImageError}
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  // Compact rounded placeholder
+                  <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-lg flex items-center justify-center border border-gray-700/50">
+                    <ImageIcon className="h-5 w-5 text-gray-600" />
                   </div>
                 )}
+
+                <div className="flex items-center gap-1">
+                  <Badge
+                    variant="outline"
+                    className={`text-xs font-medium px-2 py-0.5 border ${getCategoryColor(market.category)}`}
+                  >
+                    {MarketCategoryLabels[market.category as keyof typeof MarketCategoryLabels]}
+                  </Badge>
+                  
+                  {/* Hot indicator */}
+                  {isHot && (
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-xs">
+                      <Flame className="h-2.5 w-2.5" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {isActive && (
@@ -136,7 +198,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
             </h3>
 
             {/* Market Stats */}
-            <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
               <div className="flex items-center gap-1 px-1.5 py-1 bg-[#0A0C14]/50 rounded">
                 <TrendingUp className="h-3 w-3 text-[#9b87f5]" />
                 <span className="font-medium">{formatVolume(volume)}</span>
@@ -146,59 +208,57 @@ export const MarketCard: React.FC<MarketCardProps> = ({
                 <span className="font-medium">{Math.ceil(totalShares / 100)}</span>
               </div>
             </div>
-          </div>
 
-          {/* Options */}
-          <div className="px-3 pb-2 space-y-2">
-            {/* Option A */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg border border-gray-700/50 hover:border-green-500/50 hover:bg-green-500/5 transition-all duration-200 group/option">
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-white truncate group-hover/option:text-green-100">
-                  {market.optionA}
+            {/* Options */}
+            <div className="space-y-2 mb-3">
+              {/* Option A */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-gray-700/50 hover:border-green-500/50 hover:bg-green-500/5 transition-all duration-200 group/option">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-white truncate group-hover/option:text-green-100">
+                    {market.optionA}
+                  </div>
+                </div>
+                <div className="ml-2 flex items-center gap-1">
+                  <div
+                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                      optionAPercentage > 50
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-gray-700/50 text-gray-300"
+                    }`}
+                  >
+                    {formatOdds(optionAPercentage)}
+                  </div>
+                  {optionAPercentage > optionBPercentage && (
+                    <TrendingUp className="h-2.5 w-2.5 text-green-400" />
+                  )}
                 </div>
               </div>
-              <div className="ml-2 flex items-center gap-1">
-                <div
-                  className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
-                    optionAPercentage > 50
-                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                      : "bg-gray-700/50 text-gray-300"
-                  }`}
-                >
-                  {formatOdds(optionAPercentage)}
+
+              {/* Option B */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-gray-700/50 hover:border-red-500/50 hover:bg-red-500/5 transition-all duration-200 group/option">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-white truncate group-hover/option:text-red-100">
+                    {market.optionB}
+                  </div>
                 </div>
-                {optionAPercentage > optionBPercentage && (
-                  <TrendingUp className="h-2.5 w-2.5 text-green-400" />
-                )}
+                <div className="ml-2 flex items-center gap-1">
+                  <div
+                    className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                      optionBPercentage > 50
+                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                        : "bg-gray-700/50 text-gray-300"
+                    }`}
+                  >
+                    {formatOdds(optionBPercentage)}
+                  </div>
+                  {optionBPercentage > optionAPercentage && (
+                    <TrendingUp className="h-2.5 w-2.5 text-green-400" />
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Option B */}
-            <div className="flex items-center justify-between p-2.5 rounded-lg border border-gray-700/50 hover:border-red-500/50 hover:bg-red-500/5 transition-all duration-200 group/option">
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-white truncate group-hover/option:text-red-100">
-                  {market.optionB}
-                </div>
-              </div>
-              <div className="ml-2 flex items-center gap-1">
-                <div
-                  className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
-                    optionBPercentage > 50
-                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                      : "bg-gray-700/50 text-gray-300"
-                  }`}
-                >
-                  {formatOdds(optionBPercentage)}
-                </div>
-                {optionBPercentage > optionAPercentage && (
-                  <TrendingUp className="h-2.5 w-2.5 text-green-400" />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-3 pb-3">
+            {/* Footer */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-800/50">
               <div className="text-xs text-gray-400">
                 {market.resolved ? (
