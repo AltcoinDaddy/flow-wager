@@ -401,7 +401,7 @@ export default function MarketDetailPage() {
                 <Users className="h-4 w-4 text-[#9b87f5]" />
                 <span>Created by</span>
                 <Link
-                  href={`/profile/${market.creator}`}
+                  href={`/dashboard/${market.creator}`}
                   className="text-[#9b87f5] hover:text-[#8b5cf6] font-medium transition-colors"
                 >
                   {market.creator.slice(0, 6)}...{market.creator.slice(-4)}

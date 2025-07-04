@@ -24,6 +24,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [extractedImageURI, setExtractedImageURI] = useState<string | undefined>();
+  const [isImageHovered, setIsImageHovered] = useState(false); // New state for hover
 
   // Extract image from description field if not in imageURI
   useEffect(() => {
@@ -139,30 +140,46 @@ export const MarketCard: React.FC<MarketCardProps> = ({
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
                 {/* Compact rounded image */}
-                {hasValidImage ? (
-                  <div className="relative w-12 h-12 flex-shrink-0">
-                    {imageLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#9b87f5]"></div>
-                      </div>
-                    )}
-                    <img
-                      src={optimizedImageUrl}
-                      alt={market.title}
-                      className={`w-full h-full object-cover rounded-lg transition-all duration-300 group-hover:scale-105 ${
-                        imageLoading ? 'opacity-0' : 'opacity-100'
-                      }`}
-                      onLoad={handleImageLoad}
-                      onError={handleImageError}
-                      loading="lazy"
-                    />
-                  </div>
-                ) : (
-                  // Compact rounded placeholder
-                  <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-lg flex items-center justify-center border border-gray-700/50">
-                    <ImageIcon className="h-5 w-5 text-gray-600" />
-                  </div>
-                )}
+                <div
+                  className="relative w-12 h-12 flex-shrink-0"
+                  onMouseEnter={() => setIsImageHovered(true)} // Set hover state
+                  onMouseLeave={() => setIsImageHovered(false)} // Reset hover state
+                >
+                  {hasValidImage ? (
+                    <>
+                      {imageLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-lg">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#9b87f5]"></div>
+                        </div>
+                      )}
+                      <img
+                        src={optimizedImageUrl}
+                        alt={market.title}
+                        className={`w-full h-full object-cover rounded-lg transition-all duration-300 group-hover:scale-105 ${
+                          imageLoading ? 'opacity-0' : 'opacity-100'
+                        }`}
+                        onLoad={handleImageLoad}
+                        onError={handleImageError}
+                        loading="lazy"
+                      />
+                      {/* Pop-over */}
+                      {isImageHovered && (
+                        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-32 h-32 z-10">
+                          <img
+                            src={finalImageURI}
+                            alt={market.title}
+                            className="w-full h-full object-cover shadow-lg border border-gray-700"
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Compact rounded placeholder
+                    <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-lg flex items-center justify-center border border-gray-700/50">
+                      <ImageIcon className="h-5 w-5 text-gray-600" />
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-1">
                   <Badge
