@@ -60,7 +60,7 @@ export function WalletButton() {
       <Button 
         onClick={login} 
         disabled={isLoading}
-        className="flex items-center space-x-2"
+        className="flex items-center space-x-2 text-sm"
         style={{ 
           backgroundColor: "#9b87f5", 
           color: "white",
@@ -86,7 +86,7 @@ export function WalletButton() {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="outline" 
-          className="flex items-center space-x-2 h-9"
+          className="flex items-center space-x-2 h-9 text-sm"
           style={{ 
             backgroundColor: "#9b87f5", 
             color: "white",
@@ -122,7 +122,7 @@ export function WalletButton() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent 
-        className="w-64" 
+        className="w-64 sm:w-72" 
         align="end"
         style={{ backgroundColor: "#9b87f5", borderColor: "#8b5cf6" }}
       >

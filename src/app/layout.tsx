@@ -14,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className} bg-[#0A0C14]`}>
         <ErrorBoundary>
           <AuthProvider>
             <div className="min-h-screen flex flex-col bg-[#0A0C14] text-white">

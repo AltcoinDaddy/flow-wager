@@ -25,7 +25,7 @@ import Link from "next/link";
 
 export default function MarketsPage() {
   const {
-    // Data 
+    // Data
     markets,
     filteredAndSortedMarkets,
     marketStats,
@@ -187,7 +187,7 @@ export default function MarketsPage() {
                 className="pl-12 h-12 bg-[#1A1F2C] border-gray-700 text-white placeholder-gray-400 focus:border-[#9b87f5] focus:ring-[#9b87f5]/20 rounded-xl"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col md:flex-row gap-3">
               <Button
                 variant={showFilters ? "default" : "outline"}
                 onClick={() => setShowFilters(!showFilters)}
@@ -236,7 +236,7 @@ export default function MarketsPage() {
 
         {/* Updated Market Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto">
+          <TabsList className="relative flex w-full bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto overflow-x-auto">
             {[
               { value: "active", label: "Active", count: marketCounts.active, icon: TrendingUp },
               { value: "pending", label: "Pending", count: marketCounts.pending, icon: Timer },
@@ -245,7 +245,7 @@ export default function MarketsPage() {
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 px-4 font-medium"
+                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 px-4 font-medium whitespace-nowrap"
               >
                 <div className="flex items-center gap-2">
                   <tab.icon className="h-4 w-4" />

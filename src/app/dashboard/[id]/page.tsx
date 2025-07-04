@@ -1,53 +1,43 @@
 "use client";
 
-// User Dashboard Page - Admin-only features
-// - Only contract owner can create markets (Quick Actions & Created Markets tab)
-// - Created Markets tab is hidden for regular users
-// - Market creation and resolution buttons are restricted to the admin address
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
 import { MarketCard } from "@/components/market/market-card";
-import { MarketLoading } from "@/components/market/market-loading";
 import { MarketError } from "@/components/market/market-error";
+import { MarketLoading } from "@/components/market/market-loading";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
-import {
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Target,
-  Clock,
-  DollarSign,
-  Plus,
-  ExternalLink,
-  Bell,
-  Settings,
-  Download,
-  RefreshCw,
-  Users,
-  Trophy,
-  Activity,
-  Wallet,
-  Eye,
-  Star,
-  Calendar,
-  ArrowUpDown,
-} from "lucide-react";
 import type {
   Market,
-  MarketCategory,
-  MarketOutcome,
-  MarketStatus,
+  MarketStatus
 } from "@/types/market";
 import * as fcl from "@onflow/fcl";
-import flowConfig from "@/lib/flow/config";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  Calendar,
+  DollarSign,
+  Download,
+  ExternalLink,
+  Plus,
+  RefreshCw,
+  Settings,
+  Star,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Wallet
+} from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Types for user dashboard data
 interface UserDashboardData {
@@ -404,12 +394,12 @@ export default function UserDashboardPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-center space-x-3">
               <Button
                 variant="outline"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
+                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
               >
                 <RefreshCw
                   className={`h-4 w-4 mr-2 ${
@@ -423,7 +413,7 @@ export default function UserDashboardPage() {
                 <>
                   <Button
                     variant="outline"
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
+                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Export
@@ -435,7 +425,7 @@ export default function UserDashboardPage() {
         </div>
 
         {/* Statistics Cards - Only 4 cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3 mb-3">
@@ -524,28 +514,22 @@ export default function UserDashboardPage() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList
-            className={`grid w-full ${
-              userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT
-                ? "grid-cols-2 md:grid-cols-4"
-                : "grid-cols-2 md:grid-cols-3"
-            } bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto`}
-          >
+          <TabsList className="relative flex w-full bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto overflow-x-auto">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
+              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger
               value="positions"
-              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
+              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
             >
               Positions ({data.positions.length})
             </TabsTrigger>
             <TabsTrigger
               value="activity"
-              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
+              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
             >
               Activity
             </TabsTrigger>
@@ -553,7 +537,7 @@ export default function UserDashboardPage() {
             {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
               <TabsTrigger
                 value="markets"
-                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium"
+                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
               >
                 Created Markets ({data.createdMarkets.length})
               </TabsTrigger>
@@ -717,7 +701,7 @@ export default function UserDashboardPage() {
                 <CardContent>
                   <div className="grid md:grid-cols-3 gap-3">
                     <Button
-                      className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white justify-start"
+                      className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white justify-start w-full"
                       asChild
                     >
                       <Link href="/markets">
@@ -730,7 +714,7 @@ export default function UserDashboardPage() {
                     {isContractOwner && (
                       <Button
                         variant="outline"
-                        className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start"
+                        className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start w-full"
                         asChild
                       >
                         <Link href="/admin/create">
@@ -744,7 +728,7 @@ export default function UserDashboardPage() {
                     {isContractOwner && (
                       <Button
                         variant="outline"
-                        className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start"
+                        className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start w-full"
                         asChild
                       >
                         <Link href="/admin/resolve">
@@ -781,7 +765,7 @@ export default function UserDashboardPage() {
                         key={position.marketId}
                         className="p-4 border border-gray-800/50 rounded-xl hover:bg-gray-800/20 transition-colors"
                       >
-                        <div className="flex items-center justify-between mb-3">
+                        <div className="flex flex-col sm:flex-row items-center justify-between mb-3">
                           <Link
                             href={`/markets/${position.marketId}`}
                             className="font-medium text-white hover:text-[#9b87f5] transition-colors line-clamp-1"
