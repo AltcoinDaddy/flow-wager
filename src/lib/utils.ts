@@ -65,4 +65,26 @@ export const getFlowscanUrl = (address: string): string => {
 
 export const getAvatarFallback = (address: string): string => {
   return address.slice(2, 4).toUpperCase();
+};// Helper function to safely convert to string
+export const safeToString = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  return value.toString();
 };
+
+// Helper function to safely convert to number
+export const safeToNumber = (value: any, defaultValue: number = 0): number => {
+  if (value === null || value === undefined) return defaultValue;
+  const parsed = parseInt(safeToString(value));
+  return isNaN(parsed) ? defaultValue : parsed;
+};
+
+export const safeToUInt64 = (value: any, defaultValue: number = 0): number => {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'object' && value.rawValue !== undefined) {
+    return parseInt(value.rawValue.toString());
+  }
+  const parsed = parseInt(safeToString(value));
+  return isNaN(parsed) ? defaultValue : parsed;
+};
+
+

@@ -27,8 +27,22 @@ import {
   TrendingUp,
   Wallet,
   Zap,
+  UserPlus,
+  CheckCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  placeBetTransaction as buyShares,
+  createMarketTransaction as createUserAccount,
+  getUserProfile as getUserAccount,
+} from "@/lib/flow-wager-scripts";
+import {
+  setCookie,
+  getCookie,
+  addBetToHistory,
+  type BetInfo,
+} from "@/utils/cookies";
 
 interface BetDialogProps {
   open: boolean;
@@ -36,6 +50,12 @@ interface BetDialogProps {
   market: Market;
   initialSide?: "optionA" | "optionB";
   onBetSuccess?: () => void;
+}
+
+interface UserAccountStatus {
+  exists: boolean;
+  isCreating: boolean;
+  error: string | null;
 }
 
 export function BetDialog({
@@ -50,6 +70,11 @@ export function BetDialog({
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userAccount, setUserAccount] = useState<UserAccountStatus>({
+    exists: false,
+    isCreating: false,
+    error: null
+  });
 
   // Calculate market percentages and prices
   const totalShares =
@@ -70,12 +95,99 @@ export function BetDialog({
   const maxPayout = shares * 1; // Each share pays 1 FLOW if correct
   const potentialProfit = maxPayout - (parseFloat(amount) || 0);
 
+  // Check if user account exists when dialog opens and user is connected
+  useEffect(() => {
+    if (open && user?.addr) {
+      checkUserAccount();
+    }
+  }, [open, user?.addr]);
+
   useEffect(() => {
     setSide(initialSide);
   }, [initialSide]);
 
-  const handleBet = async () => {
-    if (!user || !amount) return;
+  const checkUserAccount = async () => {
+    if (!user?.addr) return;
+
+    try {
+      setUserAccount(prev => ({ ...prev, isCreating: false, error: null }));
+      
+      // Check if we have a cached account status
+      const cachedAccount = getCookie(`flow_wager_account_${user.addr}`);
+      if (cachedAccount === 'exists') {
+        setUserAccount(prev => ({ ...prev, exists: true }));
+        return;
+      }
+
+      // Check on blockchain using the getUserAccount script
+      const userAccountScript = await getUserAccount();
+      const accountData = await fcl.query({
+        cadence: userAccountScript,
+        args: (arg, t) => [arg(user.addr || "", t.Address)],
+      });
+
+      const accountExists = accountData !== null;
+      setUserAccount(prev => ({ ...prev, exists: accountExists }));
+
+      // Cache the result
+      if (accountExists) {
+        setCookie(`flow_wager_account_${user.addr}`, 'exists');
+      }
+
+    } catch (error) {
+      console.error("Error checking user account:", error);
+      setUserAccount(prev => ({ 
+        ...prev, 
+        error: "Failed to check account status",
+        exists: false 
+      }));
+    }
+  };
+
+  const createAccount = async () => {
+    if (!user?.addr) return;
+
+    try {
+      setUserAccount(prev => ({ ...prev, isCreating: true, error: null }));
+      
+      // Use the createUserAccount transaction script
+      const createAccountScript = await createUserAccount();
+      const transactionId = await fcl.mutate({
+        cadence: createAccountScript,
+        args: () => [],
+        payer: fcl.authz,
+        proposer: fcl.authz,
+        authorizations: [fcl.authz],
+        limit: 9999,
+      });
+
+      const transaction = await fcl.tx(transactionId).onceSealed();
+
+      if (transaction.status === 4) {
+        setUserAccount(prev => ({ ...prev, exists: true, isCreating: false }));
+        setCookie(`flow_wager_account_${user.addr}`, 'exists');
+        toast.success("FlowWager account created successfully!");
+      } else {
+        throw new Error(`Account creation failed with status: ${transaction.status}`);
+      }
+
+    } catch (error: any) {
+      console.error("Error creating account:", error);
+      let errorMessage = "Failed to create account";
+      if (error.message?.includes("User rejected")) {
+        errorMessage = "Account creation was cancelled";
+      }
+      setUserAccount(prev => ({ 
+        ...prev, 
+        error: errorMessage,
+        isCreating: false 
+      }));
+      toast.error(errorMessage);
+    }
+  };
+
+  const placeBet = async () => {
+    if (!user || !amount || !userAccount.exists) return;
 
     const betAmount = parseFloat(amount);
     const userBalanceNum = parseFloat(balance || "0");
@@ -89,61 +201,52 @@ export function BetDialog({
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Initialize Flow config
       flowConfig();
 
-      const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;  
-  const transactionId = await fcl.mutate({
-      cadence: `
-        import FlowWager from ${CONTRACT_ADDRESS}
-        import FungibleToken from 0xf233dcee88fe0abe
-        import FlowToken from 0x1654653399040a61
-
-        transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
-          prepare(signer: auth(Storage, Capabilities) &Account) {
-            // Check balance
-            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-              ?? panic("Could not borrow FlowToken vault")
-            
-            if vaultRef.balance < amount {
-              panic("Insufficient balance")
-            }
-          }
-
-          execute {
-            // Call the buyShares function from your contract
-            FlowWager.buyShares(
-              marketId: marketId,
-              option: option,
-              amount: amount
-            )
-          }
-        }
-      `,
-      args: (arg, t) => [
-        arg(market.id, t.UInt64),
-        arg(side === "optionA" ? 0 : 1, t.UInt8),
-        arg(betAmount.toFixed(8), t.UFix64),
-      ],
-      payer: fcl.authz,
-      proposer: fcl.authz,
-      authorizations: [fcl.authz],
-      limit: 9999,
-    });
-
+      // Use buyShares (which is the placeBet function) from flow-wager-scripts
+      const buySharesScript = await buyShares();
+      const transactionId = await fcl.mutate({
+        cadence: buySharesScript,
+        args: (arg, t) => [
+          arg(market.id, t.UInt64),
+          arg(side === "optionA" ? 0 : 1, t.UInt8),
+          arg(betAmount.toFixed(8), t.UFix64),
+        ],
+        payer: fcl.authz,
+        proposer: fcl.authz,
+        authorizations: [fcl.authz],
+        limit: 9999,
+      });
 
       const transaction = await fcl.tx(transactionId).onceSealed();
 
-      console.log("Transaction result:", transaction);
-
+      console.log("Bet placement transaction result:", transaction);
 
       if (transaction.status === 4) {
+        // Store bet information in cookies for position tracking
+        const betInfo: BetInfo = {
+          marketId: market.id,
+          side,
+          amount: betAmount,
+          shares,
+          timestamp: Date.now(),
+          transactionId,
+          marketTitle: market.title,
+          optionName: side === "optionA" ? market.optionA : market.optionB
+        };
+        
+        addBetToHistory(user.addr ?? "", betInfo);
+
+        const optionName = side === "optionA" ? market.optionA : market.optionB;
+        toast.success(`Successfully placed ${betAmount} FLOW bet on "${optionName}"!`);
+        
         onBetSuccess?.();
         setAmount("");
         onOpenChange(false);
       } else {
-        throw new Error(
-          `Transaction failed with status: ${transaction.status}`
-        );
+        throw new Error(`Transaction failed with status: ${transaction.status}`);
       }
     } catch (error: any) {
       let errorMessage = "Failed to place bet";
@@ -163,7 +266,7 @@ export function BetDialog({
         }
       }
       setError(errorMessage);
-
+      toast.error(errorMessage);
       console.log("Betting error:", error);
     } finally {
       setIsLoading(false);
@@ -202,8 +305,8 @@ export function BetDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-lg backdrop-blur-xl"
-        style={{ maxHeight: "500px", overflowY: "auto" }}
+        className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-sm:max-w-lg w-full backdrop-blur-xl"
+        style={{ maxHeight: "600px", overflowY: "auto" }}
       >
         <DialogHeader className="space-y-4 pb-2">
           <div className="flex items-center space-x-3">
@@ -249,6 +352,55 @@ export function BetDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* User Account Status */}
+          {user && (
+            <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 rounded-xl p-4 border border-gray-800/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {userAccount.exists ? (
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 text-yellow-400" />
+                  )}
+                  <span className="text-sm font-medium text-gray-300">
+                    {userAccount.exists ? "Account Ready" : "Account Setup Required"}
+                  </span>
+                </div>
+                
+                {!userAccount.exists && (
+                  <Button
+                    size="sm"
+                    onClick={createAccount}
+                    disabled={userAccount.isCreating}
+                    className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+                  >
+                    {userAccount.isCreating ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-3 w-3 mr-1" />
+                        Create Account
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              
+              {userAccount.error && (
+                <p className="text-xs text-red-400 mt-2">{userAccount.error}</p>
+              )}
+              
+              {!userAccount.exists && !userAccount.error && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Create a FlowWager account to start placing bets and track your positions.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Side Selection */}
           <div className="space-y-4">
             <Label className="text-gray-300 flex items-center space-x-2">
@@ -259,6 +411,7 @@ export function BetDialog({
               <Button
                 variant={side === "optionA" ? "default" : "outline"}
                 onClick={() => setSide("optionA")}
+                disabled={!userAccount.exists}
                 className={`h-16 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
                   side === "optionA"
                     ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105"
@@ -273,6 +426,7 @@ export function BetDialog({
               <Button
                 variant={side === "optionB" ? "default" : "outline"}
                 onClick={() => setSide("optionB")}
+                disabled={!userAccount.exists}
                 className={`h-16 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
                   side === "optionB"
                     ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25 transform scale-105"
@@ -310,7 +464,8 @@ export function BetDialog({
                 min={minBet}
                 max={maxBet}
                 step="0.01"
-                className="pl-10 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-12 text-lg font-medium focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
+                disabled={!userAccount.exists}
+                className="pl-10 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-12 text-lg font-medium focus:border-[#9b87f5] focus:ring-[#9b87f5]/20 disabled:opacity-50"
               />
             </div>
 
@@ -322,7 +477,8 @@ export function BetDialog({
                   variant="outline"
                   size="sm"
                   onClick={() => setAmount(quickAmount)}
-                  className="border-gray-700 text-gray-300 hover:bg-[#9b87f5]/10 hover:border-[#9b87f5]/50 text-xs"
+                  disabled={!userAccount.exists}
+                  className="border-gray-700 text-gray-300 hover:bg-[#9b87f5]/10 hover:border-[#9b87f5]/50 text-xs disabled:opacity-50"
                 >
                   {formatCurrency(quickAmount)}
                 </Button>
@@ -345,7 +501,7 @@ export function BetDialog({
           </div>
 
           {/* Bet Summary */}
-          {amount && isValidAmount && (
+          {amount && isValidAmount && userAccount.exists && (
             <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 rounded-xl p-4 border border-gray-800/50">
               <div className="flex items-center space-x-2 mb-3">
                 <Calculator className="h-4 w-4 text-[#9b87f5]" />
@@ -418,14 +574,14 @@ export function BetDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-12"
-              disabled={isLoading}
+              disabled={isLoading || userAccount.isCreating}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleBet}
-              disabled={!amount || !isValidAmount || isLoading || !user}
-              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200"
+              onClick={placeBet}
+              disabled={!amount || !isValidAmount || isLoading || !user || !userAccount.exists}
+              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200 disabled:opacity-50"
             >
               {isLoading ? (
                 <>

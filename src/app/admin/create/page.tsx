@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-// src/app/admin/create/page.tsx
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,7 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreateMarketForm } from "@/components/admin/create/create-market-form";
 import { useAuth } from "@/providers/auth-provider";
-import { getAdminStats } from "@/lib/scripts/admin";
+import { 
+  getPlatformStats,
+  getAllMarkets,
+  getContractInfo
+} from '@/lib/flow-wager-scripts';
+import * as fcl from '@onflow/fcl';
+import flowConfig from '@/lib/flow/config';
 import { 
   ArrowLeft,
   CheckCircle,
@@ -40,26 +44,94 @@ export default function AdminCreatePage() {
     marketsCreatedThisWeek: 0,
     averageVolume: 0,
     successRate: 100,
-    totalCreators: 1
+    totalCreators: 1,
+    totalMarkets: 0,
+    activeMarkets: 0,
+    totalUsers: 0,
+    totalVolume: "0",
+    totalFees: "0"
   });
+  const [contractInfo, setContractInfo] = useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // Fetch real admin stats
+  // Initialize Flow configuration
+  const initConfig = async () => {
+    try {
+      flowConfig();
+      console.log('Flow configuration initialized for admin panel');
+    } catch (error) {
+      console.error('Failed to initialize Flow configuration:', error);
+      throw error;
+    }
+  };
+
+  // Fetch real admin stats using your Flow scripts
   useEffect(() => {
     const fetchStats = async () => {
       if (!user?.addr) return;
       
       try {
-        const stats = await getAdminStats();
-        setCreationStats({
-          marketsCreatedToday: 0, // We can calculate this from real data later
-          marketsCreatedThisWeek: 0, // We can calculate this from real data later
-          averageVolume: parseFloat(stats.totalVolume || "0"),
-          successRate: 100,
-          totalCreators: 1
+        setIsLoadingStats(true);
+        await initConfig();
+
+        // Fetch platform stats using your script
+        const platformStatsScript = await getPlatformStats();
+        const stats = await fcl.query({
+          cadence: platformStatsScript,
         });
+
+        console.log('Platform stats from contract:', stats);
+
+        // Fetch all markets to calculate daily/weekly stats
+        const allMarketsScript = await getAllMarkets();
+        const markets = await fcl.query({
+          cadence: allMarketsScript,
+        });
+
+        console.log('All markets from contract:', markets);
+
+        // Fetch contract info
+        const contractInfoScript = await getContractInfo();
+        const contractData = await fcl.query({
+          cadence: contractInfoScript,
+        });
+
+        console.log('Contract info:', contractData);
+        setContractInfo(contractData);
+
+        // Calculate daily/weekly creation stats
+        const now = Date.now() / 1000;
+        const oneDayAgo = now - (24 * 60 * 60);
+        const oneWeekAgo = now - (7 * 24 * 60 * 60);
+
+        const marketsCreatedToday = markets?.filter((market: any) => 
+          parseFloat(market.createdAt) >= oneDayAgo
+        ).length || 0;
+
+        const marketsCreatedThisWeek = markets?.filter((market: any) => 
+          parseFloat(market.createdAt) >= oneWeekAgo
+        ).length || 0;
+
+        // Calculate average volume
+        const totalVolume = parseFloat(stats.totalVolume || "0");
+        const averageVolume = markets?.length > 0 ? totalVolume / markets.length : 0;
+
+        setCreationStats({
+          marketsCreatedToday,
+          marketsCreatedThisWeek,
+          averageVolume,
+          successRate: 100, // You can calculate this based on resolved markets
+          totalCreators: parseInt(stats.totalUsers?.toString() || "0"),
+          totalMarkets: parseInt(stats.totalMarkets?.toString() || "0"),
+          activeMarkets: parseInt(stats.activeMarkets?.toString() || "0"),
+          totalUsers: parseInt(stats.totalUsers?.toString() || "0"),
+          totalVolume: stats.totalVolume?.toString() || "0",
+          totalFees: stats.totalFees?.toString() || "0"
+        });
+
       } catch (error) {
         console.error("Failed to fetch admin stats:", error);
+        setError("Failed to load admin statistics from contract");
       } finally {
         setIsLoadingStats(false);
       }
@@ -77,16 +149,42 @@ export default function AdminCreatePage() {
     try {
       console.log("Creating market with data:", marketData);
       
-      // The CreateMarketForm handles the actual contract interaction
+      // The CreateMarketForm handles the actual contract interaction using your scripts
       // This will be called after successful transaction
-      if (marketData.transactionId) {
+      if (marketData.success && marketData.transactionId) {
         setCreatedMarketId(marketData.marketId || Math.floor(Math.random() * 1000) + 100);
         setCreationSuccess(true);
+        
+        // Refresh stats after successful creation
+        const fetchUpdatedStats = async () => {
+          try {
+            await initConfig();
+            const platformStatsScript = await getPlatformStats();
+            const updatedStats = await fcl.query({
+              cadence: platformStatsScript,
+            });
+            
+            setCreationStats(prev => ({
+              ...prev,
+              totalMarkets: parseInt(updatedStats.totalMarkets?.toString() || "0"),
+              activeMarkets: parseInt(updatedStats.activeMarkets?.toString() || "0"),
+              totalVolume: updatedStats.totalVolume?.toString() || "0",
+              marketsCreatedToday: prev.marketsCreatedToday + 1,
+              marketsCreatedThisWeek: prev.marketsCreatedThisWeek + 1
+            }));
+          } catch (error) {
+            console.error("Failed to refresh stats:", error);
+          }
+        };
+
+        fetchUpdatedStats();
         
         // Redirect after a delay
         setTimeout(() => {
           router.push(`/markets`);
         }, 3000);
+      } else if (!marketData.success) {
+        setError(marketData.error || "Failed to create market");
       }
       
     } catch (error: any) {
@@ -134,7 +232,12 @@ export default function AdminCreatePage() {
               
               <div className="bg-[#0A0C14] p-4 rounded-lg border border-gray-800/50 mb-6">
                 <p className="text-sm font-medium text-[#9b87f5]">Market ID: #{createdMarketId}</p>
-                <p className="text-xs text-gray-400 mt-1">Contract: {process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Contract: {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
+                </p>
+                <p className="text-xs text-gray-400">
+                  Network: {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'}
+                </p>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -206,7 +309,7 @@ export default function AdminCreatePage() {
                 </Badge>
                 <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                   <Activity className="h-3 w-3 mr-1" />
-                  Live Contract
+                  {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'} Network
                 </Badge>
               </div>
             </div>
@@ -221,7 +324,7 @@ export default function AdminCreatePage() {
           </Alert>
         )}
 
-        {/* Creation Stats */}
+        {/* Creation Stats - Now using real data from your Flow scripts */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
@@ -265,7 +368,9 @@ export default function AdminCreatePage() {
                   {isLoadingStats ? (
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">{(creationStats.averageVolume / 1000).toFixed(1)}K</p>
+                    <p className="text-2xl font-bold text-white">
+                      {(parseFloat(creationStats.totalVolume) / 1000).toFixed(1)}K
+                    </p>
                   )}
                   <p className="text-xs text-yellow-400">FLOW</p>
                 </div>
@@ -278,9 +383,13 @@ export default function AdminCreatePage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Success Rate</p>
-                  <p className="text-2xl font-bold text-white">{creationStats.successRate}%</p>
-                  <p className="text-xs text-green-400">Deployed</p>
+                  <p className="text-sm text-gray-400">Active Markets</p>
+                  {isLoadingStats ? (
+                    <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">{creationStats.activeMarkets}</p>
+                  )}
+                  <p className="text-xs text-green-400">Live</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-400" />
               </div>
@@ -291,9 +400,13 @@ export default function AdminCreatePage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-400">Total Creators</p>
-                  <p className="text-2xl font-bold text-white">{creationStats.totalCreators}</p>
-                  <p className="text-xs text-[#9b87f5]">Admins</p>
+                  <p className="text-sm text-gray-400">Total Users</p>
+                  {isLoadingStats ? (
+                    <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
+                  ) : (
+                    <p className="text-2xl font-bold text-white">{creationStats.totalUsers}</p>
+                  )}
+                  <p className="text-xs text-[#9b87f5]">Registered</p>
                 </div>
                 <Users className="h-8 w-8 text-[#9b87f5]" />
               </div>
@@ -327,19 +440,19 @@ export default function AdminCreatePage() {
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Choose appropriate betting limits</span>
+                    <span>Choose appropriate betting limits (Min: 0.1 FLOW, Max: 1000 FLOW)</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Include reliable data sources</span>
+                    <span>Include reliable data sources for resolution</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Test market parameters on mainnet first</span>
+                    <span>Test market parameters thoroughly</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Consider transaction fees and gas costs</span>
+                    <span>Consider transaction fees (Creation fee: 10 FLOW)</span>
                   </li>
                 </ul>
               </div>
@@ -379,7 +492,7 @@ export default function AdminCreatePage() {
           </CardContent>
         </Card>
 
-        {/* Contract Information */}
+        {/* Contract Information - Now shows real contract info */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -392,20 +505,34 @@ export default function AdminCreatePage() {
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-400">Contract Address:</span>
-                  <p className="text-[#9b87f5] font-mono break-all">{process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}</p>
+                  <p className="text-[#9b87f5] font-mono break-all">
+                    {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
+                  </p>
                 </div>
                 <div>
                   <span className="text-gray-400">Network:</span>
-                  <p className="text-green-400">Flow mainnet</p>
+                  <p className="text-green-400">Flow {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'}</p>
                 </div>
                 <div>
                   <span className="text-gray-400">Admin Address:</span>
                   <p className="text-blue-400 font-mono">{user?.addr}</p>
                 </div>
                 <div>
-                  <span className="text-gray-400">Gas Limit:</span>
-                  <p className="text-yellow-400">1000 units</p>
+                  <span className="text-gray-400">Creation Fee:</span>
+                  <p className="text-yellow-400">10.0 FLOW</p>
                 </div>
+                {contractInfo && (
+                  <>
+                    <div>
+                      <span className="text-gray-400">Contract Version:</span>
+                      <p className="text-white">{contractInfo.version || 'v1.0.0'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Platform Fee:</span>
+                      <p className="text-yellow-400">{contractInfo.platformFeePercentage || '2.5'}%</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -443,7 +570,7 @@ export default function AdminCreatePage() {
                 <div className="bg-[#0A0C14] p-3 rounded-lg border border-gray-800/50">
                   <div className="flex items-center justify-center space-x-2 text-xs text-gray-400">
                     <div className="animate-pulse">⚡</div>
-                    <span>Processing transaction...</span>
+                    <span>Using contract: {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}</span>
                     <div className="animate-pulse">⚡</div>
                   </div>
                 </div>

@@ -37,6 +37,10 @@ flow.json
 # vercel
 .vercel
 
+# flow
+emulator-account.pkey
+imports
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

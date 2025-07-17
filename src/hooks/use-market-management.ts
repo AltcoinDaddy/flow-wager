@@ -6,9 +6,9 @@ import * as fcl from '@onflow/fcl';
 import flowConfig from '@/lib/flow/config';
 import { Market, MarketCategory, MarketStatus, PlatformStats } from '@/types/market';
 import { 
-  GET_ALL_MARKETS, 
-  GET_PLATFORM_STATS, 
-} from '@/lib/flow/scripts';
+  getAllMarkets,
+  getPlatformStats,
+} from '@/lib/flow-wager-scripts';
 
 export function useMarketManagement() {
   // State with proper types
@@ -32,13 +32,10 @@ export function useMarketManagement() {
       
       // Debug: Log configuration status
       console.log('Flow configuration initialized:', {
-        accessNode: 'https://rest-mainnet.onflow.org',
-        wallet: 'https://fcl-discovery.onflow.org/authn',
-        flowWagerContract: process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT,
-        userRegistryContract: process.env.NEXT_PUBLIC_USER_REGISTRY_CONTRACT,
-        marketFactoryContract: process.env.NEXT_PUBLIC_MARKET_FACTORY_CONTRACT,
-        flowToken: '0x1654653399040a61',
-        fungibleToken: '0xf233dcee88fe0abe'
+        network: process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet',
+        flowWagerContract: process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT,
+        accessNode: process.env.NEXT_PUBLIC_FLOW_ACCESS_API,
+        discoveryWallet: process.env.NEXT_PUBLIC_FLOW_DISCOVERY_WALLET
       });
     } catch (error) {
       console.error('Failed to initialize Flow configuration:', error);
@@ -55,14 +52,16 @@ export function useMarketManagement() {
       // Initialize Flow configuration before making queries
       await initConfig();
 
-      // Fetch all markets from smart contract
+      // Fetch all markets using your script
+      const getAllMarketsScript = await getAllMarkets();
       const contractMarkets = await fcl.query({
-        cadence: GET_ALL_MARKETS,
-        
+        cadence: getAllMarketsScript,
       });
 
+      console.log('Raw contract markets:', contractMarkets);
+
       // Transform contract data to Market interface
-      const transformedMarkets: Market[] = contractMarkets.map((market: any) => ({
+      const transformedMarkets: Market[] = contractMarkets?.map((market: any) => ({
         id: market.id.toString(),
         title: market.title,
         description: market.description,
@@ -79,16 +78,20 @@ export function useMarketManagement() {
         resolved: market.resolved,
         totalOptionAShares: market.totalOptionAShares.toString(),
         totalOptionBShares: market.totalOptionBShares.toString(),
-        totalPool: market.totalPool.toString()
-      }));
+        totalPool: market.totalPool.toString(),
+        imageUrl: market.imageUrl || ""
+      })) || [];
 
+      console.log('Transformed markets:', transformedMarkets);
       setMarkets(transformedMarkets);
 
-      // Fetch platform stats from smart contract (FCL already configured above)
+      // Fetch platform stats using your script
+      const getPlatformStatsScript = await getPlatformStats();
       const stats = await fcl.query({
-        cadence: GET_PLATFORM_STATS,
-        
+        cadence: getPlatformStatsScript,
       });
+
+      console.log('Raw platform stats:', stats);
 
       setPlatformStats({
         totalMarkets: parseInt(stats.totalMarkets.toString()),
@@ -101,12 +104,67 @@ export function useMarketManagement() {
     } catch (err) {
       console.error('Error fetching markets from smart contract:', err);
       
-      // Check if it's a configuration error
-      if (err instanceof Error && err.message.includes('accessNode.api')) {
-        setError('Flow network configuration error. Please check that NEXT_PUBLIC_FLOWWAGER_CONTRACT is set in your environment variables.');
+      // Enhanced error handling
+      if (err instanceof Error) {
+        if (err.message.includes('accessNode.api')) {
+          setError('Flow network configuration error. Please check environment variables.');
+        } else if (err.message.includes('script not found')) {
+          setError('Contract script error. Please verify contract deployment.');
+        } else if (err.message.includes('location')) {
+          setError('Contract address error. Please check NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT.');
+        } else {
+          setError(`Blockchain error: ${err.message}`);
+        }
       } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch markets from blockchain');
+        setError('Failed to fetch markets from blockchain');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch active markets only (more efficient for dashboard)
+  const fetchActiveMarkets = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      await initConfig();
+
+      // Use getActiveMarkets for better performance if you only need active markets
+      const { getActiveMarkets } = await import('@/lib/flow-wager-scripts');
+      const getActiveMarketsScript = await getActiveMarkets();
+      
+      const contractMarkets = await fcl.query({
+        cadence: getActiveMarketsScript,
+      });
+
+      const transformedMarkets: Market[] = contractMarkets?.map((market: any) => ({
+        id: market.id.toString(),
+        title: market.title,
+        description: market.description,
+        category: parseInt(market.category.rawValue),
+        optionA: market.optionA,
+        optionB: market.optionB,
+        creator: market.creator,
+        createdAt: market.createdAt.toString(),
+        endTime: market.endTime.toString(),
+        minBet: market.minBet.toString(),
+        maxBet: market.maxBet.toString(),
+        status: parseInt(market.status.rawValue),
+        outcome: market.outcome ? parseInt(market.outcome.rawValue) : undefined,
+        resolved: market.resolved,
+        totalOptionAShares: market.totalOptionAShares.toString(),
+        totalOptionBShares: market.totalOptionBShares.toString(),
+        totalPool: market.totalPool.toString(),
+        imageUrl: market.imageUrl || ""
+      })) || [];
+
+      setMarkets(transformedMarkets);
+
+    } catch (err) {
+      console.error('Error fetching active markets:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch active markets');
     } finally {
       setLoading(false);
     }
@@ -256,11 +314,6 @@ export function useMarketManagement() {
   // Fetch data on mount and setup interval for real-time updates
   useEffect(() => {
     fetchMarkets();
-    
-    // Refresh data every 30 seconds
-    const interval = setInterval(fetchMarkets, 50000000);
-    
-    return () => clearInterval(interval);
   }, []);
 
   return {
@@ -291,6 +344,7 @@ export function useMarketManagement() {
     
     // Actions
     refetch: fetchMarkets,
+    fetchActiveMarkets, // New method for better performance
     handleResetFilters
   };
 }

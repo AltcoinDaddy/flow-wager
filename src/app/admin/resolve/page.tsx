@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import flowConfig from '@/lib/flow/config';
+import * as fcl from "@onflow/fcl";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -23,48 +26,36 @@ import {
   Search,
   TrendingUp,
   Users,
-  XCircle,
-  Wallet
+  Wallet,
+  XCircle
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, ChangeEvent, JSX } from "react";
-import * as fcl from "@onflow/fcl";
+import { ChangeEvent, JSX, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// Import your existing types (fix: remove 'type' from MarketOutcome and MarketCategoryLabels)
-import type { 
-  Market, 
-  MarketCategory, 
-  MarketStatus 
+// Import your Flow Wager scripts
+import {
+  getAllMarkets,
+  resolveMarketTransaction
+} from '@/lib/flow-wager-scripts';
+
+// Import your existing types
+import type {
+  Market
 } from "@/types/market";
 
-import { 
-  MarketOutcome,
-  MarketCategoryLabels
+import {
+  MarketCategoryLabels,
+  MarketOutcome
 } from "@/types/market";
 
-// Your existing auth hook (match the dashboard)
+// Your existing auth hook
 import { useAuth } from "@/providers/auth-provider";
-import { checkAdminStatus } from "@/lib/scripts/";
-
-// Flow service imports - add resolve function if available
-import { 
-  usePendingMarkets
-} from "@/lib/flow-service";
-
-// Try importing resolve script if it exists
-// import { resolveMarketScript } from "@/lib/scripts/";
 
 // Resolution form data interface
 interface ResolutionData {
   outcome: string;
-  evidence: string;
-  sourceUrl: string;
-  adminNotes: string;
-}
-
-interface ResolutionOptions {
   evidence: string;
   sourceUrl: string;
   adminNotes: string;
@@ -75,22 +66,17 @@ function AdminResolveContent(): JSX.Element {
   const router = useRouter();
   const marketIdParam = searchParams.get("id");
   
-  // Use your existing auth hook (match dashboard pattern)
+  // Use your existing auth hook
   const { 
     user,
     isAuthenticated: loggedIn, 
     isLoading: authLoading
   } = useAuth();
   
-  // Flow hooks
-  const { 
-    markets: pendingMarkets, 
-    loading: marketsLoading, 
-    error: marketsError, 
-    refetch 
-  } = usePendingMarkets();
-
-  // Local resolution state
+  // State management
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [marketsLoading, setMarketsLoading] = useState(true);
+  const [marketsError, setMarketsError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<boolean>(false);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   
@@ -103,39 +89,77 @@ function AdminResolveContent(): JSX.Element {
     adminNotes: ""
   });
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [adminInfo, setAdminInfo] = useState<any>(null);
 
-  // Simple admin check (match dashboard pattern)
+
+  // Simple admin check
   const isAdmin = loggedIn && user?.addr;
 
-  // Check admin status (match dashboard pattern)
+  // Initialize Flow configuration
   useEffect(() => {
-    const fetchAdminStatus = async () => {
-      if (user?.addr && loggedIn) {
-        try {
-          const adminStatus = await checkAdminStatus(user.addr);
-          setAdminInfo(adminStatus);
-          console.log("Admin status:", adminStatus);
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-        }
+    const initFlow = async () => {
+      try {
+        flowConfig();
+        console.log('Flow configuration initialized for admin resolve');
+      } catch (error) {
+        console.error('Failed to initialize Flow configuration:', error);
       }
     };
 
-    fetchAdminStatus();
-  }, [user?.addr, loggedIn]);
+    initFlow();
+  }, []);
+
+  // Fetch pending markets using your Flow scripts
+  useEffect(() => {
+    const fetchMarkets = async () => {
+      if (!loggedIn) return;
+      
+      try {
+        setMarketsLoading(true);
+        setMarketsError(null);
+
+        // Get all markets using your script
+        const allMarketsScript = await getAllMarkets();
+        const allMarkets = await fcl.query({
+          cadence: allMarketsScript,
+        });
+
+        console.log('All markets from contract:', allMarkets);
+
+        // Filter for markets that need resolution (ended but not resolved)
+        const now = Date.now() / 1000;
+        const pendingMarkets = allMarkets?.filter((market: any) => {
+          const endTime = parseFloat(market.endTime);
+          const isEnded = endTime < now;
+          const isPending = market.status === 'Active'; // Adjust based on your status enum
+          
+          return isEnded && isPending;
+        }) || [];
+
+        console.log('Pending markets for resolution:', pendingMarkets);
+        setMarkets(pendingMarkets);
+
+      } catch (error) {
+        console.error("Failed to fetch markets:", error);
+        setMarketsError("Failed to load markets from contract");
+      } finally {
+        setMarketsLoading(false);
+      }
+    };
+
+    fetchMarkets();
+  }, [loggedIn]);
 
   // Load specific market if ID provided
   useEffect(() => {
-    if (marketIdParam && pendingMarkets.length > 0) {
-      const market = pendingMarkets.find((m: Market) => m.id === marketIdParam);
+    if (marketIdParam && markets.length > 0) {
+      const market = markets.find((m: Market) => m.id === marketIdParam);
       if (market) {
         setSelectedMarket(market);
       }
     }
-  }, [marketIdParam, pendingMarkets]);
+  }, [marketIdParam, markets]);
 
-  // Redirect non-admin users (simplified)
+  // Redirect non-admin users
   useEffect(() => {
     if (!authLoading && loggedIn && !isAdmin) {
       toast.error("You don't have admin privileges");
@@ -144,9 +168,9 @@ function AdminResolveContent(): JSX.Element {
   }, [loggedIn, isAdmin, authLoading, router]);
 
   // Filter markets with proper typing
-  const filteredMarkets: Market[] = pendingMarkets.filter((market: Market) =>
+  const filteredMarkets: Market[] = markets.filter((market: Market) =>
     market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    MarketCategoryLabels[market.category]?.toLowerCase().includes(searchQuery.toLowerCase())
+    (market.category in MarketCategoryLabels && MarketCategoryLabels[market.category as keyof typeof MarketCategoryLabels]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Event handlers with proper typing
@@ -174,6 +198,7 @@ function AdminResolveContent(): JSX.Element {
     setSearchQuery(e.target.value);
   };
 
+  // 🚨 UPDATED: Use your Flow Wager resolve script
   const handleResolve = async (): Promise<void> => {
     if (!selectedMarket || !resolutionData.outcome) {
       toast.error("Please select an outcome");
@@ -202,79 +227,63 @@ function AdminResolveContent(): JSX.Element {
         throw new Error("Invalid market ID or outcome");
       }
 
-      // Prepare arguments - ensure all are defined
-      const evidence = resolutionData.evidence.trim();
-      const sourceUrl = resolutionData.sourceUrl?.trim() || "";
-      const adminNotes = resolutionData.adminNotes?.trim() || "";
-
-      console.log("Resolving with args:", { marketId, outcomeValue, evidence, sourceUrl, adminNotes });
+      console.log("Resolving market with your Flow Wager script:", { 
+        marketId, 
+        outcomeValue, 
+        evidence: resolutionData.evidence.trim() 
+      });
 
       toast.loading("Submitting resolution transaction...");
 
-      // Get contract address from environment
-      const contractAddress = process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;
-      console.log("Contract address:", contractAddress);
+      // 🚨 USE YOUR FLOW WAGER RESOLVE SCRIPT 🚨
+      const transactionScript = await resolveMarketTransaction();
+      
+      console.log("Using resolution script from flow-wager-scripts");
 
-      if (!contractAddress) {
-        throw new Error("Contract address not configured");
-      }
-
-      // Direct FCL transaction call with correct Admin resource access
-      const response = await fcl.mutate({
-        cadence: `
-          import FlowWager from ${contractAddress}
-          
-          transaction(marketId: UInt64, outcome: UInt8) {
-              let adminRef: &FlowWager.Admin
-              
-              prepare(signer: auth(Storage) &Account) {
-                  log("Resolving market with ID: ".concat(marketId.toString()))
-                  log("Outcome: ".concat(outcome.toString()))
-                  
-                  // Get the Admin resource from storage in prepare block
-                  self.adminRef = signer.storage.borrow<&FlowWager.Admin>(from: /storage/FlowWagerAdmin)
-                      ?? panic("Could not borrow Admin resource - you must be an admin")
-              }
-              
-              execute {
-                  // Call resolveMarket on the Admin resource
-                  self.adminRef.resolveMarket(
-                      marketId: marketId,
-                      outcome: FlowWager.MarketOutcome(rawValue: outcome)!
-                  )
-                  
-                  log("Market resolved successfully")
-              }
-          }
-        `,
+      const transactionId = await fcl.mutate({
+        cadence: transactionScript,
         args: (arg, t) => [
-          arg(marketId, t.UInt64),
-          arg(outcomeValue, t.UInt8)
-          // Remove evidence, sourceUrl, adminNotes - they're not in the contract
+          arg(marketId, t.UInt64),      // marketId
+          arg(outcomeValue, t.UInt8),   // outcome (MarketOutcome enum value)
         ],
-        proposer: fcl.currentUser,
-        payer: fcl.currentUser,
-        authorizations: [fcl.currentUser],
-        limit: 9999
+        proposer: fcl.authz,
+        payer: fcl.authz,
+        authorizations: [fcl.authz],
+        limit: 1000
       });
 
-      console.log("Transaction submitted:", response);
+      console.log("Resolution transaction submitted:", transactionId);
       toast.dismiss();
       toast.loading("Waiting for transaction to be sealed...");
 
       // Wait for transaction to be sealed
-      const result = await fcl.tx(response).onceSealed();
+      const result = await fcl.tx(transactionId).onceSealed();
       console.log("Transaction sealed:", result);
       toast.dismiss();
 
       if (result.status === 4) { // SEALED
         toast.success("Market resolved successfully!", {
-          description: `Transaction ID: ${response}`,
+          description: `Transaction ID: ${transactionId}`,
           duration: 5000
         });
         
-        // Refresh markets
-        await refetch();
+        // Refresh markets by re-fetching
+        const allMarketsScript = await getAllMarkets();
+        const updatedMarkets = await fcl.query({
+          cadence: allMarketsScript,
+        });
+
+        // Filter for pending markets again
+        const now = Date.now() / 1000;
+        const pendingMarkets = updatedMarkets?.filter((market: any) => {
+          const endTime = parseFloat(market.endTime);
+          const isEnded = endTime < now;
+          const isPending = market.status === 'Active';
+          
+          return isEnded && isPending;
+        }) || [];
+
+        setMarkets(pendingMarkets);
         
         // Reset form
         setSelectedMarket(null);
@@ -292,7 +301,23 @@ function AdminResolveContent(): JSX.Element {
 
     } catch (error: unknown) {
       console.error("Resolution failed:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      
+      let errorMessage = "Unknown error occurred";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Handle specific Flow errors
+      if (errorMessage.includes('Could not borrow Admin reference')) {
+        errorMessage = "Only admin accounts can resolve markets. Please ensure you're using an authorized admin wallet.";
+      } else if (errorMessage.includes('panic:')) {
+        const panicMatch = errorMessage.match(/panic: (.+?)(?:\n|$)/);
+        if (panicMatch) {
+          errorMessage = panicMatch[1];
+        }
+      }
+      
       setResolutionError(errorMessage);
       toast.dismiss();
       toast.error("Failed to resolve market", {
@@ -303,7 +328,6 @@ function AdminResolveContent(): JSX.Element {
       setResolving(false);
     }
   };
-
 
   // Utility functions with proper typing
   const formatCurrency = (value: string | number): string => {
@@ -438,7 +462,7 @@ function AdminResolveContent(): JSX.Element {
             </CardHeader>
             <CardContent>
               <p className="text-gray-400 mb-4">
-                You don't have admin privileges to access this page.
+                You don&lsquo;t have admin privileges to access this page.
               </p>
               <div className="text-xs text-gray-500 mb-4">
                 Connected as: {user?.addr}
@@ -472,11 +496,9 @@ function AdminResolveContent(): JSX.Element {
               </p>
               <div className="text-xs text-gray-500 mt-1">
                 Admin: {user?.addr?.slice(0, 6)}...{user?.addr?.slice(-4)}
-                {adminInfo?.isContractDeployer === "true" && (
-                  <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30">
-                    Contract Deployer
-                  </Badge>
-                )}
+                <Badge className="ml-2 bg-green-500/20 text-green-400 border-green-500/30">
+                  Flow Wager Admin
+                </Badge>
               </div>
             </div>
           </div>
@@ -484,7 +506,7 @@ function AdminResolveContent(): JSX.Element {
           <div className="flex items-center gap-3">
             <Badge variant="destructive" className="flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />
-              {pendingMarkets.length} Pending Resolution
+              {markets.length} Pending Resolution
             </Badge>
           </div>
         </div>
@@ -542,12 +564,15 @@ function AdminResolveContent(): JSX.Element {
                   {marketsLoading ? (
                     <div className="text-center py-8 text-gray-400">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-b-transparent mx-auto mb-2" />
-                      <p>Loading markets...</p>
+                      <p>Loading markets from Flow blockchain...</p>
                     </div>
                   ) : filteredMarkets.length === 0 ? (
                     <div className="text-center py-8 text-gray-400">
                       <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>No markets found matching your search.</p>
+                      {markets.length === 0 && (
+                        <p className="text-sm mt-2">All markets may already be resolved.</p>
+                      )}
                     </div>
                   ) : (
                     filteredMarkets.map((market: Market) => {
@@ -568,7 +593,7 @@ function AdminResolveContent(): JSX.Element {
                                 Pending
                               </Badge>
                               <Badge variant="secondary" className="bg-gray-700 text-gray-200">
-                                {MarketCategoryLabels[market.category] || "Unknown"}
+                                {MarketCategoryLabels[market.category as keyof typeof MarketCategoryLabels] || "Unknown"}
                               </Badge>
                             </div>
                             <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
@@ -653,7 +678,7 @@ function AdminResolveContent(): JSX.Element {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-400">Category:</span>
-                          <div className="font-medium text-white">{MarketCategoryLabels[selectedMarket.category] || "Unknown"}</div>
+                          <div className="font-medium text-white">{MarketCategoryLabels[selectedMarket.category as keyof typeof MarketCategoryLabels] || "Unknown"}</div>
                         </div>
                         <div>
                           <span className="text-gray-400">Creator:</span>
@@ -828,14 +853,8 @@ function AdminResolveContent(): JSX.Element {
                             <span className="text-white">{formatCurrency(selectedMarket.totalPool)} FLOW</span>
                           </div>
                           <div>
-                            <span className="text-gray-400">Est. Winning Participants:</span>{" "}
-                            <span className="text-white">
-                              {parseInt(resolutionData.outcome) === MarketOutcome.OptionA 
-                                ? Math.floor(getEstimatedParticipants(selectedMarket) * getSharePercentage(selectedMarket.totalOptionAShares, getTotalShares(selectedMarket)) / 100)
-                                : parseInt(resolutionData.outcome) === MarketOutcome.OptionB 
-                                ? Math.floor(getEstimatedParticipants(selectedMarket) * getSharePercentage(selectedMarket.totalOptionBShares, getTotalShares(selectedMarket)) / 100)
-                                : getEstimatedParticipants(selectedMarket)}
-                            </span>
+                            <span className="text-gray-400">Contract:</span>{" "}
+                            <span className="text-blue-400 font-mono">{process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}</span>
                           </div>
                         </div>
                       </div>
@@ -846,7 +865,7 @@ function AdminResolveContent(): JSX.Element {
                       <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" />
                       <div className="text-sm text-yellow-200">
                         <p className="font-medium mb-1">Resolution is permanent and irreversible</p>
-                        <p>Once resolved, this action cannot be undone. Funds will be distributed immediately. Please verify all information is accurate before proceeding.</p>
+                        <p>Once resolved, this action cannot be undone. Funds will be distributed immediately using your Flow Wager contract. Please verify all information is accurate before proceeding.</p>
                       </div>
                     </div>
 
@@ -877,7 +896,7 @@ function AdminResolveContent(): JSX.Element {
                   <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4 opacity-50" />
                   <h3 className="text-xl font-medium mb-2 text-white">Select a Market to Resolve</h3>
                   <p className="text-gray-400 max-w-md mx-auto">
-                    Choose a market from the list on the left to begin the resolution process. You can search by question or category to find specific markets.
+                    Choose a market from the list on the left to begin the resolution process. Markets are loaded from your Flow Wager contract at {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}.
                   </p>
                 </CardContent>
               </Card>
@@ -893,7 +912,7 @@ function AdminResolveContent(): JSX.Element {
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-b-transparent mx-auto mb-6"></div>
                 <h3 className="text-lg font-medium mb-2 text-white">Resolving Market...</h3>
                 <p className="text-gray-400 mb-4">
-                  Processing resolution and distributing winnings to participants
+                  Processing resolution using Flow Wager contract
                 </p>
                 <div className="space-y-2 text-sm text-gray-400">
                   <div>• Validating resolution data</div>

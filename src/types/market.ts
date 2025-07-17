@@ -22,7 +22,8 @@ export interface Market {
   imageURI?: string; // ✅ Added image support
   // Additional calculated fields
   totalBets?: number;
-  totalParticipants?: number;       // UFix64 from contract (not number)
+  totalParticipants?: number;
+  imageUrl?: string      // UFix64 from contract (not number)
 }
 
 export interface MarketMetadata {

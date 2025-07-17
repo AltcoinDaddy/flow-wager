@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/flow-service.ts
 import * as fcl from "@onflow/fcl";
 import flowConfig from "@/lib/flow/config";
