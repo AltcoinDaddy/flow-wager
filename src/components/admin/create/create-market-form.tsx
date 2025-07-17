@@ -513,14 +513,10 @@ export function CreateMarketForm({
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
       const endTimeUnix = endDateTime.getTime() / 1000;
 
-      // Store image URL hidden in description field if present
-      const descriptionWithImage = formData.imageURI 
-        ? `${formData.rules}\n\n__IMG__:${formData.imageURI}`
-        : formData.rules;
-
+  
       const marketCreationData = {
         question: formData.question.trim(),
-        description: descriptionWithImage,
+        description: formData.rules.trim(),
         optionA: formData.optionA.trim(),
         optionB: formData.optionB.trim(),
         category: formData.category,
