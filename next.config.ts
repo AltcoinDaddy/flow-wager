@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   images: {
@@ -10,49 +11,46 @@ const nextConfig: NextConfig = {
     ],
   },
   env: {
-    NEXT_PUBLIC_FLOW_NETWORK: process.env.NEXT_PUBLIC_FLOW_NETWORK || "mainnet",
-    NEXT_PUBLIC_APP_URL:
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    NEXT_PUBLIC_FLOW_NETWORK: process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet",
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    NEXT_PUBLIC_FUNGIBLE_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_FLOW_NETWORK === "mainnet" 
+      ? "0xf233dcee88fe0abe" 
+      : "0x9a0766d93b6608b7",
+    NEXT_PUBLIC_FLOW_TOKEN_ADDRESS: process.env.NEXT_PUBLIC_FLOW_NETWORK === "mainnet"
+      ? "0x1654653399040a61"
+      : "0x7e60df042a9c0868",
   },
-  webpack: (config) => {
-    // Fix for Flow FCL in browser
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
+  webpack: (config, { isServer }) => {
+    // Add the Cadence loader first
+    config.module.rules.push({
+      test: /\.cdc$/,
+      type: 'asset/source',
+    });
+
+    // Add alias configuration
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+      '@flow-wager': path.resolve(__dirname, 'flow-wager'),
     };
+
+    // Only add fallback for client-side
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
 
     return config;
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "X-Frame-Options",
-            value: "DENY",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "origin-when-cross-origin",
-          },
-        ],
-      },
-    ];
-  },
-
   typescript: {
-    ignoreBuildErrors: true, // Allow build to succeed even with TypeScript errors
-
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: true, // Allow build to succeed even with ESLint errors
+    ignoreDuringBuilds: true,
   }
 };
 

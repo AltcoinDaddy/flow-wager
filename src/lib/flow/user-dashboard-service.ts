@@ -1,135 +1,29 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/flow/user-dashboard-service.ts
 import * as fcl from "@onflow/fcl";
 import flowConfig from "@/lib/flow/config";
 import type { Market } from "@/types/market";
 import React from "react";
+import { 
+  getUserProfile as getUserProfileScript,
+  getUserPositions as getUserPositionsScript,
+  getMarketCreator as getMarketCreatorScript,
+  getUserDashboardData as getUserDashboardDataScript
+} from "@/lib/flow-wager-scripts";
 
 // Initialize Flow configuration
 const initConfig = async () => {
   flowConfig();
 };
 
-// Cadence scripts for user dashboard data
-export const GET_USER_PROFILE_SCRIPT = `
-  import FlowWager from 0xFlowWager
-  
-  access(all) fun main(userAddress: Address): {String: AnyStruct} {
-    let userProfile = FlowWager.getUserProfile(userAddress: userAddress)
-    if (userProfile == nil) {
-      return {
-        "totalTrades": 0,
-        "totalVolume": "0.0",
-        "totalPnL": "0.0", 
-        "winRate": 0.0,
-        "joinDate": getCurrentBlock().timestamp.toString(),
-        "reputation": 0.0,
-        "rank": 0
-      }
-    }
-    return userProfile!
-  }
-`;
-
-export const GET_USER_POSITIONS_SCRIPT = `
-  import FlowWager from 0xFlowWager
-  
-  access(all) fun main(userAddress: Address): [AnyStruct] {
-    let positions: [AnyStruct] = []
-    let allMarkets = FlowWager.getAllMarkets()
-    
-    for market in allMarkets {
-      let position = FlowWager.getUserPosition(userAddress: userAddress, marketId: market.id)
-      if (position != nil) {
-        let positionData = position!
-        let totalShares = positionData.optionAShares + positionData.optionBShares
-        
-        if (totalShares > 0.0) {
-          // Calculate current value and P&L
-          let marketData = FlowWager.getMarket(marketId: market.id)!
-          let totalMarketShares = marketData.totalOptionAShares + marketData.totalOptionBShares
-          let currentPrice = totalMarketShares > 0.0 ? marketData.totalPool / totalMarketShares : 1.0
-          let currentValue = totalShares * currentPrice
-          let pnl = currentValue - positionData.totalInvested
-          let pnlPercentage = positionData.totalInvested > 0.0 ? (pnl / positionData.totalInvested) * 100.0 : 0.0
-          
-          positions.append({
-            "marketId": market.id,
-            "marketTitle": market.title,
-            "optionAShares": positionData.optionAShares,
-            "optionBShares": positionData.optionBShares,
-            "totalInvested": positionData.totalInvested,
-            "currentValue": currentValue,
-            "pnl": pnl,
-            "pnlPercentage": pnlPercentage,
-            "status": market.status,
-            "outcome": market.outcome
-          })
-        }
-      }
-    }
-    
-    return positions
-  }
-`;
-
-export const GET_USER_CREATED_MARKETS_SCRIPT = `
-  import FlowWager from 0xFlowWager
-  
-  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
-    let allMarkets = FlowWager.getAllMarkets()
-    let userMarkets: [FlowWager.Market] = []
-    
-    for market in allMarkets {
-      if (market.creator == creatorAddress) {
-        userMarkets.append(market)
-      }
-    }
-    
-    return userMarkets
-  }
-`;
-
-export const GET_USER_TRADING_HISTORY_SCRIPT = `
-  import FlowWager from 0xFlowWager
-  
-  access(all) fun main(userAddress: Address): [AnyStruct] {
-    // This would need to be implemented in the contract to track user trading history
-    // For now, returning empty array - you'll need to add event tracking to your contract
-    let history: [AnyStruct] = []
-    
-    // Example structure for when you implement it:
-    // {
-    //   "id": "trade_id",
-    //   "type": "BuyShares" | "SellShares" | "ClaimWinnings" | "CreateMarket", 
-    //   "marketId": marketId,
-    //   "marketTitle": market.title,
-    //   "amount": amount,
-    //   "side": "optionA" | "optionB",
-    //   "timestamp": timestamp,
-    //   "txHash": txHash
-    // }
-    
-    return history
-  }
-`;
-
-export const GET_LEADERBOARD_RANK_SCRIPT = `
-  import FlowWager from 0xFlowWager
-  
-  access(all) fun main(userAddress: Address): Int {
-    // This would calculate user's rank based on total volume, P&L, or other metrics
-    // For now returning 0 - implement leaderboard logic in contract
-    return 0
-  }
-`;
-
-// User dashboard service functions
+// User dashboard service functions using your scripts
 export const getUserProfile = async (userAddress: string) => {
   try {
     await initConfig();
     
+    const script = await getUserProfileScript();
     const profile = await fcl.query({
-      cadence: GET_USER_PROFILE_SCRIPT,
+      cadence: script,
       args: (arg, t) => [arg(userAddress, t.Address)]
     });
 
@@ -144,12 +38,13 @@ export const getUserPositions = async (userAddress: string) => {
   try {
     await initConfig();
     
+    const script = await getUserPositionsScript();
     const positions = await fcl.query({
-      cadence: GET_USER_POSITIONS_SCRIPT,
+      cadence: script,
       args: (arg, t) => [arg(userAddress, t.Address)]
     });
 
-    return positions || [];
+    return positions || {};
   } catch (error) {
     console.error(`Failed to fetch user positions for ${userAddress}:`, error);
     throw error;
@@ -160,8 +55,9 @@ export const getUserCreatedMarkets = async (userAddress: string): Promise<Market
   try {
     await initConfig();
     
+    const script = await getMarketCreatorScript();
     const markets = await fcl.query({
-      cadence: GET_USER_CREATED_MARKETS_SCRIPT,
+      cadence: script,
       args: (arg, t) => [arg(userAddress, t.Address)]
     });
 
@@ -183,7 +79,8 @@ export const getUserCreatedMarkets = async (userAddress: string): Promise<Market
       resolved: market.resolved,
       totalOptionAShares: market.totalOptionAShares.toString(),
       totalOptionBShares: market.totalOptionBShares.toString(),
-      totalPool: market.totalPool.toString()
+      totalPool: market.totalPool.toString(),
+      imageUrl: market.imageUrl || ""
     })) || [];
   } catch (error) {
     console.error(`Failed to fetch created markets for ${userAddress}:`, error);
@@ -195,15 +92,11 @@ export const getUserTradingHistory = async (userAddress: string) => {
   try {
     await initConfig();
     
-    const history = await fcl.query({
-      cadence: GET_USER_TRADING_HISTORY_SCRIPT,
-      args: (arg, t) => [arg(userAddress, t.Address)]
-    });
-
-    return history || [];
+    // For now, return empty array since trading history tracking might not be implemented yet
+    // You can implement this when you add event tracking to your contract
+    return [];
   } catch (error) {
     console.error(`Failed to fetch trading history for ${userAddress}:`, error);
-    // Return empty array on error since trading history might not be implemented yet
     return [];
   }
 };
@@ -212,46 +105,75 @@ export const getUserLeaderboardRank = async (userAddress: string) => {
   try {
     await initConfig();
     
-    const rank = await fcl.query({
-      cadence: GET_LEADERBOARD_RANK_SCRIPT,
-      args: (arg, t) => [arg(userAddress, t.Address)]
-    });
-
-    return rank || 0;
+    // For now, return 0 since leaderboard might not be implemented yet
+    // You can implement this when you add leaderboard logic to your contract
+    return 0;
   } catch (error) {
     console.error(`Failed to fetch leaderboard rank for ${userAddress}:`, error);
     return 0;
   }
 };
 
-// Batch fetch all user dashboard data
+// Enhanced batch fetch using your comprehensive dashboard script
 export const getUserDashboardData = async (userAddress: string) => {
   try {
-    const [profile, positions, createdMarkets, tradingHistory] = await Promise.all([
-      getUserProfile(userAddress),
-      getUserPositions(userAddress),
-      getUserCreatedMarkets(userAddress),
-      getUserTradingHistory(userAddress)
-    ]);
+    await initConfig();
+    
+    // Use your comprehensive getUserDashboardData script
+    const script = await getUserDashboardDataScript();
+    const dashboardData = await fcl.query({
+      cadence: script,
+      args: (arg, t) => [arg(userAddress, t.Address)]
+    });
+
+    // Also fetch created markets separately since it's not in the dashboard script
+    const createdMarkets = await getUserCreatedMarkets(userAddress);
 
     return {
-      profile,
-      positions,
+      profile: dashboardData.profile,
+      stats: dashboardData.stats,
+      positions: dashboardData.positions,
+      claimableWinnings: dashboardData.claimableWinnings,
+      wagerPoints: dashboardData.wagerPoints,
       createdMarkets,
-      tradingHistory
+      tradingHistory: [] // Placeholder until implemented
     };
   } catch (error) {
     console.error(`Failed to fetch dashboard data for ${userAddress}:`, error);
-    throw error;
+    
+    // Fallback: fetch data individually if batch fails
+    try {
+      const [profile, positions, createdMarkets] = await Promise.all([
+        getUserProfile(userAddress),
+        getUserPositions(userAddress),
+        getUserCreatedMarkets(userAddress)
+      ]);
+
+      return {
+        profile,
+        stats: null,
+        positions,
+        claimableWinnings: [],
+        wagerPoints: 0,
+        createdMarkets,
+        tradingHistory: []
+      };
+    } catch (fallbackError) {
+      console.error('Fallback fetch also failed:', fallbackError);
+      throw error;
+    }
   }
 };
 
 // React hook for user dashboard data
 type UserDashboardData = {
   profile: any;
+  stats: any;
   positions: any;
+  claimableWinnings: any[];
+  wagerPoints: number;
   createdMarkets: Market[];
-  tradingHistory: any;
+  tradingHistory: any[];
 };
 
 export const useUserDashboard = (userAddress: string) => {
@@ -279,4 +201,41 @@ export const useUserDashboard = (userAddress: string) => {
   }, [fetchData]);
 
   return { data, loading, error, refetch: fetchData };
+};
+
+// Additional helper functions for specific data
+export const getClaimableWinnings = async (userAddress: string) => {
+  try {
+    await initConfig();
+    
+    const dashboardData = await getUserDashboardData(userAddress);
+    return dashboardData.claimableWinnings || [];
+  } catch (error) {
+    console.error(`Failed to fetch claimable winnings for ${userAddress}:`, error);
+    return [];
+  }
+};
+
+export const getWagerPoints = async (userAddress: string) => {
+  try {
+    await initConfig();
+    
+    const dashboardData = await getUserDashboardData(userAddress);
+    return dashboardData.wagerPoints || 0;
+  } catch (error) {
+    console.error(`Failed to fetch wager points for ${userAddress}:`, error);
+    return 0;
+  }
+};
+
+export const getUserStats = async (userAddress: string) => {
+  try {
+    await initConfig();
+    
+    const dashboardData = await getUserDashboardData(userAddress);
+    return dashboardData.stats;
+  } catch (error) {
+    console.error(`Failed to fetch user stats for ${userAddress}:`, error);
+    return null;
+  }
 };

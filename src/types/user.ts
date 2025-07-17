@@ -10,10 +10,13 @@ export interface UserStats {
   currentStreak: number;
   longestStreak: number;
   totalFeesPaid: number;
-  totalInvested: number;
+  totalInvested?: number;
   winRate: number;
   roi: number; // Return on Investment
   rank?: number;
+  totalMarketsParticipated?: number; // Optional for backward compatibility
+  totalLosses?: number; // Optional for backward compatibility
+  winStreak?: number; // Optional for backward compatibility
 }
 
 export interface UserPosition {
@@ -82,11 +85,11 @@ export interface LeaderboardUser {
   username?: string;
   avatar?: string;
   rank: number;
-  totalPnL: string;
-  winRate: number;
-  totalVolume: string;
-  accuracy: number;
-  change: number; // rank change from previous period
+  totalPnL?: string;
+  winRate?: number;
+  totalVolume?: string;
+  accuracy?: number;
+  change?: number; // rank change from previous period
 }
 
 export interface LeaderboardResponse {
@@ -152,26 +155,8 @@ export interface FollowStats {
   isFollower?: boolean;
 }
 
-// User search and discovery
-export interface UserSearchResult {
-  address: string;
-  username?: string;
-  avatar?: string;
-  stats: Pick<UserStats, 'totalWinnings' | 'winRate' | 'totalBets'>;
-  followStats: FollowStats;
-}
 
-export interface UpdateProfileRequest {
-  username?: string;
-  bio?: string;
-  avatar?: string;
-}
 
-export interface UpdatePreferencesRequest {
-  notifications?: Partial<UserPreferences['notifications']>;
-  privacy?: Partial<UserPreferences['privacy']>;
-  display?: Partial<UserPreferences['display']>;
-}
 
 export interface User {
   address: string;
@@ -184,18 +169,7 @@ export interface User {
   socialLinks?: SocialLinks;
 }
 
-export interface UserStats {
-  totalVolume: string;
-  totalPnL: string;
-  totalTrades: number;
-  winRate: number;
-  activePositions: number;
-  marketsCreated: number;
-  marketsResolved: number;
-  accuracy: number;
-  rank?: number;
-  reputation: number;
-}
+
 
 export interface SocialLinks {
   twitter?: string;
@@ -203,17 +177,7 @@ export interface SocialLinks {
   website?: string;
 }
 
-export interface LeaderboardUser {
-  address: string;
-  username?: string;
-  avatar?: string;
-  rank: number;
-  totalPnL: string;
-  winRate: number;
-  totalVolume: string;
-  accuracy: number;
-  change: number; // rank change from previous period
-}
+
 
 export interface UserActivity {
   id: string;

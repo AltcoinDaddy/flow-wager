@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/resolution-scripts.ts
 import type { MarketOutcome } from "@/types/market";
 
