@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
 
 import { MarketCard } from "@/components/market/market-card";
 import { MarketError } from "@/components/market/market-error";
@@ -17,6 +18,12 @@ import type {
   MarketStatus
 } from "@/types/market";
 import * as fcl from "@onflow/fcl";
+import {
+  getAllMarkets,
+  getMarketById,
+  getPlatformStats,
+  getContractInfo,
+} from "@/lib/flow-wager-scripts";
 import {
   Activity,
   BarChart3,
@@ -57,6 +64,8 @@ interface UserDashboardData {
   recentActivity: Activity[];
   createdMarkets: Market[];
   watchlistMarkets: Market[];
+  platformStats?: any;
+  contractInfo?: any;
 }
 
 interface UserPosition {
@@ -83,9 +92,9 @@ interface Activity {
   txHash: string;
 }
 
-// Flow scripts for user data (using working scripts)
+// Enhanced Flow script for user data using your flow-wager-scripts
 const GET_USER_BASIC_INFO = `
-  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace(
+  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT?.replace(
     "0x",
     ""
   )}
@@ -93,31 +102,34 @@ const GET_USER_BASIC_INFO = `
   access(all) fun main(address: Address): {String: AnyStruct} {
     let allMarkets = FlowWager.getAllMarkets()
     var marketsCreated = 0
+    var totalVolume = 0.0
+    var totalTrades = 0
     
-    // Count markets created by user
+    // Count markets created by user and calculate stats
     for market in allMarkets {
       if (market.creator == address) {
         marketsCreated = marketsCreated + 1
+        totalVolume = totalVolume + UFix64.fromString(market.totalPool) ?? 0.0
       }
     }
     
     return {
       "address": address.toString(),
-      "totalTrades": 0,
-      "totalVolume": "0.0",
+      "totalTrades": totalTrades,
+      "totalVolume": totalVolume.toString(),
       "totalPnL": "0.0",
       "winRate": 0.0,
       "activePositions": 0,
       "marketsCreated": marketsCreated,
       "joinDate": getCurrentBlock().timestamp.toString(),
-      "reputation": 0.0,
+      "reputation": Float64(marketsCreated * 10), // Simple reputation based on markets created
       "rank": 0
     } as {String: AnyStruct}
   }
 `;
 
 const GET_USER_CREATED_MARKETS = `
-  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT?.replace(
+  import FlowWager from 0x${process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT?.replace(
     "0x",
     ""
   )}
@@ -139,7 +151,7 @@ const GET_USER_CREATED_MARKETS = `
 export default function UserDashboardPage() {
   const params = useParams();
   const userAddress = params.id as string;
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAuthenticated } = useAuth();
 
   const [data, setData] = useState<UserDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,47 +164,82 @@ export default function UserDashboardPage() {
 
   // Check if current user is the contract owner/admin
   const isContractOwner =
-    currentUser?.addr === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT;
+    currentUser?.addr === process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT;
 
   // Initialize Flow configuration
   const initConfig = async () => {
     flowConfig();
   };
 
-  // Fetch user dashboard data
+  // Fetch user dashboard data using your flow-wager-scripts
   const fetchUserData = async () => {
     try {
       setError(null);
       await initConfig();
 
-      // Fetch basic user info (this should work)
+      // Fetch basic user info
       const profile = await fcl.query({
         cadence: GET_USER_BASIC_INFO,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
 
-      // Fetch created markets (this should work)
+      // Fetch created markets using your script
       const createdMarkets = await fcl.query({
         cadence: GET_USER_CREATED_MARKETS,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
 
-      // Transform data with fallbacks
+      // Fetch platform stats using your flow-wager-scripts
+      let platformStats = null;
+      let contractInfo = null;
+      
+      try {
+        const platformStatsScript = await getPlatformStats();
+        platformStats = await fcl.query({
+          cadence: platformStatsScript,
+        });
+        
+        const contractInfoScript = await getContractInfo();
+        contractInfo = await fcl.query({
+          cadence: contractInfoScript,
+        });
+      } catch (statsError) {
+        console.warn("Could not fetch platform stats:", statsError);
+      }
+
+      // Fetch all markets for additional context using your script
+      let allMarkets = [];
+      try {
+        const allMarketsScript = await getAllMarkets();
+        allMarkets = await fcl.query({
+          cadence: allMarketsScript,
+        });
+      } catch (marketsError) {
+        console.warn("Could not fetch all markets:", marketsError);
+      }
+
+      // Calculate enhanced stats based on user's markets
+      const userMarketIds = createdMarkets?.map((market: any) => market.id.toString()) || [];
+      const totalVolumeFromMarkets = createdMarkets?.reduce((sum: number, market: any) => {
+        return sum + parseFloat(market.totalPool || "0");
+      }, 0) || 0;
+
+      // Transform data with enhanced calculations
       const dashboardData: UserDashboardData = {
         profile: {
           address: userAddress,
           totalTrades: parseInt(profile.totalTrades?.toString() || "0"),
-          totalVolume: profile.totalVolume?.toString() || "0.00",
+          totalVolume: totalVolumeFromMarkets.toString(),
           totalPnL: profile.totalPnL?.toString() || "0.00",
           winRate: parseFloat(profile.winRate?.toString() || "0"),
-          activePositions: 0, // Will be calculated from positions
+          activePositions: 0, // Will be calculated from positions when available
           marketsCreated: parseInt(profile.marketsCreated?.toString() || "0"),
           joinDate: profile.joinDate?.toString() || Date.now().toString(),
           reputation: parseFloat(profile.reputation?.toString() || "0"),
           rank: parseInt(profile.rank?.toString() || "0"),
         },
-        positions: [], // Empty for now since getUserPosition may not exist
-        recentActivity: [], // Empty for now since trading history may not exist
+        positions: [], // Empty for now since position tracking needs implementation
+        recentActivity: [], // Empty for now since activity tracking needs implementation
         createdMarkets:
           createdMarkets?.map((market: any) => ({
             id: market.id.toString(),
@@ -216,6 +263,8 @@ export default function UserDashboardPage() {
             totalPool: market.totalPool.toString(),
           })) || [],
         watchlistMarkets: [],
+        platformStats,
+        contractInfo,
       };
 
       setData(dashboardData);
@@ -258,6 +307,39 @@ export default function UserDashboardPage() {
     await fetchUserData();
   };
 
+  // Export user data
+  const handleExportData = async () => {
+    if (!data) return;
+
+    try {
+      const exportData = {
+        userProfile: data.profile,
+        createdMarkets: data.createdMarkets,
+        positions: data.positions,
+        recentActivity: data.recentActivity,
+        platformStats: data.platformStats,
+        contractInfo: data.contractInfo,
+        exportedAt: new Date().toISOString(),
+        contractAddress: process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT,
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `flow-wager-user-${userAddress}-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  };
+
   // Fetch data on mount
   useEffect(() => {
     if (userAddress) {
@@ -268,6 +350,7 @@ export default function UserDashboardPage() {
   // Utility functions
   const formatCurrency = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(num)) return "0";
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toFixed(2);
@@ -381,11 +464,20 @@ export default function UserDashboardPage() {
                   </div>
                   {/* Show admin badge for contract owner */}
                   {userAddress ===
-                    process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
+                    process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT && (
                     <div className="flex items-center space-x-1">
                       <Settings className="h-4 w-4 text-green-400" />
                       <span className="text-green-400 font-medium">
                         Contract Admin
+                      </span>
+                    </div>
+                  )}
+                  {/* Show platform stats if available */}
+                  {data.platformStats && (
+                    <div className="flex items-center space-x-1">
+                      <Activity className="h-4 w-4 text-blue-400" />
+                      <span className="text-blue-400">
+                        Platform: {data.platformStats.totalMarkets || 0} markets
                       </span>
                     </div>
                   )}
@@ -410,21 +502,33 @@ export default function UserDashboardPage() {
               </Button>
 
               {isOwnProfile && (
-                <>
-                  <Button
-                    variant="outline"
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  onClick={handleExportData}
+                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              )}
+
+              {/* Show admin panel link for contract owner */}
+              {isOwnProfile && isContractOwner && (
+                <Button
+                  asChild
+                  className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white w-full sm:w-auto"
+                >
+                  <Link href="/admin">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin Panel
+                  </Link>
+                </Button>
               )}
             </div>
           </div>
         </div>
 
-        {/* Statistics Cards - Only 4 cards */}
+        {/* Enhanced Statistics Cards with Platform Data */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
@@ -438,6 +542,9 @@ export default function UserDashboardPage() {
               </div>
               <p className="text-2xl font-bold text-white">
                 {data.profile.totalTrades}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Across all markets
               </p>
             </CardContent>
           </Card>
@@ -454,6 +561,9 @@ export default function UserDashboardPage() {
               </div>
               <p className="text-2xl font-bold text-white">
                 {formatCurrency(data.profile.totalVolume)} FLOW
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                From created markets
               </p>
             </CardContent>
           </Card>
@@ -488,6 +598,9 @@ export default function UserDashboardPage() {
                 {parseFloat(data.profile.totalPnL) >= 0 ? "+" : ""}
                 {formatCurrency(data.profile.totalPnL)} FLOW
               </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Trading profit/loss
+              </p>
             </CardContent>
           </Card>
 
@@ -498,15 +611,57 @@ export default function UserDashboardPage() {
                   <Target className="h-5 w-5 text-blue-400" />
                 </div>
                 <span className="text-sm font-medium text-gray-400">
-                  Win Rate
+                  Markets Created
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
-                {data.profile.winRate.toFixed(1)}%
+                {data.profile.marketsCreated}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                Total markets created
               </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* Platform Stats Banner for Contract Info */}
+        {data.contractInfo && (
+          <Card className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Activity className="h-5 w-5 text-blue-400" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-400">
+                      Contract Statistics
+                    </p>
+                    <p className="text-xs text-gray-300">
+                      Live data from Flow blockchain
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-6 text-sm">
+                  {data.platformStats?.totalMarkets && (
+                    <div>
+                      <span className="text-gray-400">Total Markets: </span>
+                      <span className="text-white font-medium">
+                        {data.platformStats.totalMarkets}
+                      </span>
+                    </div>
+                  )}
+                  {data.platformStats?.totalUsers && (
+                    <div>
+                      <span className="text-gray-400">Total Users: </span>
+                      <span className="text-white font-medium">
+                        {data.platformStats.totalUsers}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content Tabs */}
         <Tabs
@@ -533,15 +688,12 @@ export default function UserDashboardPage() {
             >
               Activity
             </TabsTrigger>
-            {/* Only show Created Markets tab for contract owner */}
-            {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
-              <TabsTrigger
-                value="markets"
-                className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
-              >
-                Created Markets ({data.createdMarkets.length})
-              </TabsTrigger>
-            )}
+            <TabsTrigger
+              value="markets"
+              className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
+            >
+              Created Markets ({data.createdMarkets.length})
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -589,6 +741,7 @@ export default function UserDashboardPage() {
                       <div className="text-center py-8 text-gray-400">
                         <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>No recent activity</p>
+                        <p className="text-xs mt-2">Activity tracking coming soon</p>
                       </div>
                     ) : (
                       data.recentActivity.slice(0, 5).map((activity) => (
@@ -667,7 +820,7 @@ export default function UserDashboardPage() {
                       </span>
                     </div>
                     <Progress
-                      value={data.profile.reputation}
+                      value={Math.min(data.profile.reputation, 100)}
                       className="h-2 bg-gray-800"
                     />
                   </div>
@@ -679,20 +832,18 @@ export default function UserDashboardPage() {
                       </p>
                       <p className="text-xs text-gray-400">Total Trades</p>
                     </div>
-                    {isContractOwner && (
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-white">
-                          {data.profile.marketsCreated}
-                        </p>
-                        <p className="text-xs text-gray-400">Markets Created</p>
-                      </div>
-                    )}
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-white">
+                        {data.profile.marketsCreated}
+                      </p>
+                      <p className="text-xs text-gray-400">Markets Created</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Quick Actions - Removed Leaderboard */}
+            {/* Quick Actions */}
             {isOwnProfile && (
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
@@ -724,16 +875,16 @@ export default function UserDashboardPage() {
                       </Button>
                     )}
 
-                    {/* Only show Resolve Markets button for contract owner */}
+                    {/* Only show Admin Dashboard button for contract owner */}
                     {isContractOwner && (
                       <Button
                         variant="outline"
                         className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start w-full"
                         asChild
                       >
-                        <Link href="/admin/resolve">
+                        <Link href="/admin">
                           <Settings className="h-4 w-4 mr-2" />
-                          Resolve Markets
+                          Admin Dashboard
                         </Link>
                       </Button>
                     )}
@@ -755,7 +906,7 @@ export default function UserDashboardPage() {
                     <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-lg font-medium">No active positions</p>
                     <p className="text-sm">
-                      Start trading to see your positions here
+                      Position tracking will be available when implemented in the smart contract
                     </p>
                   </div>
                 ) : (
@@ -835,7 +986,7 @@ export default function UserDashboardPage() {
                   <div className="text-center py-12 text-gray-400">
                     <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-lg font-medium">No trading activity</p>
-                    <p className="text-sm">Trading history will appear here</p>
+                    <p className="text-sm">Activity tracking will be available when implemented</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -896,66 +1047,66 @@ export default function UserDashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* Created Markets Tab - Only for contract owner */}
-          {userAddress === process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT && (
-            <TabsContent value="markets">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      Created Markets
-                    </h3>
-                    <p className="text-gray-400">
-                      Markets created by this user
-                    </p>
-                  </div>
-                  {/* Only show Create Market button for contract owner */}
-                  {isContractOwner && isOwnProfile && (
-                    <Button
-                      asChild
-                      className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
-                    >
-                      <Link href="/admin/create">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Market
-                      </Link>
-                    </Button>
-                  )}
+          {/* Created Markets Tab */}
+          <TabsContent value="markets">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Created Markets
+                  </h3>
+                  <p className="text-gray-400">
+                    Markets created by this user
+                  </p>
                 </div>
-
-                {data.createdMarkets.length > 0 ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {data.createdMarkets.map((market) => (
-                      <MarketCard key={market.id} market={market} />
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-                    <CardContent className="text-center py-12">
-                      <Plus className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-50" />
-                      <h3 className="text-lg font-medium text-white mb-2">
-                        No markets created
-                      </h3>
-                      <p className="text-gray-400 mb-4">
-                        You haven't created any markets yet
-                      </p>
-                      {/* Only show Create Market button for contract owner viewing their own profile */}
-                      {isOwnProfile && isContractOwner && (
-                        <Button
-                          asChild
-                          className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
-                        >
-                          <Link href="/admin/create">
-                            Create Your First Market
-                          </Link>
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
+                {/* Only show Create Market button for contract owner viewing their own profile */}
+                {isContractOwner && isOwnProfile && (
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+                  >
+                    <Link href="/admin/create">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Market
+                    </Link>
+                  </Button>
                 )}
               </div>
-            </TabsContent>
-          )}
+
+              {data.createdMarkets.length > 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {data.createdMarkets.map((market) => (
+                    <MarketCard key={market.id} market={market} />
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+                  <CardContent className="text-center py-12">
+                    <Plus className="mx-auto h-12 w-12 text-gray-400 mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium text-white mb-2">
+                      No markets created
+                    </h3>
+                    <p className="text-gray-400 mb-4">
+                      {isOwnProfile 
+                        ? "You haven't created any markets yet" 
+                        : "This user hasn't created any markets yet"}
+                    </p>
+                    {/* Only show Create Market button for contract owner viewing their own profile */}
+                    {isOwnProfile && isContractOwner && (
+                      <Button
+                        asChild
+                        className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+                      >
+                        <Link href="/admin/create">
+                          Create Your First Market
+                        </Link>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
     </div>

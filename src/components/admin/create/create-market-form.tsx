@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-// src/components/admin/create/create-market-form.tsx
-
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +21,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Check, Upload, Loader2, X, Image as ImageIcon } from "lucide-react";
 import * as fcl from "@onflow/fcl";
 import { toast } from "sonner";
+import flowConfig from '@/lib/flow/config';
+import { 
+  createMarketTransaction,
+} from '@/lib/flow-wager-scripts';
+import Image from "next/image";
 
 // Market categories matching your FlowWager contract enum values
 const MARKET_CATEGORIES = [
@@ -192,6 +195,20 @@ export function CreateMarketForm({
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  // Initialize Flow configuration
+  useEffect(() => {
+    const initFlow = async () => {
+      try {
+        flowConfig();
+        console.log('Flow configuration initialized for market creation');
+      } catch (error) {
+        console.error('Failed to initialize Flow configuration:', error);
+      }
+    };
+
+    initFlow();
   }, []);
 
   // Handle file selection and upload
@@ -371,7 +388,7 @@ export function CreateMarketForm({
     setStep(step - 1);
   };
 
-  // 🚨 THIS IS WHERE THE SMART CONTRACT IS CALLED 🚨
+  // 🚨 UPDATED: Use your Flow Wager scripts instead of hardcoded Cadence 🚨
   const createMarketOnBlockchain = async (marketData: any): Promise<string> => {
     if (!user?.addr) {
       throw new Error("User not authenticated");
@@ -380,57 +397,23 @@ export function CreateMarketForm({
     try {
       console.log("Creating market on blockchain with data:", marketData);
 
-      const transactionId = await fcl.mutate({
-        cadence: `
-          import FlowWager from ${process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
+      // Get the create market transaction script from your flow-wager-scripts
+      const transactionScript = await createMarketTransaction();
+      
+      console.log("Using transaction script from flow-wager-scripts");
 
-          transaction(
-            question: String,
-            description: String,
-            optionA: String,
-            optionB: String,
-            category: UInt8,
-            minBet: UFix64,
-            maxBet: UFix64,
-            duration: UFix64
-          ) {
-            let adminRef: auth(Storage) &FlowWager.Admin
-            
-            prepare(signer: auth(Storage) &Account) {
-              self.adminRef = signer.storage.borrow<auth(Storage) &FlowWager.Admin>(from: /storage/FlowWagerAdmin)
-                ?? panic("Could not borrow Admin reference. Only admins can create markets.")
-            }
-            
-            execute {
-              let categoryEnum = FlowWager.MarketCategory(rawValue: category)
-                ?? panic("Invalid category value")
-              
-              let endTime = getCurrentBlock().timestamp + duration
-              
-              let marketId = self.adminRef.createMarket(
-                title: question,
-                description: description,
-                category: categoryEnum,
-                optionA: optionA,
-                optionB: optionB,
-                endTime: endTime,
-                minBet: minBet,
-                maxBet: maxBet
-              )
-              
-              log("Market created with ID: ".concat(marketId.toString()))
-            }
-          }
-        `,
+      const transactionId = await fcl.mutate({
+        cadence: transactionScript,
         args: (arg, t) => [
-          arg(marketData.question, t.String),
-          arg(marketData.description, t.String), // ✅ This contains rules + hidden image URL
-          arg(marketData.optionA, t.String),
-          arg(marketData.optionB, t.String),
-          arg(marketData.category.toString(), t.UInt8),
-          arg(marketData.minBet.toFixed(8), t.UFix64),
-          arg(marketData.maxBet.toFixed(8), t.UFix64),
-          arg((marketData.duration * 3600).toFixed(1), t.UFix64)
+          arg(marketData.question, t.String),           // title
+          arg(marketData.description, t.String),        // description (includes rules + image)
+          arg(marketData.category.toString(), t.UInt8), // category
+          arg(marketData.optionA, t.String),           // optionA
+          arg(marketData.optionB, t.String),           // optionB
+          arg(marketData.endTime.toFixed(1), t.UFix64), // endTime (Unix timestamp)
+          arg(marketData.minBet.toFixed(8), t.UFix64),  // minBet
+          arg(marketData.maxBet.toFixed(8), t.UFix64),  // maxBet
+          arg(marketData.imageURI || "", t.String),     // imageUrl
         ],
         proposer: fcl.authz,
         payer: fcl.authz,
@@ -447,9 +430,9 @@ export function CreateMarketForm({
       console.log("Transaction status:", transaction.status);
       console.log("Transaction events:", transaction.events);
 
-      // Check the correct status codes
+      // Check transaction status
       if (transaction.status === 5) {
-        // Status 5 = EXPIRED (failed)
+        // Status 5 = EXPIRED/FAILED
         const errorMsg = transaction.errorMessage || "Transaction expired/failed";
         console.error("Transaction failed with error:", errorMsg);
         throw new Error(`Transaction failed: ${errorMsg}`);
@@ -459,13 +442,18 @@ export function CreateMarketForm({
         // Status 4 = SEALED (success!)
         console.log("Transaction sealed successfully!");
         
-        // Try to extract market ID from events if possible
+        // Try to extract market ID from events
         const marketCreatedEvent = transaction.events?.find(
           (event: any) => event.type.includes('MarketCreated')
         );
         
         if (marketCreatedEvent) {
           console.log("Market created event:", marketCreatedEvent);
+          // Extract market ID from event data if available
+          const marketId = marketCreatedEvent.data?.marketId;
+          if (marketId) {
+            console.log("Extracted market ID:", marketId);
+          }
         }
         
         return transactionId;
@@ -493,6 +481,15 @@ export function CreateMarketForm({
         }
       }
       
+      // Handle specific error cases
+      if (errorMessage.includes('Could not borrow Admin reference')) {
+        errorMessage = "Only admin accounts can create markets. Please ensure you're using an authorized admin wallet.";
+      } else if (errorMessage.includes('Could not borrow FlowToken vault')) {
+        errorMessage = "Unable to access your Flow token vault. Please ensure you have sufficient FLOW tokens and proper vault setup.";
+      } else if (errorMessage.includes('location')) {
+        errorMessage = "Contract deployment error. Please check the contract address configuration.";
+      }
+      
       console.error("Processed error message:", errorMessage);
       throw new Error(errorMessage);
     }
@@ -512,39 +509,39 @@ export function CreateMarketForm({
     setIsSubmitting(true);
 
     try {
-      // Calculate duration in hours from end date/time
+      // Calculate end time as Unix timestamp
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-      const now = new Date();
-      const durationHours = (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const endTimeUnix = endDateTime.getTime() / 1000;
 
-      // ✅ Store image URL hidden in rules field (hidden from users)
-      const rulesWithImage = formData.imageURI 
+      // Store image URL hidden in description field if present
+      const descriptionWithImage = formData.imageURI 
         ? `${formData.rules}\n\n__IMG__:${formData.imageURI}`
         : formData.rules;
 
       const marketCreationData = {
         question: formData.question.trim(),
-        description: rulesWithImage, // ✅ Image URL hidden in description field
+        description: descriptionWithImage,
         optionA: formData.optionA.trim(),
         optionB: formData.optionB.trim(),
         category: formData.category,
-        duration: durationHours,
+        endTime: endTimeUnix, // Unix timestamp
         minBet: parseFloat(formData.minBet),
         maxBet: parseFloat(formData.maxBet),
+        imageURI: formData.imageURI.trim(),
       };
 
       console.log("Submitting market creation:", marketCreationData);
 
-      // 🚨 CALLING THE SMART CONTRACT HERE 🚨
+      // 🚨 CALLING YOUR FLOW WAGER SCRIPT HERE 🚨
       const transactionId = await createMarketOnBlockchain(marketCreationData);
 
-      toast.success("Market created successfully!");
+      toast.success("Market created successfully on Flow blockchain!");
 
       if (onSubmit) {
         onSubmit({
           success: true,
           transactionId,
-          marketId: Date.now(), // Temporary ID until we can extract from events
+          marketId: Date.now(), // Temporary ID - you could extract real ID from events
         });
       } else {
         router.push("/admin");
@@ -758,10 +755,12 @@ export function CreateMarketForm({
               {(imagePreview || formData.imageURI) && (
                 <div className="relative">
                   <div className="relative w-full h-48 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                    <img
+                    <Image
                       src={imagePreview || formData.imageURI}
                       alt="Market preview"
                       className="w-full h-full object-cover"
+                      width={100}
+                      height={100}
                     />
                     <Button
                       type="button"
@@ -1005,18 +1004,22 @@ export function CreateMarketForm({
               <div className="text-sm text-gray-400 space-y-1">
                 <p>
                   • <strong className="text-gray-300">Contract:</strong>{" "}
-                  {process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT}
+                  {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT || "0xfb16e84ea1882f67"}
                 </p>
                 <p>
-                  • <strong className="text-gray-300">Network:</strong> Flow
-                  Mainnet
+                  • <strong className="text-gray-300">Network:</strong> Flow{" "}
+                  {process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet"}
                 </p>
                 <p>
                   • <strong className="text-gray-300">Your Address:</strong>{" "}
                   {user?.addr}
                 </p>
                 <p>
-                  • <strong className="text-gray-300">Platform Fee:</strong> 3%
+                  • <strong className="text-gray-300">Creation Fee:</strong> 10.0 FLOW
+                  (waived for contract deployer)
+                </p>
+                <p>
+                  • <strong className="text-gray-300">Platform Fee:</strong> 2.5%
                   of winnings
                 </p>
               </div>
@@ -1074,7 +1077,9 @@ export function CreateMarketForm({
                 <div>
                   <h4 className="font-semibold text-white">Market Image</h4>
                   <div className="w-32 h-20 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-                    <img
+                    <Image
+                      width={100}
+                      height={100}
                       src={formData.imageURI}
                       alt="Market image"
                       className="w-full h-full object-cover"
