@@ -135,7 +135,7 @@ transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
 import FlowWager from ${getFlowWagerAddress()}
 
     transaction(username: String, displayName: String) {
-    prepare(signer: auth(Storage) &Account) {}
+    prepare(signer: &Account) {}
     
     execute {
         FlowWager.createUserAccount(username: username, displayName: displayName)
