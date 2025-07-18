@@ -204,7 +204,7 @@ export default function HomePage() {
               <div className="text-3xl font-bold text-white mb-2">
                 {platformStats.totalUsers}+
               </div>
-              <div className="text-sm text-gray-400">Traders</div>
+              <div className="text-sm text-gray-400">Trades</div>
             </div>
           </div>
         </div>
