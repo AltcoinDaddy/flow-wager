@@ -714,13 +714,15 @@ access(all) contract FlowWager {
         return marketId
     }
     
-    access(all) fun createUserAccount(username: String, displayName: String) {
+    access(all)  fun createUserAccount(username: String, displayName: String) {
         pre {
             !self.paused: "Contract is paused for migration/upgrade"
             username.length > 0: "Username cannot be empty"
             displayName.length > 0: "Display name cannot be empty"
-            FlowWager.userProfiles[self.account.address] == nil: "User already registered"
         }
+        
+        // Check if user is already registered
+        assert(FlowWager.getUserProfile(address: self.account.address) == nil, message: "User already registered")
         
         let userProfile = UserProfile(
             address: self.account.address,
