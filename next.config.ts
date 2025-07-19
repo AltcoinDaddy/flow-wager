@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       "api.dicebear.com",
       "flowscan.org",
       "avatars.githubusercontent.com",
+      "res.cloudinary.com",
     ],
   },
   env: {
