@@ -54,9 +54,8 @@ const CADENCE_SCRIPTS = {
 
   getMarketCreator: `
     import FlowWager from ${getFlowWagerAddress()}
-
     access(all) fun main(creator: Address): [FlowWager.Market] {
-        return FlowWager.getMarketsByCreator(creator: creator)
+      return FlowWager.getMarketsByCreator(creator: creator)
     }
   `,
 
@@ -362,6 +361,52 @@ access(all) fun main(marketId: UInt64): FlowWager.Market? {
 }
  
  `,
+
+  activeUserPositions: `
+  import FlowWager from ${getFlowWagerAddress()}
+
+  access(all) struct ActivePosition {
+      access(all) let marketId: UInt64
+      access(all) let marketTitle: String
+      access(all) let optionAShares: UFix64
+      access(all) let optionBShares: UFix64
+      access(all) let totalInvested: UFix64
+
+      init(
+          marketId: UInt64,
+          marketTitle: String,
+          optionAShares: UFix64,
+          optionBShares: UFix64,
+          totalInvested: UFix64
+      ) {
+          self.marketId = marketId
+          self.marketTitle = marketTitle
+          self.optionAShares = optionAShares
+          self.optionBShares = optionBShares
+          self.totalInvested = totalInvested
+      }
+  }
+
+  access(all) fun main(userAddress: Address): [ActivePosition] {
+      let positionsDict = FlowWager.getUserPositions(address: userAddress)
+      var activePositions: [ActivePosition] = []
+      for marketId in positionsDict.keys {
+          if let market = FlowWager.getMarket(marketId: marketId) {
+              if market.status == FlowWager.MarketStatus.Active {
+                  let position = positionsDict[marketId]!
+                  activePositions.append(ActivePosition(
+                      marketId: marketId,
+                      marketTitle: market.title,
+                      optionAShares: position.optionAShares,
+                      optionBShares: position.optionBShares,
+                      totalInvested: position.totalInvested
+                  ))
+              }
+          }
+      }
+      return activePositions
+  }
+`,
 };
 
 export class FlowWagerScripts {
@@ -425,6 +470,8 @@ export const getUserPositions = () =>
   FlowWagerScripts.getScript("getUserPositions");
 export const getUserDashboardData = () =>
   FlowWagerScripts.getScript("getUserDashboarData");
+export const getActiveUserPositions = () =>
+  FlowWagerScripts.getScript("activeUserPositions");
 
 export const getMarketById = () => FlowWagerScripts.getScript("getMarketById");
 
@@ -466,4 +513,5 @@ export type QueryName =
   | "getPendingMarketsWithEvidence"
   | "getUserPositions"
   | "getUserDashboardData"
-  | "getMarketById";
+  | "getMarketById"
+  | "activeUserPositions";

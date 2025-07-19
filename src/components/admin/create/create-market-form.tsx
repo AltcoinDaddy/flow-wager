@@ -483,7 +483,7 @@ export function CreateMarketForm({
       
       // Handle specific error cases
       if (errorMessage.includes('Could not borrow Admin reference')) {
-        errorMessage = "Only admin accounts can create markets. Please ensure you're using an authorized admin wallet.";
+        errorMessage = "You do not have the required permissions to create a market. Please ensure your account is set up correctly or contact support if this issue persists.";
       } else if (errorMessage.includes('Could not borrow FlowToken vault')) {
         errorMessage = "Unable to access your Flow token vault. Please ensure you have sufficient FLOW tokens and proper vault setup.";
       } else if (errorMessage.includes('location')) {
@@ -573,8 +573,7 @@ export function CreateMarketForm({
         <Alert className="bg-yellow-500/10 border-yellow-500/30">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-yellow-400">
-            Please connect your wallet to create markets. Only admin wallets can
-            create markets.
+            Please connect your wallet to create markets.
           </AlertDescription>
         </Alert>
       )}
