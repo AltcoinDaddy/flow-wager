@@ -596,7 +596,7 @@ access(all) contract FlowWager {
                 // Admin agrees with creator's evidence
                 return ResolutionDetails(
                     outcome: evidence.requestedOutcome,
-                    justification: "Evidence-based: ".concat(evidence.evidence),
+                    justification: "Evidence-based:".concat(evidence.evidence),
                     resolutionType: "approved"
                 )
             } else {
@@ -667,6 +667,7 @@ access(all) contract FlowWager {
                 // Take exact fee amount
                 let feeVault <- vault.withdraw(amount: FlowWager.marketCreationFee)
                 FlowWager.flowVault.deposit(from: <-feeVault)
+                log("Platform vault balance after deposit: ".concat(FlowWager.flowVault.balance.toString()))
                 
                 // Handle any excess (should not happen, but safety check)
                 if vault.balance > 0.0 {

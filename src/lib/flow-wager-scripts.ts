@@ -198,6 +198,7 @@ import FungibleToken from ${getFungibleTokenAddress()}
         
         log("Market created with ID: ".concat(marketId.toString()))
         log("Image URL (not stored): ".concat(imageUrl))
+        log("Creation fee sent to contract vault (see contract logs for vault balance)")
     }
 }
   `,
