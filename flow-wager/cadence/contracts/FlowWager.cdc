@@ -15,7 +15,7 @@ access(all) contract FlowWager {
     access(all) event UserRegistered(address: Address, username: String)
     access(all) event PlatformFeesWithdrawn(admin: Address, amount: UFix64)
     access(all) event MarketCreationFeePaid(creator: Address, amount: UFix64)
-    access(all) event BatchWinningsClaimed(claimer: Address, marketCount: UInt64, totalAmount: UFix64)
+    access(all) event BatchWinningmarketCreationFeesClaimed(claimer: Address, marketCount: UInt64, totalAmount: UFix64)
     access(all) event ReferralCodeGenerated(user: Address, code: String)
     access(all) event WagerPointsEarned(user: Address, points: UInt64)
     
@@ -596,7 +596,7 @@ access(all) contract FlowWager {
                 // Admin agrees with creator's evidence
                 return ResolutionDetails(
                     outcome: evidence.requestedOutcome,
-                    justification: "Evidence-based: ".concat(evidence.evidence),
+                    justification: "Evidence-based:".concat(evidence.evidence),
                     resolutionType: "approved"
                 )
             } else {
@@ -667,6 +667,7 @@ access(all) contract FlowWager {
                 // Take exact fee amount
                 let feeVault <- vault.withdraw(amount: FlowWager.marketCreationFee)
                 FlowWager.flowVault.deposit(from: <-feeVault)
+                log("Platform vault balance after deposit: ".concat(FlowWager.flowVault.balance.toString()))
                 
                 // Handle any excess (should not happen, but safety check)
                 if vault.balance > 0.0 {
