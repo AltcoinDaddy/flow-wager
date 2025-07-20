@@ -1,3 +1,6 @@
+// This file contains backend Cadence script/transaction generators and does not render any UI.
+// Mobile responsiveness should be implemented in the React components/pages that use these scripts.
+// No changes needed for mobile responsiveness here.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/resolution-scripts.ts
 import type { MarketOutcome } from "@/types/market";

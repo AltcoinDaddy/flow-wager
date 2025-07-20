@@ -13,7 +13,6 @@ import { useAuth } from "@/providers/auth-provider";
 import { 
   getPlatformStats,
   getAllMarkets,
-  getContractInfo
 } from '@/lib/flow-wager-scripts';
 import * as fcl from '@onflow/fcl';
 import flowConfig from '@/lib/flow/config';
@@ -51,7 +50,6 @@ export default function AdminCreatePage() {
     totalVolume: "0",
     totalFees: "0"
   });
-  const [contractInfo, setContractInfo] = useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   // Initialize Flow configuration
@@ -89,15 +87,6 @@ export default function AdminCreatePage() {
         });
 
         console.log('All markets from contract:', markets);
-
-        // Fetch contract info
-        const contractInfoScript = await getContractInfo();
-        const contractData = await fcl.query({
-          cadence: contractInfoScript,
-        });
-
-        console.log('Contract info:', contractData);
-        setContractInfo(contractData);
 
         // Calculate daily/weekly creation stats
         const now = Date.now() / 1000;
@@ -521,18 +510,6 @@ export default function AdminCreatePage() {
                   <span className="text-gray-400">Creation Fee:</span>
                   <p className="text-yellow-400">10.0 FLOW</p>
                 </div>
-                {contractInfo && (
-                  <>
-                    <div>
-                      <span className="text-gray-400">Contract Version:</span>
-                      <p className="text-white">{contractInfo.version || 'v1.0.0'}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Platform Fee:</span>
-                      <p className="text-yellow-400">{contractInfo.platformFeePercentage || '2.5'}%</p>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           </CardContent>

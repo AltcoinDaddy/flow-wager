@@ -27,6 +27,7 @@ import {
   getUserDashboardData,
   getActiveUserPositions,
   getMarketCreator,
+  claimWinningsTransaction,
 } from "@/lib/flow-wager-scripts";
 import {
   Activity,
@@ -70,6 +71,7 @@ interface UserDashboardData {
   watchlistMarkets: Market[];
   platformStats?: any;
   contractInfo?: any;
+  claimableWinnings?: any[]; // Added for claimable winnings
 }
 
 interface UserPosition {
@@ -170,6 +172,10 @@ export default function UserDashboardPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
   const [allMarkets, setAllMarkets] = useState<Market[]>([]);
+  // Add state for claim winnings
+  const [claimingMarketId, setClaimingMarketId] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const [claimSuccess, setClaimSuccess] = useState<string | null>(null);
 
   // Check if viewing own profile
   const isOwnProfile = currentUser?.addr === userAddress;
@@ -263,6 +269,7 @@ export default function UserDashboardPage() {
           watchlistMarkets: [], // Populate if available in dashboardDataRaw
           platformStats,
           contractInfo,
+          claimableWinnings: dashboardDataRaw.claimableWinnings || [], // Populate claimable winnings
         };
       } else {
         dashboardData = {
@@ -284,6 +291,7 @@ export default function UserDashboardPage() {
           watchlistMarkets: [],
           platformStats,
           contractInfo,
+          claimableWinnings: [],
         };
       }
 
@@ -308,6 +316,7 @@ export default function UserDashboardPage() {
         recentActivity: [],
         createdMarkets: [],
         watchlistMarkets: [],
+        claimableWinnings: [],
       };
       setData(fallbackData);
       setError(
@@ -670,6 +679,69 @@ export default function UserDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Claimable Winnings Section */}
+        {data.claimableWinnings && data.claimableWinnings.length > 0 && (
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 my-6">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-400" />
+              Claimable Winnings
+            </h2>
+            <table className="min-w-full text-sm mb-4">
+              <thead>
+                <tr className="bg-[#151923]">
+                  <th className="px-2 py-2 text-white">Market</th>
+                  <th className="px-2 py-2 text-white">Amount</th>
+                  <th className="px-2 py-2 text-white">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.claimableWinnings.map((win: any) => {
+                  const market = allMarkets.find((m) => m.id.toString() === win.marketId.toString());
+                  return (
+                    <tr key={win.marketId} className="border-b border-gray-800">
+                      <td className="px-2 py-2 text-white">{market ? market.title : `Market #${win.marketId}`}</td>
+                      <td className="px-2 py-2 text-white">{parseFloat(win.amount).toFixed(2)} FLOW</td>
+                      <td className="px-2 py-2 text-white">
+                        <Button
+                          size="sm"
+                          className="text-white"
+                          disabled={claimingMarketId === win.marketId.toString()}
+                          onClick={async () => {
+                            setClaimingMarketId(win.marketId.toString());
+                            setClaimError(null);
+                            setClaimSuccess(null);
+                            try {
+                              const txScript = await claimWinningsTransaction();
+                              await fcl.mutate({
+                                cadence: txScript,
+                                args: (arg, t) => [arg(win.marketId, t.UInt64)],
+                                proposer: fcl.authz,
+                                payer: fcl.authz,
+                                authorizations: [fcl.authz],
+                                limit: 1000,
+                              });
+                              setClaimSuccess("Winnings claimed successfully!");
+                              setTimeout(() => setClaimSuccess(null), 2000);
+                            } catch (err: any) {
+                              setClaimError(err.message || "Failed to claim winnings");
+                            } finally {
+                              setClaimingMarketId(null);
+                            }
+                          }}
+                        >
+                          {claimingMarketId === win.marketId.toString() ? "Claiming..." : "Claim Winnings"}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {claimError && <div className="text-red-400 mb-2">{claimError}</div>}
+            {claimSuccess && <div className="text-green-400 mb-2">{claimSuccess}</div>}
+          </div>
+        )}
 
         {/* Platform Stats Banner for Contract Info */}
         {data.contractInfo && (

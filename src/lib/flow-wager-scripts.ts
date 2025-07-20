@@ -287,16 +287,43 @@ access(all) fun main(): [PendingMarketWithEvidence] {
     import FungibleToken from ${getFungibleTokenAddress()}
 
     transaction(amount: UFix64) {
+        let admin: &FlowWager.Admin
         let flowReceiver: &{FungibleToken.Receiver}
-        
-        prepare(signer: auth(BorrowValue) &Account) {
+
+        prepare(signer: auth(Storage) &Account) {
+            self.admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+                ?? panic("Could not borrow Admin resource")
             self.flowReceiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(
                 /public/flowTokenReceiver
             ) ?? panic("Could not borrow receiver reference to the recipient's Vault")
         }
-        
+
         execute {
-            let fees <- FlowWager.withdrawPlatformFees(amount: amount)
+            let fees <- self.admin.withdrawPlatformFees(amount: amount)
+            self.flowReceiver.deposit(from: <-fees)
+        }
+    }
+  `,
+
+  withdrawAllPlatformFees: `
+    import FlowWager from ${getFlowWagerAddress()}
+    import FlowToken from ${getFlowTokenAddress()}
+    import FungibleToken from ${getFungibleTokenAddress()}
+
+    transaction {
+        let admin: &FlowWager.Admin
+        let flowReceiver: &{FungibleToken.Receiver}
+
+        prepare(signer: auth(Storage) &Account) {
+            self.admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+                ?? panic("Could not borrow Admin resource")
+            self.flowReceiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver
+            ) ?? panic("Could not borrow receiver reference to the recipient's Vault")
+        }
+
+        execute {
+            let fees <- self.admin.withdrawAllPlatformFees()
             self.flowReceiver.deposit(from: <-fees)
         }
     }
@@ -407,6 +434,19 @@ access(all) fun main(marketId: UInt64): FlowWager.Market? {
       return activePositions
   }
 `,
+  submitResolutionEvidence: `
+    import FlowWager from ${getFlowWagerAddress()}
+    transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
+      prepare(signer: &Account) {}
+      execute {
+        FlowWager.submitResolutionEvidence(
+          marketId: marketId,
+          evidence: evidence,
+          requestedOutcome: requestedOutcome
+        )
+      }
+    }
+  `,
 };
 
 export class FlowWagerScripts {
@@ -474,6 +514,8 @@ export const getActiveUserPositions = () =>
   FlowWagerScripts.getScript("activeUserPositions");
 
 export const getMarketById = () => FlowWagerScripts.getScript("getMarketById");
+export const submitResolutionEvidenceTransaction = () =>
+  FlowWagerScripts.getTransaction("submitResolutionEvidence");
 
 // Transaction convenience exports
 export const placeBetTransaction = () =>
@@ -488,6 +530,8 @@ export const claimWinningsTransaction = () =>
   FlowWagerScripts.getTransaction("claimWinnings");
 export const withdrawPlatformFeesTransaction = () =>
   FlowWagerScripts.getTransaction("withdrawPlatformFees");
+export const withdrawAllPlatformFeesTransaction = () =>
+  FlowWagerScripts.getTransaction("withdrawAllPlatformFees");
 
 // Type definitions for better IntelliSense
 export type ScriptName = keyof typeof CADENCE_SCRIPTS;
@@ -498,7 +542,9 @@ export type TransactionName =
   | "createMarket"
   | "resolveMarket"
   | "claimWinnings"
-  | "withdrawPlatformFees";
+  | "withdrawPlatformFees"
+  | "withdrawAllPlatformFees"
+  | "submitResolutionEvidence";
 
 export type QueryName =
   | "getActiveMarkets"

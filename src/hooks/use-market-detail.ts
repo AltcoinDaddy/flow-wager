@@ -78,11 +78,15 @@ export const useMarketDetail = (marketId: string, userAddress?: string) => {
   const getMarketById = async (marketId: number): Promise<Market | null> => {
     try {
       await initConfig();
-      
+      // Ensure marketId is a valid integer string
+      if (marketId === undefined || marketId === null || isNaN(Number(marketId))) {
+        throw new Error("Invalid market ID");
+      }
+      const safeMarketId = String(parseInt(marketId.toString(), 10));
       const script = await getScript('getMarketById');
       const rawMarket = await fcl.query({
         cadence: script,
-        args: (arg: any, t: any) => [arg(marketId, t.UInt64)]
+        args: (arg: any, t: any) => [arg(safeMarketId, t.UInt64)]
       });
 
       if (!rawMarket) return null;
@@ -219,7 +223,7 @@ export const useMarketDetail = (marketId: string, userAddress?: string) => {
   };
 
   const fetchMarketData = useCallback(async () => {
-    if (!marketId) return;
+    if (!marketId || isNaN(Number(marketId))) return;
 
     try {
       setLoading(true);
