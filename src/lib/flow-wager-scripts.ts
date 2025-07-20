@@ -160,27 +160,18 @@ import FungibleToken from ${getFungibleTokenAddress()}
     maxBet: UFix64,
     imageUrl: String
 ) {
-    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault?
+    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault
     
     prepare(signer: auth(Storage) &Account) {
-        // Check if this is the deployer (no fee required)
-        if signer.address == ${getFlowWagerAddress()} {
-            self.flowVault = nil
-        } else {
-            self.flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-                from: /storage/flowTokenVault
-            ) ?? panic("Could not borrow FlowToken vault")
-        }
+        self.flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+            from: /storage/flowTokenVault
+        ) ?? panic("Could not borrow FlowToken vault")
     }
     
     execute {
         // Prepare creation fee vault
         var creationFeeVault: @FlowToken.Vault? <- nil
-        
-        if let vault = self.flowVault {
-            creationFeeVault <-! vault.withdraw(amount: 10.0) as! @FlowToken.Vault
-        }
-        
+        creationFeeVault <-! self.flowVault.withdraw(amount: 10.0) as! @FlowToken.Vault
         let marketCategory = FlowWager.MarketCategory(rawValue: category)!
        
         let marketId = FlowWager.createMarket(
@@ -198,7 +189,6 @@ import FungibleToken from ${getFungibleTokenAddress()}
         
         log("Market created with ID: ".concat(marketId.toString()))
         log("Image URL (not stored): ".concat(imageUrl))
-        log("Creation fee sent to contract vault (see contract logs for vault balance)")
     }
 }
   `,

@@ -15,7 +15,7 @@ access(all) contract FlowWager {
     access(all) event UserRegistered(address: Address, username: String)
     access(all) event PlatformFeesWithdrawn(admin: Address, amount: UFix64)
     access(all) event MarketCreationFeePaid(creator: Address, amount: UFix64)
-    access(all) event BatchWinningsClaimed(claimer: Address, marketCount: UInt64, totalAmount: UFix64)
+    access(all) event BatchWinningmarketCreationFeesClaimed(claimer: Address, marketCount: UInt64, totalAmount: UFix64)
     access(all) event ReferralCodeGenerated(user: Address, code: String)
     access(all) event WagerPointsEarned(user: Address, points: UInt64)
     
