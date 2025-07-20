@@ -359,9 +359,9 @@ export default function AdminPage() {
             <Card className="bg-gray-900 border border-gray-700 rounded-xl p-6 flex flex-col gap-4 shadow-lg">
               <CardContent className="bg-gray-900">
                 <div className="flex items-center gap-2 mb-2">
-                  <Coins className="h-5 w-5 text-" />
+                  <Coins className="h-5 w-5 text-white" />
                   <span className="text-lg font-semibold text-white">Platform Fees</span>
-                  <span className="ml-2 text-sm text-yellow-300">{formatCurrency(availableFees)} FLOW available</span>
+                  <span className="ml-2 text-sm text-white">{formatCurrency(availableFees)} FLOW available</span>
                 </div>
                 <p className="text-gray-400 text-sm mb-2">Withdraw accumulated platform fees to the admin wallet.</p>
                 {withdrawError && (
