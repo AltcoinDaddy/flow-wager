@@ -359,7 +359,7 @@ export default function AdminPage() {
             <Card className="bg-gray-900 border border-gray-700 rounded-xl p-6 flex flex-col gap-4 shadow-lg">
               <CardContent className="bg-gray-900">
                 <div className="flex items-center gap-2 mb-2">
-                  <Coins className="h-5 w-5 text-yellow-400" />
+                  <Coins className="h-5 w-5 text-" />
                   <span className="text-lg font-semibold text-white">Platform Fees</span>
                   <span className="ml-2 text-sm text-yellow-300">{formatCurrency(availableFees)} FLOW available</span>
                 </div>
@@ -370,7 +370,7 @@ export default function AdminPage() {
                 <Button
                   onClick={handleWithdrawFees}
                   disabled={withdrawing || parseFloat(availableFees) <= 0}
-                  className="bg-gradient-to-r from-yellow-500 to-yellow-400 text-black font-bold h-12 w-full"
+                  className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white font-bold h-12 w-full"
                 >
                   {withdrawing ? "Withdrawing..." : "Withdraw Platform Fees"}
                 </Button>
