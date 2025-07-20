@@ -112,32 +112,18 @@ function AdminResolveContent(): JSX.Element {
   useEffect(() => {
     const fetchMarkets = async () => {
       if (!loggedIn) return;
-      
       try {
         setMarketsLoading(true);
         setMarketsError(null);
-
         // Get all markets using your script
         const allMarketsScript = await getAllMarkets();
-        const allMarkets = await fcl.query({
-          cadence: allMarketsScript,
-        });
-
-        console.log('All markets from contract:', allMarkets);
-
-        // Filter for markets that need resolution (ended but not resolved)
+        const allMarkets = await fcl.query({ cadence: allMarketsScript });
+        // Filter for markets that have ended and are not resolved
         const now = Date.now() / 1000;
-        const pendingMarkets = allMarkets?.filter((market: any) => {
-          const endTime = parseFloat(market.endTime);
-          const isEnded = endTime < now;
-          const isPending = market.status === 'Active'; // Adjust based on your status enum
-          
-          return isEnded && isPending;
-        }) || [];
-
-        console.log('Pending markets for resolution:', pendingMarkets);
+        const pendingMarkets = (allMarkets || []).filter((market: any) => {
+          return parseFloat(market.endTime) < now && !market.resolved;
+        });
         setMarkets(pendingMarkets);
-
       } catch (error) {
         console.error("Failed to fetch markets:", error);
         setMarketsError("Failed to load markets from contract");
@@ -145,7 +131,6 @@ function AdminResolveContent(): JSX.Element {
         setMarketsLoading(false);
       }
     };
-
     fetchMarkets();
   }, [loggedIn]);
 
@@ -222,6 +207,7 @@ function AdminResolveContent(): JSX.Element {
       // Validate inputs
       const marketId = parseInt(selectedMarket.id);
       const outcomeValue = parseInt(resolutionData.outcome);
+      const justification = resolutionData.evidence.trim();
       
       if (isNaN(marketId) || isNaN(outcomeValue)) {
         throw new Error("Invalid market ID or outcome");
@@ -245,6 +231,7 @@ function AdminResolveContent(): JSX.Element {
         args: (arg, t) => [
           arg(marketId, t.UInt64),      // marketId
           arg(outcomeValue, t.UInt8),   // outcome (MarketOutcome enum value)
+          arg(justification, t.String), // justification
         ],
         proposer: fcl.authz,
         payer: fcl.authz,
@@ -479,9 +466,10 @@ function AdminResolveContent(): JSX.Element {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0A0C14] text-white">
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Responsive container */}
+      <div className="container mx-auto px-2 py-4 space-y-6">
+        {/* Header: stack vertically on mobile, row on desktop */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="sm" asChild className="border-gray-600 hover:bg-gray-800 text-white">
               <Link href="/admin">
@@ -534,12 +522,13 @@ function AdminResolveContent(): JSX.Element {
           </Card>
         )}
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        {/* Responsive grid for main content */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
           {/* Market Selection */}
-          <div className="space-y-6">
-            <Card className="bg-gray-900/50 border-gray-700 backdrop-blur">
+          <div className="space-y-6 w-full">
+            <Card className="bg-gray-900/50 border-gray-700 backdrop-blur w-full">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
+                <CardTitle className="flex items-center gap-2 text-white text-base md:text-lg">
                   <Clock className="h-5 w-5" />
                   Markets Pending Resolution
                   {marketsLoading && (
@@ -547,20 +536,20 @@ function AdminResolveContent(): JSX.Element {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 w-full">
                 {/* Search */}
-                <div className="relative">
+                <div className="relative w-full">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <Input
                     placeholder="Search markets by question or category..."
                     value={searchQuery}
                     onChange={handleSearchChange}
-                    className="pl-9 bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                    className="pl-9 bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 h-12 text-base w-full"
                   />
                 </div>
 
-                {/* Market List */}
-                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                {/* Market List: scrollable on mobile */}
+                <div className="space-y-3 max-h-[500px] overflow-y-auto w-full">
                   {marketsLoading ? (
                     <div className="text-center py-8 text-gray-400">
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-b-transparent mx-auto mb-2" />
@@ -601,7 +590,8 @@ function AdminResolveContent(): JSX.Element {
                             </span>
                           </div>
                           
-                          <h4 className="font-medium mb-3 line-clamp-2 text-sm text-white">
+                          {/* Add line-clamp and break-words for long titles */}
+                          <h4 className="font-medium mb-3 line-clamp-2 text-sm md:text-base text-white break-words">
                             {market.title}
                           </h4>
                           
@@ -656,11 +646,11 @@ function AdminResolveContent(): JSX.Element {
           </div>
 
           {/* Resolution Form */}
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             {selectedMarket ? (
               <>
                 {/* Market Details */}
-                <Card className="bg-gray-900/50 border-gray-700 backdrop-blur">
+                <Card className="bg-gray-900/50 border-gray-700 backdrop-blur w-full">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between text-white">
                       <span>Market Details</span>
@@ -739,19 +729,19 @@ function AdminResolveContent(): JSX.Element {
                 </Card>
 
                 {/* Resolution Form */}
-                <Card className="bg-gray-900/50 border-gray-700 backdrop-blur">
+                <Card className="bg-gray-900/50 border-gray-700 backdrop-blur w-full">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-white">
+                    <CardTitle className="flex items-center gap-2 text-white text-base md:text-lg">
                       <CheckCircle className="h-5 w-5" />
                       Resolution
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-6">
+                  <CardContent className="space-y-6 w-full">
                     {/* Outcome Selection */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 w-full">
                       <Label className="text-sm font-medium text-white">Outcome *</Label>
                       <Select value={resolutionData.outcome} onValueChange={handleOutcomeChange}>
-                        <SelectTrigger className="h-12 bg-gray-800 border-gray-600 text-white">
+                        <SelectTrigger className="h-12 bg-gray-800 border-gray-600 text-white text-base w-full">
                           <SelectValue placeholder="Select the winning outcome" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-600">
@@ -793,14 +783,14 @@ function AdminResolveContent(): JSX.Element {
                     </div>
 
                     {/* Evidence */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <Label htmlFor="evidence" className="text-sm font-medium text-white">Evidence/Reasoning *</Label>
                       <Textarea
                         id="evidence"
                         placeholder="Provide detailed evidence and reasoning for this resolution. Include facts, sources, and clear explanation of why this outcome is correct..."
                         value={resolutionData.evidence}
                         onChange={handleInputChange("evidence")}
-                        className="min-h-32 bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                        className="min-h-32 bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 text-base w-full"
                         maxLength={1000}
                       />
                       <div className="text-xs text-gray-400">
@@ -809,7 +799,7 @@ function AdminResolveContent(): JSX.Element {
                     </div>
 
                     {/* Source URL */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <Label htmlFor="sourceUrl" className="text-sm font-medium text-white">Source URL</Label>
                       <Input
                         id="sourceUrl"
@@ -817,7 +807,7 @@ function AdminResolveContent(): JSX.Element {
                         placeholder="https://example.com/proof-or-official-announcement"
                         value={resolutionData.sourceUrl}
                         onChange={handleInputChange("sourceUrl")}
-                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 text-base w-full h-12"
                       />
                       <div className="text-xs text-gray-400">
                         Provide a reliable source that supports your resolution
@@ -825,7 +815,7 @@ function AdminResolveContent(): JSX.Element {
                     </div>
 
                     {/* Admin Notes */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-full">
                       <Label htmlFor="adminNotes" className="text-sm font-medium text-white">Admin Notes (Internal)</Label>
                       <Textarea
                         id="adminNotes"
@@ -833,7 +823,7 @@ function AdminResolveContent(): JSX.Element {
                         value={resolutionData.adminNotes}
                         onChange={handleInputChange("adminNotes")}
                         rows={3}
-                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                        className="bg-gray-800 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500 text-base w-full"
                       />
                     </div>
 
@@ -869,11 +859,11 @@ function AdminResolveContent(): JSX.Element {
                       </div>
                     </div>
 
-                    {/* Submit Button */}
+                    {/* Submit Button: large and touch-friendly */}
                     <Button 
                       onClick={handleResolve}
                       disabled={resolving || !resolutionData.outcome || !resolutionData.evidence.trim()}
-                      className="w-full h-12 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-400"
+                      className="w-full h-14 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-400 text-base"
                       size="lg"
                     >
                       {resolving ? (

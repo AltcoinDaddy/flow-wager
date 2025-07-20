@@ -68,7 +68,7 @@ export function BetDialog({
   initialSide = "optionA",
   onBetSuccess,
 }: BetDialogProps) {
-  const { user, balance } = useAuth();
+  const { user, balance, refreshBalance } = useAuth();
   const [side, setSide] = useState<"optionA" | "optionB">(initialSide);
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -348,6 +348,8 @@ export function BetDialog({
         const optionName = side === "optionA" ? market.optionA : market.optionB;
         toast.success(`Successfully placed ${betAmount} FLOW bet on "${optionName}"!`);
         
+        // Immediately refresh balance after bet
+        await refreshBalance();
         onBetSuccess?.();
         setAmount("");
         onOpenChange(false);

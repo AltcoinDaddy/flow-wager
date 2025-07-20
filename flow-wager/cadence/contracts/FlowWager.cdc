@@ -892,15 +892,11 @@ access(all) contract FlowWager {
         let userPositions = self.getUserPositions(address: bettor)
         assert(UInt64(userPositions.length) < self.maxPositionsPerUser, message: "User has too many positions")
         
-        let platformFee = betAmount * (self.platformFeePercentage / 100.0)
-        let netBetAmount = betAmount - platformFee
-        
         self.flowVault.deposit(from: <-betVault)
-        
+
         self.totalVolumeTraded = self.totalVolumeTraded + betAmount
-        self.totalPlatformFees = self.totalPlatformFees + platformFee
-        
-        let shares = netBetAmount
+
+        let shares = betAmount
         
         let updatedMarket = Market(
             id: market.id,
@@ -918,7 +914,7 @@ access(all) contract FlowWager {
             resolved: market.resolved,
             totalOptionAShares: option == 0 ? market.totalOptionAShares + shares : market.totalOptionAShares,
             totalOptionBShares: option == 1 ? market.totalOptionBShares + shares : market.totalOptionBShares,
-            totalPool: market.totalPool + netBetAmount,
+            totalPool: market.totalPool + betAmount,
             imageUrl: market.imageUrl
         )
         
@@ -993,6 +989,30 @@ access(all) contract FlowWager {
         
         // Resolve the market
         let marketOutcome = MarketOutcome(rawValue: finalOutcome)!
+        let totalPool = market.totalPool
+        let platformFee = totalPool * 0.03
+        let distributablePool = totalPool - platformFee
+
+        // Add platformFee to contract's fee vault
+        self.totalPlatformFees = self.totalPlatformFees + platformFee
+
+        // Use distributablePool for payout calculations
+        // (You may need to update payout logic to use distributablePool instead of totalPool)
+        let winningShares: UFix64 =
+            (marketOutcome == MarketOutcome.OptionA && market.totalOptionAShares > 0.0) ? market.totalOptionAShares :
+            (marketOutcome == MarketOutcome.OptionB && market.totalOptionBShares > 0.0) ? market.totalOptionBShares : 0.0
+        
+        let totalWinningShares: UFix64 =
+            marketOutcome == MarketOutcome.OptionA ? market.totalOptionAShares :
+            marketOutcome == MarketOutcome.OptionB ? market.totalOptionBShares : 0.0
+        
+        if totalWinningShares == 0.0 || winningShares == 0.0 {
+            return
+        }
+        
+        let payout = distributablePool * (winningShares / totalWinningShares)
+        
+        // Resolve the market
         let resolvedMarket = Market(
             id: market.id,
             title: market.title,

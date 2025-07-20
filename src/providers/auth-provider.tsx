@@ -7,6 +7,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode, useCa
 import * as fcl from '@onflow/fcl';
 import flowConfig from '@/lib/flow/config'; // Import your existing config
 import { GET_USER_BALANCE } from '@/lib/flow/scripts';
+import { getUserProfile, createUserAccountTransaction } from "@/lib/flow-wager-scripts";
 
 
 interface User {
@@ -275,6 +276,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
     };
   }, [resetSessionActivity]);
+
+  useEffect(() => {
+    // Auto-create user account/position on wallet connect
+    const autoCreateUserAccount = async () => {
+      if (user?.addr) {
+        try {
+          // 1. Check if user profile exists
+          const script = await getUserProfile();
+          const profile = await fcl.query({
+            cadence: script,
+            args: (arg, t) => [arg(user.addr ?? "", t.Address)],
+          });
+          // 2. If not, create it
+          if (!profile) {
+            const tx = await createUserAccountTransaction();
+            await fcl.mutate({
+              cadence: tx,
+              args: () => [],
+              proposer: fcl.authz,
+              payer: fcl.authz,
+              authorizations: [fcl.authz],
+              limit: 100,
+            });
+          }
+        } catch (err) {
+          console.error("Error auto-creating user account:", err);
+        }
+      }
+    };
+    autoCreateUserAccount();
+  }, [user?.addr]);
 
   const login = async (): Promise<void> => {
     try {
