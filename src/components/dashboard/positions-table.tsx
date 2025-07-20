@@ -1,43 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { CountdownTimer } from "@/components/market/countdown-timer";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from "@/components/ui/select";
-import { 
-  TrendingUp, 
-  TrendingDown,
-  Search,
+import {
+  getAllMarkets
+} from "@/lib/flow-wager-scripts";
+import flowConfig from "@/lib/flow/config";
+import { useAuth } from "@/providers/auth-provider";
+import type { Market, Position } from "@/types/market";
+import * as fcl from "@onflow/fcl";
+import {
+  AlertTriangle,
   ArrowUpDown,
-  ExternalLink,
-  DollarSign,
   Calendar,
-  Target,
+  ExternalLink,
   MoreHorizontal,
   RefreshCw,
-  AlertTriangle
+  Search,
+  Target,
+  TrendingDown,
+  TrendingUp
 } from "lucide-react";
-import { CountdownTimer } from "@/components/market/countdown-timer";
-import type { Position } from "@/types/market";
-import type { Market } from "@/types/market";
-import { useAuth } from "@/providers/auth-provider";
-import * as fcl from "@onflow/fcl";
-import flowConfig from "@/lib/flow/config";
-import {
-  getAllMarkets,
-  getMarketById,
-  getPlatformStats,
-  getContractInfo,
-} from "@/lib/flow-wager-scripts";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // Enhanced Position interface to match Flow contract data

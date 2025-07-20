@@ -722,6 +722,9 @@ access(all) contract FlowWager {
             displayName.length > 0: "Display name cannot be empty"
         }
         
+        // Check if user is already registered
+        assert(FlowWager.getUserProfile(address: self.account.address) != nil, message: "User already registered")
+        
         let userProfile = UserProfile(
             address: self.account.address,
             username: username,
