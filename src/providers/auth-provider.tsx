@@ -8,6 +8,7 @@ import * as fcl from '@onflow/fcl';
 import flowConfig from '@/lib/flow/config'; // Import your existing config
 import { GET_USER_BALANCE } from '@/lib/flow/scripts';
 import { getUserProfile, createUserAccountTransaction } from "@/lib/flow-wager-scripts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 
 interface User {
@@ -57,6 +58,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const sessionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const balanceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Onboarding modal state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingUsername, setOnboardingUsername] = useState("");
+  const [onboardingDisplayName, setOnboardingDisplayName] = useState("");
+  const [onboardingError, setOnboardingError] = useState<string>("");
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   // Fetch user balance
   const fetchBalance = useCallback(async (address: string) => {
@@ -308,6 +316,73 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     autoCreateUserAccount();
   }, [user?.addr]);
 
+  // Check if user needs onboarding after login/connect
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (user?.addr && user.loggedIn) {
+        try {
+          const script = await getUserProfile();
+          const profile = await fcl.query({
+            cadence: script,
+            args: (arg, t) => [arg(user.addr, t.Address)],
+          });
+          if (!profile) {
+            setShowOnboarding(true);
+          } else {
+            setShowOnboarding(false);
+          }
+        } catch {
+          setShowOnboarding(true);
+        }
+      } else {
+        setShowOnboarding(false);
+      }
+    };
+    checkOnboarding();
+  }, [user?.addr, user?.loggedIn]);
+
+  // Onboarding account creation handler
+  const handleCreateAccount = async () => {
+    setOnboardingError("");
+    if (!onboardingUsername.trim() || !onboardingDisplayName.trim()) {
+      setOnboardingError("Username and display name are required.");
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(onboardingUsername)) {
+      setOnboardingError("Username can only contain letters, numbers, and underscores.");
+      return;
+    }
+    if (onboardingUsername.length < 3 || onboardingUsername.length > 20) {
+      setOnboardingError("Username must be between 3 and 20 characters.");
+      return;
+    }
+    setIsCreatingAccount(true);
+    try {
+      const tx = await createUserAccountTransaction();
+      const authorization = fcl.currentUser().authorization;
+      const txId = await fcl.mutate({
+        cadence: tx,
+        args: (arg, t) => [
+          arg(onboardingUsername.trim(), t.String),
+          arg(onboardingDisplayName.trim(), t.String)
+        ],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
+        limit: 100,
+      });
+      await fcl.tx(txId).onceSealed();
+      setShowOnboarding(false);
+      setOnboardingUsername("");
+      setOnboardingDisplayName("");
+      setOnboardingError(null);
+    } catch (err: any) {
+      setOnboardingError((err && typeof err.message === 'string') ? err.message : "Failed to create user account");
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
   const login = async (): Promise<void> => {
     try {
       setIsLoading(true);
@@ -383,7 +458,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {/* Onboarding Modal */}
+      <Dialog open={showOnboarding} onOpenChange={() => {}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Your FlowWager Account</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-gray-300 mb-1">Username</label>
+              <input
+                type="text"
+                value={onboardingUsername}
+                onChange={e => setOnboardingUsername(e.target.value)}
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-[#9b87f5]"
+                placeholder="Enter a username"
+                disabled={isCreatingAccount}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 mb-1">Display Name</label>
+              <input
+                type="text"
+                value={onboardingDisplayName}
+                onChange={e => setOnboardingDisplayName(e.target.value)}
+                className="w-full p-2 rounded bg-gray-800 text-white border border-gray-700 focus:border-[#9b87f5]"
+                placeholder="Enter your display name"
+                disabled={isCreatingAccount}
+              />
+            </div>
+            {onboardingError && <div className="text-red-400 text-sm">{onboardingError}</div>}
+            <button
+              onClick={handleCreateAccount}
+              className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white font-bold py-2 rounded mt-2 disabled:opacity-50"
+              disabled={isCreatingAccount}
+            >
+              {isCreatingAccount ? "Creating Account..." : "Create Account"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Block app actions until onboarding is complete */}
+      <div style={{ pointerEvents: showOnboarding ? "none" : undefined, opacity: showOnboarding ? 0.5 : 1 }}>
+        {children}
+      </div>
     </AuthContext.Provider>
   );
 };
