@@ -713,12 +713,13 @@ export default function UserDashboardPage() {
                             setClaimSuccess(null);
                             try {
                               const txScript = await claimWinningsTransaction();
+                              const authorization = fcl.currentUser().authorization;
                               await fcl.mutate({
                                 cadence: txScript,
                                 args: (arg, t) => [arg(win.marketId, t.UInt64)],
-                                proposer: fcl.authz,
-                                payer: fcl.authz,
-                                authorizations: [fcl.authz],
+                                proposer: authorization,
+                                payer: authorization,
+                                authorizations: [authorization],
                                 limit: 1000,
                               });
                               setClaimSuccess("Winnings claimed successfully!");

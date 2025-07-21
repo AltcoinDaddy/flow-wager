@@ -226,6 +226,7 @@ function AdminResolveContent(): JSX.Element {
       
       console.log("Using resolution script from flow-wager-scripts");
 
+      const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
@@ -233,9 +234,9 @@ function AdminResolveContent(): JSX.Element {
           arg(outcomeValue, t.UInt8),   // outcome (MarketOutcome enum value)
           arg(justification, t.String), // justification
         ],
-        proposer: fcl.authz,
-        payer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 1000
       });
 
