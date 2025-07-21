@@ -9,6 +9,7 @@ import flowConfig from '@/lib/flow/config'; // Import your existing config
 import { GET_USER_BALANCE } from '@/lib/flow/scripts';
 import { getUserProfile, createUserAccountTransaction } from "@/lib/flow-wager-scripts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 
 interface User {
@@ -345,15 +346,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const handleCreateAccount = async () => {
     setOnboardingError("");
     if (!onboardingUsername.trim() || !onboardingDisplayName.trim()) {
-      setOnboardingError("Username and display name are required.");
+      setOnboardingError(String("Username and display name are required."));
+      toast.error("Username and display name are required.");
       return;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(onboardingUsername)) {
-      setOnboardingError("Username can only contain letters, numbers, and underscores.");
+      setOnboardingError(String("Username can only contain letters, numbers, and underscores."));
+      toast.error("Username can only contain letters, numbers, and underscores.");
       return;
     }
     if (onboardingUsername.length < 3 || onboardingUsername.length > 20) {
-      setOnboardingError("Username must be between 3 and 20 characters.");
+      setOnboardingError(String("Username must be between 3 and 20 characters."));
+      toast.error("Username must be between 3 and 20 characters.");
       return;
     }
     setIsCreatingAccount(true);
@@ -372,12 +376,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         limit: 100,
       });
       await fcl.tx(txId).onceSealed();
-      setShowOnboarding(false);
-      setOnboardingUsername("");
-      setOnboardingDisplayName("");
-      setOnboardingError(null);
+      // Re-check profile up to 5 times
+      let profile = null;
+      for (let i = 0; i < 5; i++) {
+        const script = await getUserProfile();
+        profile = await fcl.query({
+          cadence: script,
+          args: (arg, t) => [arg(String(user?.addr ?? ""), t.Address)],
+        });
+        if (profile) break;
+        await new Promise(res => setTimeout(res, 1000)); // Wait 1s
+      }
+      if (profile) {
+        setShowOnboarding(false);
+        setOnboardingUsername("");
+        setOnboardingDisplayName("");
+        setOnboardingError(String(""));
+        toast.success("User account created successfully!");
+      } else {
+        setOnboardingError(String("Account created, but not yet available. Please wait a moment and try again."));
+        toast.error("Account created, but not yet available. Please wait a moment and try again.");
+      }
     } catch (err: any) {
-      setOnboardingError((err && typeof err.message === 'string') ? err.message : "Failed to create user account");
+      const errorMsg = (err && typeof err.message === 'string') ? err.message : "Failed to create user account";
+      setOnboardingError(String(errorMsg ?? ""));
+      toast.error(String(errorMsg ?? "An error occurred"));
     } finally {
       setIsCreatingAccount(false);
     }
@@ -460,7 +483,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     <AuthContext.Provider value={value}>
       {/* Onboarding Modal */}
       <Dialog open={showOnboarding} onOpenChange={() => {}}>
-        <DialogContent>
+        <DialogContent className="bg-[#0A0C14] bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14] border border-gray-800/50">
           <DialogHeader>
             <DialogTitle>Create Your FlowWager Account</DialogTitle>
           </DialogHeader>
@@ -487,7 +510,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 disabled={isCreatingAccount}
               />
             </div>
-            {onboardingError && <div className="text-red-400 text-sm">{onboardingError}</div>}
+            {onboardingError && <div className="text-red-400 text-sm">{String(onboardingError)}</div>}
             <button
               onClick={handleCreateAccount}
               className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white font-bold py-2 rounded mt-2 disabled:opacity-50"
