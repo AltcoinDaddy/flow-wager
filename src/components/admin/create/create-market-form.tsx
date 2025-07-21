@@ -404,6 +404,7 @@ export function CreateMarketForm({
       
       console.log("Using transaction script from flow-wager-scripts");
 
+      const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
@@ -417,9 +418,9 @@ export function CreateMarketForm({
           arg(marketData.maxBet.toFixed(8), t.UFix64),  // maxBet
           arg(marketData.imageURI || "", t.String),     // imageUrl
         ],
-        proposer: fcl.authz,
-        payer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 1000
       });
 
@@ -519,12 +520,13 @@ export function CreateMarketForm({
         const tx = await createUserAccountTransaction();
         let txId;
         try {
+          const authorization = fcl.currentUser().authorization;
           txId = await fcl.mutate({
             cadence: tx,
             args: () => [],
-            proposer: fcl.authz,
-            payer: fcl.authz,
-            authorizations: [fcl.authz],
+            proposer: authorization,
+            payer: authorization,
+            authorizations: [authorization],
             limit: 100,
           });
         } catch (err: any) {
