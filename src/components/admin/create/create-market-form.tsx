@@ -25,7 +25,6 @@ import flowConfig from '@/lib/flow/config';
 import { 
   createMarketTransaction,
   getUserProfile,
-  createUserAccountTransaction,
 } from '@/lib/flow-wager-scripts';
 import Image from "next/image";
 
@@ -504,57 +503,15 @@ export function CreateMarketForm({
       toast.error("Wallet not connected. Please connect your wallet.");
       throw new Error("Wallet not connected");
     }
-    try {
-      // Check if user profile exists
-      const script = await getUserProfile();
-      const profile = await fcl.query({
-        cadence: script,
-        args: (arg, t) => [arg(user.addr, t.Address)],
-      });
-      if (!profile) {
-        // Prompt user to create account
-        if (!window.confirm("You need to create a FlowWager user account before creating a market. Continue?")) {
-          toast.info("User account creation cancelled.");
-          throw new Error("User account creation cancelled");
-        }
-        const tx = await createUserAccountTransaction();
-        let txId;
-        try {
-          const authorization = fcl.currentUser().authorization;
-          txId = await fcl.mutate({
-            cadence: tx,
-            args: () => [],
-            proposer: authorization,
-            payer: authorization,
-            authorizations: [authorization],
-            limit: 100,
-          });
-        } catch (err: any) {
-          if (err && err.message && err.message.toLowerCase().includes("user rejected")) {
-            toast.error("Transaction cancelled by user.");
-            throw new Error("User rejected the transaction");
-          }
-          toast.error("Failed to send account creation transaction. Please check your wallet connection.");
-          throw err;
-        }
-        // Wait for transaction to be sealed
-        try {
-          await fcl.tx(txId).onceSealed();
-        } catch (err: any) {
-          toast.error("Account creation transaction failed or was not sealed.");
-          throw err;
-        }
-        toast.success("User account created successfully!");
-      }
-    } catch (err: any) {
-      if (err && err.message && err.message.toLowerCase().includes("user rejected")) {
-        toast.error("Transaction cancelled by user.");
-      } else if (err && err.message && err.message.toLowerCase().includes("wallet not connected")) {
-        toast.error("Wallet not connected. Please connect your wallet.");
-      } else {
-        toast.error("Error creating user account: " + (err.message || err));
-      }
-      throw err;
+    // Only check if user profile exists, do not prompt for onboarding here
+    const script = await getUserProfile();
+    const profile = await fcl.query({
+      cadence: script,
+      args: (arg, t) => [arg(user.addr, t.Address)],
+    });
+    if (!profile) {
+      toast.error("You must create a FlowWager account before creating a market.");
+      throw new Error("User account not found");
     }
   };
 
