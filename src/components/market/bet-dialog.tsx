@@ -217,15 +217,16 @@ export function BetDialog({
         displayName: displayName.trim()
       });
 
+      const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: createAccountScript,
         args: (arg, t) => [
           arg(username.trim(), t.String),
           arg(displayName.trim(), t.String)
         ],
-        payer: fcl.authz,
-        proposer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 9999,
       });
 
@@ -313,6 +314,7 @@ export function BetDialog({
 
       // Use buyShares (which is the placeBet function) from flow-wager-scripts
       const buySharesScript = await buyShares();
+      const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: buySharesScript,
         args: (arg, t) => [
@@ -320,9 +322,9 @@ export function BetDialog({
           arg(side === "optionA" ? 0 : 1, t.UInt8),
           arg(betAmount.toFixed(8), t.UFix64),
         ],
-        payer: fcl.authz,
-        proposer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 9999,
       });
 

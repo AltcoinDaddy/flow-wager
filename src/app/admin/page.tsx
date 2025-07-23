@@ -180,12 +180,13 @@ export default function AdminPage() {
     setWithdrawError(null);
     try {
       const txScript = await adminWithdrawAllPlatformFeesTransaction();
+      const authorization = fcl.currentUser().authorization;
       const txId = await fcl.mutate({
         cadence: txScript,
         args: (arg, t) => [], // No arguments needed
-        proposer: fcl.authz,
-        payer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 1000,
       });
       toast.loading("Withdrawing all platform fees...");

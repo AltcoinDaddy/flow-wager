@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import flowConfig from '@/lib/flow/config';
 import { 
   createMarketTransaction,
+  getUserProfile,
 } from '@/lib/flow-wager-scripts';
 import Image from "next/image";
 
@@ -402,6 +403,7 @@ export function CreateMarketForm({
       
       console.log("Using transaction script from flow-wager-scripts");
 
+      const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
@@ -415,9 +417,9 @@ export function CreateMarketForm({
           arg(marketData.maxBet.toFixed(8), t.UFix64),  // maxBet
           arg(marketData.imageURI || "", t.String),     // imageUrl
         ],
-        proposer: fcl.authz,
-        payer: fcl.authz,
-        authorizations: [fcl.authz],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
         limit: 1000
       });
 
@@ -495,6 +497,24 @@ export function CreateMarketForm({
     }
   };
 
+  // Helper to ensure user account exists before market creation
+  const ensureUserAccount = async () => {
+    if (!user?.addr) {
+      toast.error("Wallet not connected. Please connect your wallet.");
+      throw new Error("Wallet not connected");
+    }
+    // Only check if user profile exists, do not prompt for onboarding here
+    const script = await getUserProfile();
+    const profile = await fcl.query({
+      cadence: script,
+      args: (arg, t) => [arg(user.addr, t.Address)],
+    });
+    if (!profile) {
+      toast.error("You must create a FlowWager account before creating a market.");
+      throw new Error("User account not found");
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateStep3()) return;
 
@@ -509,6 +529,9 @@ export function CreateMarketForm({
     setIsSubmitting(true);
 
     try {
+      // Ensure user account exists before proceeding
+      await ensureUserAccount();
+
       // Calculate end time as Unix timestamp
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
       const endTimeUnix = endDateTime.getTime() / 1000;
@@ -529,7 +552,24 @@ export function CreateMarketForm({
       console.log("Submitting market creation:", marketCreationData);
 
       // 🚨 CALLING YOUR FLOW WAGER SCRIPT HERE 🚨
-      const transactionId = await createMarketOnBlockchain(marketCreationData);
+      let transactionId;
+      try {
+        transactionId = await createMarketOnBlockchain(marketCreationData);
+      } catch (err: any) {
+        if (err && err.message && err.message.toLowerCase().includes("user rejected")) {
+          toast.error("Transaction cancelled by user.");
+          if (onSubmit) onSubmit({ success: false, error: "User rejected the transaction" });
+          return;
+        }
+        if (err && err.message && err.message.toLowerCase().includes("wallet not connected")) {
+          toast.error("Wallet not connected. Please connect your wallet.");
+          if (onSubmit) onSubmit({ success: false, error: "Wallet not connected" });
+          return;
+        }
+        toast.error("Failed to create market: " + (err.message || err));
+        if (onSubmit) onSubmit({ success: false, error: err.message || "Failed to create market" });
+        return;
+      }
 
       toast.success("Market created successfully on Flow blockchain!");
 
