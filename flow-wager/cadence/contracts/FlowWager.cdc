@@ -722,9 +722,12 @@ access(all) contract FlowWager {
             displayName.length > 0: "Display name cannot be empty"
         }
         
-        // Check if user is already registered
-        assert(FlowWager.getUserProfile(address: self.account.address) != nil, message: "User already registered")
+        // FIXED: Check if user does NOT exist before registering
+        if let existingProfile = FlowWager.getUserProfile(address: self.account.address) {
+            panic("User already registered")
+        }
         
+        // Create new profile since user doesn't exist
         let userProfile = UserProfile(
             address: self.account.address,
             username: username,
@@ -733,6 +736,7 @@ access(all) contract FlowWager {
             profileImageUrl: ""
         )
         
+        // Initialize user stats
         let userStatsData = UserStats(
             totalMarketsParticipated: 0,
             totalWinnings: 0.0,
@@ -745,10 +749,11 @@ access(all) contract FlowWager {
             totalStaked: 0.0
         )
         
+        // Store the new user data
         FlowWager.userProfiles[self.account.address] = userProfile
         FlowWager.userStats[self.account.address] = userStatsData
         
-        // SAFE resource initialization - no race condition
+        // Initialize resources
         self.initializeUserResources()
         
         emit UserRegistered(address: self.account.address, username: username)
