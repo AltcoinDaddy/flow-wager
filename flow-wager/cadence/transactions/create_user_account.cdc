@@ -1,11 +1,19 @@
-import "FlowWager"
+import FlowWager from "FlowWager" // or use import address alias
+
 transaction(username: String, displayName: String) {
-    prepare(signer: auth(Storage) &Account) {}
-    
+
+    prepare(signer: &Account) {
+
+        // But this pattern is overkill if createUserAccount is a public function;
+        // Instead, you should call:
+        FlowWager.createUserAccount(
+            userAddress: signer.address,
+            username: username,
+            displayName: displayName,
+        )
+    }
+
     execute {
-        FlowWager.createUserAccount(username: username, displayName: displayName)
         log("User account created successfully!")
-        log("Username: ".concat(username))
-        log("Display Name: ".concat(displayName))
     }
 }
