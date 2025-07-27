@@ -1,12 +1,9 @@
-// Auto-generated script imports using @flow-wager alias
-
-// Get contract address from environment
 const getFlowWagerAddress = () => {
   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
   return network === "mainnet"
-    ? process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT
+    ? process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT || "0x512a5459cb3a2b20"
     : process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT ||
-        "0xfb16e84ea1882f67";
+        "0x512a5459cb3a2b20";
 };
 
 const getFlowTokenAddress = () => {
@@ -25,9 +22,7 @@ const getFungibleTokenAddress = () => {
         "0x9a0766d93b6608b7";
 };
 
-// Direct Cadence scripts with dynamic contract addresses
 const CADENCE_SCRIPTS = {
-  // Query scripts
   getActiveMarkets: `
     import FlowWager from ${getFlowWagerAddress()}
 
@@ -44,16 +39,17 @@ const CADENCE_SCRIPTS = {
     }
   `,
 
-  getContractInfo: `
+  getMarketById: `
     import FlowWager from ${getFlowWagerAddress()}
 
-    access(all) fun main(): FlowWager.ContractInfo {
-        return FlowWager.getContractInfo()
+    access(all) fun main(marketId: UInt64): FlowWager.Market? {
+        return FlowWager.getMarketById(marketId: marketId)
     }
   `,
 
   getMarketCreator: `
     import FlowWager from ${getFlowWagerAddress()}
+
     access(all) fun main(creator: Address): [FlowWager.Market] {
       return FlowWager.getMarketsByCreator(creator: creator)
     }
@@ -71,88 +67,227 @@ const CADENCE_SCRIPTS = {
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
- 
-access(all) fun main(address: Address): UFix64 {
-    let account = getAccount(address)
-    let vaultRef = account.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)
-        .borrow()
-        ?? panic("Could not borrow Balance reference to the Vault")
-    
-    return vaultRef.balance
-}
+    access(all) fun main(address: Address): UFix64 {
+        let account = getAccount(address)
+        let vaultRef = account.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)
+            .borrow()
+            ?? panic("Could not borrow Vault reference")
+        return vaultRef.balance
+    }
   `,
 
   getUserProfile: `
     import FlowWager from ${getFlowWagerAddress()}
 
-    access(all) fun main(address: Address): FlowWager.UserProfile? {
-        return FlowWager.getUserProfile(address: address)
-    }
-  `,
-
-  testBetValidation: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-    access(all) fun main(marketId: UInt64, option: UInt8, amount: UFix64): Bool {
-        return FlowWager.validateBet(marketId: marketId, option: option, amount: amount)
-    }
-  `,
-
-  // Transaction scripts
-  placeBet: `
-   import FlowWager from ${getFlowWagerAddress()}
-import FlowToken from ${getFlowTokenAddress()}
-import FungibleToken from ${getFungibleTokenAddress()}
-
-transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
-    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault
-    
-    prepare(signer: auth(Storage) &Account) {
-        self.flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-            from: /storage/flowTokenVault
-        ) ?? panic("Could not borrow FlowToken vault")
-    }
-    
-    execute {
-        let betVault <- self.flowVault.withdraw(amount: amount) as! @FlowToken.Vault
-        
-        FlowWager.placeBet(
-            marketId: marketId,
-            option: option,
-            betVault: <-betVault
-        )
-        
-        log("Bet placed successfully!")
-        log("Market ID: ".concat(marketId.toString()))
-        log("Option: ".concat(option.toString()).concat(" (0=Option A, 1=Option B)"))
-        log("Amount: ".concat(amount.toString()).concat(" FLOW"))
-    }
+access(all) fun main(address: Address): &{FlowWager.UserProfilePublic}? {
+    return FlowWager.getUserProfile(address: address)
 }
   `,
 
-  createUserAccount: `
-import FlowWager from ${getFlowWagerAddress()}
+  getPendingMarkets: `
+    import FlowWager from ${getFlowWagerAddress()}
 
-    transaction(username: String, displayName: String) {
-    prepare(signer: &Account) {}
-    
-    execute {
-        FlowWager.createUserAccount(username: username, displayName: displayName)
-        log("User account created successfully!")
-        log("Username: ".concat(username))
-        log("Display Name: ".concat(displayName))
+    access(all) fun main(): [FlowWager.Market] {
+        return FlowWager.getPendingResolutionMarkets()
+    }
+  `,
+
+  getPendingMarketsWithEvidence: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    access(all) struct PendingMarketWithEvidence {
+        access(all) let market: FlowWager.Market
+        access(all) let evidence: FlowWager.ResolutionEvidence?
+        
+        init(market: FlowWager.Market, evidence: FlowWager.ResolutionEvidence?) {
+            self.market = market
+            self.evidence = evidence
+        }
+    }
+
+    access(all) fun main(): [PendingMarketWithEvidence] {
+        let pendingMarkets = FlowWager.getPendingResolutionMarkets()
+        let result: [PendingMarketWithEvidence] = []
+        
+        for market in pendingMarkets {
+            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
+            result.append(PendingMarketWithEvidence(market: market, evidence: evidence))
+        }
+        
+        return result
+    }
+  `,
+
+  getUserPositions: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    access(all) fun main(userAddress: Address): {UInt64: FlowWager.UserPosition} {
+        return FlowWager.getUserPositions(address: userAddress)
+    }
+  `,
+
+  getUserDashboardData: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    access(all) struct UserDashboard {
+        access(all) let profile: {String: String}?
+        access(all) let stats: FlowWager.UserStats?
+        access(all) let positions: {UInt64: FlowWager.UserPosition}
+        access(all) let claimableWinnings: [FlowWager.ClaimableWinnings]
+        
+        init(
+            profile: {String: String}?,
+            stats: FlowWager.UserStats?,
+            positions: {UInt64: FlowWager.UserPosition},
+            claimableWinnings: [FlowWager.ClaimableWinnings]
+        ) {
+            self.profile = profile
+            self.stats = stats
+            self.positions = positions
+            self.claimableWinnings = claimableWinnings
+        }
+    }
+
+    access(all) fun main(userAddress: Address): UserDashboard {
+        let profileRef = FlowWager.getUserProfile(address: userAddress)
+        let profile: {String: String}? = profileRef == nil ? nil : {
+            "username": profileRef!.getUsername(),
+            "displayName": profileRef!.getDisplayName(),
+            "bio": profileRef!.bio,
+            "profileImageUrl": profileRef!.profileImageUrl,
+            "address": profileRef!.address.toString(),
+            "joinedAt": profileRef!.joinedAt.toString()
+        }
+        let stats = FlowWager.getUserStats(address: userAddress)
+        let positions = FlowWager.getUserPositions(address: userAddress)
+        let claimableWinnings = FlowWager.getClaimableWinnings(address: userAddress)
+        
+        return UserDashboard(
+            profile: profile,
+            stats: stats,
+            positions: positions,
+            claimableWinnings: claimableWinnings
+        )
+    }
+  `,
+
+  activeUserPositions: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    access(all) struct ActivePosition {
+        access(all) let marketId: UInt64
+        access(all) let marketTitle: String
+        access(all) let optionAShares: UFix64
+        access(all) let optionBShares: UFix64
+        access(all) let totalInvested: UFix64
+
+        init(
+            marketId: UInt64,
+            marketTitle: String,
+            optionAShares: UFix64self.optionAShares: optionAShares,
+            optionBShares: UFix64,
+            totalInvested: UFix64
+        ) {
+            self.marketId = marketId
+            self.marketTitle = marketTitle
+            self.optionAShares = optionAShares
+            self.optionBShares = optionBShares
+            self.totalInvested = totalInvested
+        }
+    }
+
+    access(all) fun main(userAddress: Address): [ActivePosition] {
+        let positionsDict = FlowWager.getUserPositions(address: userAddress)
+        var activePositions: [ActivePosition] = []
+        for marketId in positionsDict.keys {
+            if let market = FlowWager.getMarketById(marketId: marketId) {
+                if market.status == FlowWager.MarketStatus.Active {
+                    let position = positionsDict[marketId]!
+                    activePositions.append(ActivePosition(
+                        marketId: marketId,
+                        marketTitle: market.title,
+                        optionAShares: position.optionAShares,
+                        optionBShares: position.optionBShares,
+                        totalInvested: position.totalInvested
+                    ))
+                }
+            }
+        }
+        return activePositions
+    }
+  `,
+
+  getClaimableWinnings: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    access(all) fun main(address: Address): [FlowWager.ClaimableWinnings] {
+        return FlowWager.getClaimableWinnings(address: address)
+    }
+  `,
+
+  createUserAccount: `
+    import FlowWager from ${getFlowWagerAddress()}
+    import FlowToken from ${getFlowTokenAddress()}
+
+  transaction(username: String, displayName: String, bio: String, profileImageUrl: String) {
+    prepare(signer: auth(BorrowValue, SaveValue, PublishCapability, StorageCapabilities ) &Account) {
+        // Create user account in contract
+        FlowWager.createUserAccount(
+            userAddress: signer.address,
+            username: username,
+            displayName: displayName
+        )
+        
+        // Create and save UserProfile resource
+        let userProfile <- FlowWager.createUserProfile(
+            userAddress: signer.address,
+            username: username,
+            displayName: displayName,
+            bio: bio,
+            profileImageUrl: profileImageUrl
+        )
+        signer.storage.save(<-userProfile, to: FlowWager.UserProfileStoragePath)
+        
+        // Create UserProfile capability
+        let userProfileCap = signer.capabilities.storage.issue<&{FlowWager.UserProfilePublic}>(
+            FlowWager.UserProfileStoragePath
+        )
+        signer.capabilities.publish(userProfileCap, at: FlowWager.UserProfilePublicPath)
+        
+        // Create and save UserPositions resource
+        let userPositions <- FlowWager.createUserPositions()
+        signer.storage.save(<-userPositions, to: FlowWager.UserPositionsStoragePath)
+        
+        // Create UserPositions capability
+        let userPositionsCap = signer.capabilities.storage.issue<&{FlowWager.UserPositionsPublic}>(
+            FlowWager.UserPositionsStoragePath
+        )
+        signer.capabilities.publish(userPositionsCap, at: FlowWager.UserPositionsPublicPath)
+        
+        // Create and save UserStats resource
+        let userStats <- FlowWager.createUserStatsResource()
+        signer.storage.save(<-userStats, to: FlowWager.UserStatsStoragePath)
+        
+        // Create UserStats capability
+        let userStatsCap = signer.capabilities.storage.issue<&{FlowWager.UserStatsPublic}>(
+            FlowWager.UserStatsStoragePath
+        )
+        signer.capabilities.publish(userStatsCap, at: FlowWager.UserStatsPublicPath)
+        
+        log("User account setup completed for: ".concat(username))
     }
 }
   `,
 
   createMarket: `
-  import FlowWager from ${getFlowWagerAddress()}
-import FlowToken from ${getFlowTokenAddress()}
-import FungibleToken from ${getFungibleTokenAddress()}
- transaction(
+    import FlowWager from ${getFlowWagerAddress()}
+    import FlowToken from ${getFlowTokenAddress()}
+    import FungibleToken from ${getFungibleTokenAddress()}
+
+   transaction(
     title: String,
     description: String,
-    category: UInt8,
+    categoryRaw: UInt8,
     optionA: String,
     optionB: String,
     endTime: UFix64,
@@ -160,61 +295,171 @@ import FungibleToken from ${getFungibleTokenAddress()}
     maxBet: UFix64,
     imageUrl: String
 ) {
-    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault
+    let flowVault: @FlowToken.Vault?
+    let category: FlowWager.MarketCategory
+    let signerAddress: Address
+    let isDeployer: Bool
     
-    prepare(signer: auth(Storage) &Account) {
-        self.flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-            from: /storage/flowTokenVault
-        ) ?? panic("Could not borrow FlowToken vault")
+    prepare(signer: auth(BorrowValue) &Account) {
+        // Store the category and signer address for use in execute
+        self.category = FlowWager.MarketCategory(rawValue: categoryRaw)!
+        self.signerAddress = signer.address
+        
+        // Check if signer is the deployer (gets contract deployer address)
+        let deployerAddress = FlowWager.deployerAddress
+        self.isDeployer = signer.address == deployerAddress
+        
+        // Only prepare creation fee if user is NOT the deployer
+        if !self.isDeployer {
+            let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+                from: /storage/flowTokenVault
+            ) ?? panic("Could not borrow FlowToken vault")
+            
+            // Get the current market creation fee from contract
+            let marketCreationFee = FlowWager.marketCreationFee
+            self.flowVault <- vault.withdraw(amount: marketCreationFee) as! @FlowToken.Vault
+            
+            log("Creation fee of ".concat(marketCreationFee.toString()).concat(" FLOW will be charged"))
+        } else {
+            self.flowVault <- nil
+            log("No creation fee required for deployer")
+        }
     }
     
     execute {
-        // Prepare creation fee vault
-        var creationFeeVault: @FlowToken.Vault? <- nil
-        creationFeeVault <-! self.flowVault.withdraw(amount: 10.0) as! @FlowToken.Vault
-        let marketCategory = FlowWager.MarketCategory(rawValue: category)!
-       
         let marketId = FlowWager.createMarket(
             title: title,
             description: description,
-            category: marketCategory,
+            category: self.category,
             optionA: optionA,
             optionB: optionB,
             endTime: endTime,
             minBet: minBet,
             maxBet: maxBet,
             imageUrl: imageUrl,
-            creationFeeVault: <-creationFeeVault
+            creationFeeVault: <-self.flowVault,
+            address: self.signerAddress
         )
         
         log("Market created with ID: ".concat(marketId.toString()))
-        log("Image URL (not stored): ".concat(imageUrl))
     }
 }
   `,
 
-  resolveMarket: `
-    import FlowWager from ${getFlowWagerAddress()}
-transaction(
-    marketId: UInt64,
-    outcome: UInt8,
-    justification: String
-) {
-    prepare(signer: auth(Storage) &Account) {}
+  checkUserRegistered: `
+  import FlowWager from ${getFlowWagerAddress()}
+
+access(all) fun main(userAddress: Address): {String: AnyStruct} {
+    // Check if user is registered in the contract
+    let userStats = FlowWager.getUserStats(address: userAddress)
+    let isRegisteredInContract = userStats != nil
     
-    execute {
-        FlowWager.resolveMarket(
-            marketId: marketId,
-            outcome: outcome,
-            justification: justification
-        )
-        
-        log("Market resolved successfully!")
-        log("Market ID: ".concat(marketId.toString()))
-        log("Outcome: ".concat(outcome.toString()))
-        log("Justification: ".concat(justification))
+    // Check if user has UserProfile resource
+    let account = getAccount(userAddress)
+    let userProfile = account.capabilities.get<&{FlowWager.UserProfilePublic}>(
+        FlowWager.UserProfilePublicPath
+    ).borrow()
+    let hasUserProfile = userProfile != nil
+    
+    // Check if user has UserPositions resource
+    let userPositions = account.capabilities.get<&{FlowWager.UserPositionsPublic}>(
+        FlowWager.UserPositionsPublicPath
+    ).borrow()
+    let hasUserPositions = userPositions != nil
+    
+    // Check if user has UserStats resource
+    let userStatsResource = account.capabilities.get<&{FlowWager.UserStatsPublic}>(
+        FlowWager.UserStatsPublicPath
+    ).borrow()
+    let hasUserStatsResource = userStatsResource != nil
+    
+    // Get user profile details if available
+    var username: String? = nil
+    var displayName: String? = nil
+    var joinedAt: UFix64? = nil
+    
+    if let profile = userProfile {
+        username = profile.getUsername()
+        displayName = profile.getDisplayName()
+        joinedAt = profile.joinedAt
+    }
+    
+    // Determine overall registration status
+    let isFullyRegistered = isRegisteredInContract && hasUserProfile && hasUserPositions && hasUserStatsResource
+    
+    return {
+        "address": userAddress,
+        "isRegisteredInContract": isRegisteredInContract,
+        "hasUserProfile": hasUserProfile,
+        "hasUserPositions": hasUserPositions,
+        "hasUserStatsResource": hasUserStatsResource,
+        "isFullyRegistered": isFullyRegistered,
+        "username": username,
+        "displayName": displayName,
+        "joinedAt": joinedAt,
+        "userStats": userStats
     }
 }
+
+// Simple version - just returns boolean
+access(all) fun isUserRegistered(userAddress: Address): Bool {
+    let userStats = FlowWager.getUserStats(address: userAddress)
+    let account = getAccount(userAddress)
+    let userProfile = account.capabilities.get<&{FlowWager.UserProfilePublic}>(
+        FlowWager.UserProfilePublicPath
+    ).borrow()
+    
+    return userStats != nil && userProfile != nil
+}`,
+
+  placeBet: `
+    import FlowWager from ${getFlowWagerAddress()}
+    import FlowToken from ${getFlowTokenAddress()}
+    import FungibleToken from ${getFungibleTokenAddress()}
+
+    transaction(marketId: UInt64, option: UInt8, amount: UFix64) {
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow reference to FlowToken Vault")
+            
+            let betVault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
+            
+            FlowWager.placeBet(
+               十五userAddress: signer.address,
+                marketId: marketId,
+                option: option,
+                betVault: <-betVault
+            )
+        }
+
+        execute {
+            log("Bet placed successfully!")
+            log("Market ID: ".concat(marketId.toString()))
+            log("Option: ".concat(option.toString()).concat(" (0=Option A, 1=Option B)"))
+            log("Amount: ".concat(amount.toString()).concat(" FLOW"))
+        }
+    }
+  `,
+
+  resolveMarket: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+    transaction(marketId: UInt64, outcome: UInt8, justification: String) {
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            FlowWager.resolveMarket(
+                marketId: marketId,
+                outcome: outcome,
+                justification: justification
+            )
+        }
+
+        execute {
+            log("Market resolved successfully!")
+            log("Market ID: ".concat(marketId.toString()))
+            log("Outcome: ".concat(outcome.toString()))
+            log("Justification: ".concat(justification))
+        }
+    }
   `,
 
   claimWinnings: `
@@ -223,53 +468,41 @@ transaction(
     import FungibleToken from ${getFungibleTokenAddress()}
 
     transaction(marketId: UInt64) {
-        let flowReceiver: &{FungibleToken.Receiver}
-        
-        prepare(signer: auth(BorrowValue) &Account) {
-            self.flowReceiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(
-                /public/flowTokenReceiver
-            ) ?? panic("Could not borrow receiver reference to the recipient's Vault")
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            let vault <- FlowWager.claimWinnings(
+                marketId: marketId,
+                claimerAddress: signer.address
+            )
+            
+            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow reference to FlowToken Vault")
+            
+            vaultRef.deposit(from: <-vault)
         }
-        
+
         execute {
-            let winnings <- FlowWager.claimWinnings(marketId: marketId)
-            self.flowReceiver.deposit(from: <-winnings)
+            log("Winnings claimed successfully")
         }
     }
   `,
 
-  getPendingMarkets: `
-  
+  submitResolutionEvidence: `
     import FlowWager from ${getFlowWagerAddress()}
 
-access(all) fun main(): [FlowWager.Market] {
-    return FlowWager.getPendingResolutionMarkets()
-}
-  `,
+    transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            FlowWager.submitResolutionEvidence(
+                address: signer.address,
+                marketId: marketId,
+                evidence: evidence,
+                requestedOutcome: requestedOutcome
+            )
+        }
 
-  getPendingMarketsWithEvidence: `
-    import FlowWager from ${getFlowWagerAddress()}
-access(all) struct PendingMarketWithEvidence {
-    access(all) let market: FlowWager.Market
-    access(all) let evidence: FlowWager.ResolutionEvidence?
-    
-    init(market: FlowWager.Market, evidence: FlowWager.ResolutionEvidence?) {
-        self.market = market
-        self.evidence = evidence
+        execute {
+            log("Evidence submitted successfully")
+        }
     }
-}
-
-access(all) fun main(): [PendingMarketWithEvidence] {
-    let pendingMarkets = FlowWager.getPendingResolutionMarkets()
-    let result: [PendingMarketWithEvidence] = []
-    
-    for market in pendingMarkets {
-        let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-        result.append(PendingMarketWithEvidence(market: market, evidence: evidence))
-    }
-    
-    return result
-}
   `,
 
   withdrawPlatformFees: `
@@ -278,20 +511,18 @@ access(all) fun main(): [PendingMarketWithEvidence] {
     import FungibleToken from ${getFungibleTokenAddress()}
 
     transaction(amount: UFix64) {
-        let admin: &FlowWager.Admin
-        let flowReceiver: &{FungibleToken.Receiver}
-
-        prepare(signer: auth(Storage) &Account) {
-            self.admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            let admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
                 ?? panic("Could not borrow Admin resource")
-            self.flowReceiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(
-                /public/flowTokenReceiver
-            ) ?? panic("Could not borrow receiver reference to the recipient's Vault")
+            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow reference to FlowToken Vault")
+            
+            let fees <- admin.withdrawPlatformFees(amount: amount)
+            vaultRef.deposit(from: <-fees)
         }
 
         execute {
-            let fees <- self.admin.withdrawPlatformFees(amount: amount)
-            self.flowReceiver.deposit(from: <-fees)
+            log("Platform fees withdrawn successfully")
         }
     }
   `,
@@ -302,140 +533,19 @@ access(all) fun main(): [PendingMarketWithEvidence] {
     import FungibleToken from ${getFungibleTokenAddress()}
 
     transaction {
-        let admin: &FlowWager.Admin
-        let flowReceiver: &{FungibleToken.Receiver}
-
-        prepare(signer: auth(Storage) &Account) {
-            self.admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+        prepare(signer: auth(Storage, Capabilities) &Account) {
+            let admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
                 ?? panic("Could not borrow Admin resource")
-            self.flowReceiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(
-                /public/flowTokenReceiver
-            ) ?? panic("Could not borrow receiver reference to the recipient's Vault")
+            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow reference to FlowToken Vault")
+            
+            let fees <- admin.withdrawAllPlatformFees()
+            vaultRef.deposit(from: <-fees)
         }
 
         execute {
-            let fees <- self.admin.withdrawAllPlatformFees()
-            self.flowReceiver.deposit(from: <-fees)
+            log("All platform fees withdrawn successfully")
         }
-    }
-  `,
-
-  // USER SCRIPTS
-  getUserPositions: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-access(all) fun main(userAddress: Address): {UInt64: FlowWager.UserPosition} {
-    return FlowWager.getUserPositions(address: userAddress)
-}
-  `,
-
-  getUserDashboarData: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-access(all) struct UserDashboard {
-    access(all) let profile: FlowWager.UserProfile?
-    access(all) let stats: FlowWager.UserStats?
-    access(all) let positions: {UInt64: FlowWager.UserPosition}
-    access(all) let claimableWinnings: [FlowWager.ClaimableWinnings]
-    access(all) let wagerPoints: UInt64
-    
-    init(
-        profile: FlowWager.UserProfile?,
-        stats: FlowWager.UserStats?,
-        positions: {UInt64: FlowWager.UserPosition},
-        claimableWinnings: [FlowWager.ClaimableWinnings],
-        wagerPoints: UInt64
-    ) {
-        self.profile = profile
-        self.stats = stats
-        self.positions = positions
-        self.claimableWinnings = claimableWinnings
-        self.wagerPoints = wagerPoints
-    }
-}
-
-access(all) fun main(userAddress: Address): UserDashboard {
-    let profile = FlowWager.getUserProfile(address: userAddress)
-    let stats = FlowWager.getUserStats(address: userAddress)
-    let positions = FlowWager.getUserPositions(address: userAddress)
-    let claimableWinnings = FlowWager.getClaimableWinnings(address: userAddress)
-    let wagerPoints = FlowWager.getWagerPoints(address: userAddress)
-    
-    return UserDashboard(
-        profile: profile,
-        stats: stats,
-        positions: positions,
-        claimableWinnings: claimableWinnings,
-        wagerPoints: wagerPoints
-    )
-}
- `,
-
-  getMarketById: `
- import FlowWager from ${getFlowWagerAddress()}
-
-access(all) fun main(marketId: UInt64): FlowWager.Market? {
-    return FlowWager.getMarket(marketId: marketId)
-}
- 
- `,
-
-  activeUserPositions: `
-  import FlowWager from ${getFlowWagerAddress()}
-
-  access(all) struct ActivePosition {
-      access(all) let marketId: UInt64
-      access(all) let marketTitle: String
-      access(all) let optionAShares: UFix64
-      access(all) let optionBShares: UFix64
-      access(all) let totalInvested: UFix64
-
-      init(
-          marketId: UInt64,
-          marketTitle: String,
-          optionAShares: UFix64,
-          optionBShares: UFix64,
-          totalInvested: UFix64
-      ) {
-          self.marketId = marketId
-          self.marketTitle = marketTitle
-          self.optionAShares = optionAShares
-          self.optionBShares = optionBShares
-          self.totalInvested = totalInvested
-      }
-  }
-
-  access(all) fun main(userAddress: Address): [ActivePosition] {
-      let positionsDict = FlowWager.getUserPositions(address: userAddress)
-      var activePositions: [ActivePosition] = []
-      for marketId in positionsDict.keys {
-          if let market = FlowWager.getMarket(marketId: marketId) {
-              if market.status == FlowWager.MarketStatus.Active {
-                  let position = positionsDict[marketId]!
-                  activePositions.append(ActivePosition(
-                      marketId: marketId,
-                      marketTitle: market.title,
-                      optionAShares: position.optionAShares,
-                      optionBShares: position.optionBShares,
-                      totalInvested: position.totalInvested
-                  ))
-              }
-          }
-      }
-      return activePositions
-  }
-`,
-  submitResolutionEvidence: `
-    import FlowWager from ${getFlowWagerAddress()}
-    transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
-      prepare(signer: &Account) {}
-      execute {
-        FlowWager.submitResolutionEvidence(
-          marketId: marketId,
-          evidence: evidence,
-          requestedOutcome: requestedOutcome
-        )
-      }
     }
   `,
 };
@@ -471,18 +581,15 @@ export class FlowWagerScripts {
   }
 }
 
-// Export convenience methods
 export const getScript = FlowWagerScripts.getScript.bind(FlowWagerScripts);
 export const getTransaction =
   FlowWagerScripts.getTransaction.bind(FlowWagerScripts);
 export const getQuery = FlowWagerScripts.getQuery.bind(FlowWagerScripts);
 
-// Query convenience exports
 export const getActiveMarkets = () =>
   FlowWagerScripts.getScript("getActiveMarkets");
 export const getAllMarkets = () => FlowWagerScripts.getScript("getAllMarkets");
-export const getContractInfo = () =>
-  FlowWagerScripts.getScript("getContractInfo");
+export const getMarketById = () => FlowWagerScripts.getScript("getMarketById");
 export const getMarketCreator = () =>
   FlowWagerScripts.getScript("getMarketCreator");
 export const getPlatformStats = () =>
@@ -491,8 +598,6 @@ export const getUserFlowBalance = () =>
   FlowWagerScripts.getScript("getUserFlowBalance");
 export const getUserProfile = () =>
   FlowWagerScripts.getScript("getUserProfile");
-export const testBetValidation = () =>
-  FlowWagerScripts.getScript("testBetValidation");
 export const getPendingMarkets = () =>
   FlowWagerScripts.getScript("getPendingMarkets");
 export const getPendingMarketsWithEvidence = () =>
@@ -500,55 +605,60 @@ export const getPendingMarketsWithEvidence = () =>
 export const getUserPositions = () =>
   FlowWagerScripts.getScript("getUserPositions");
 export const getUserDashboardData = () =>
-  FlowWagerScripts.getScript("getUserDashboarData");
+  FlowWagerScripts.getScript("getUserDashboardData");
 export const getActiveUserPositions = () =>
   FlowWagerScripts.getScript("activeUserPositions");
+export const getClaimableWinnings = () =>
+  FlowWagerScripts.getScript("getClaimableWinnings");
+export const checkUserRegistered = () =>
+  FlowWagerScripts.getScript("checkUserRegistered");
+// export const checkUsernameAvailability = () =>
+//   FlowWagerScripts.getScript("checkUsernameAvailability");
 
-export const getMarketById = () => FlowWagerScripts.getScript("getMarketById");
-export const submitResolutionEvidenceTransaction = () =>
-  FlowWagerScripts.getTransaction("submitResolutionEvidence");
-
-// Transaction convenience exports
-export const placeBetTransaction = () =>
-  FlowWagerScripts.getTransaction("placeBet");
 export const createUserAccountTransaction = () =>
   FlowWagerScripts.getTransaction("createUserAccount");
 export const createMarketTransaction = () =>
   FlowWagerScripts.getTransaction("createMarket");
+export const placeBetTransaction = () =>
+  FlowWagerScripts.getTransaction("placeBet");
 export const resolveMarketTransaction = () =>
   FlowWagerScripts.getTransaction("resolveMarket");
 export const claimWinningsTransaction = () =>
   FlowWagerScripts.getTransaction("claimWinnings");
+export const submitResolutionEvidenceTransaction = () =>
+  FlowWagerScripts.getTransaction("submitResolutionEvidence");
 export const withdrawPlatformFeesTransaction = () =>
   FlowWagerScripts.getTransaction("withdrawPlatformFees");
 export const withdrawAllPlatformFeesTransaction = () =>
   FlowWagerScripts.getTransaction("withdrawAllPlatformFees");
 
-// Type definitions for better IntelliSense
 export type ScriptName = keyof typeof CADENCE_SCRIPTS;
 
 export type TransactionName =
-  | "placeBet"
   | "createUserAccount"
   | "createMarket"
+  | "placeBet"
   | "resolveMarket"
   | "claimWinnings"
+  | "submitResolutionEvidence"
   | "withdrawPlatformFees"
   | "withdrawAllPlatformFees"
-  | "submitResolutionEvidence";
+  | "checkUserRegistered"
+  | "checkUsernameAvailability";
 
 export type QueryName =
   | "getActiveMarkets"
   | "getAllMarkets"
-  | "getContractInfo"
+  | "getMarketById"
   | "getMarketCreator"
   | "getPlatformStats"
   | "getUserFlowBalance"
   | "getUserProfile"
-  | "testBetValidation"
   | "getPendingMarkets"
   | "getPendingMarketsWithEvidence"
   | "getUserPositions"
   | "getUserDashboardData"
-  | "getMarketById"
-  | "activeUserPositions";
+  | "activeUserPositions"
+  | "getClaimableWinnings"
+  | "checkUserRegistered"
+  | "checkUsernameAvailability";

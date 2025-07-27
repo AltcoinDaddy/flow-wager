@@ -22,7 +22,6 @@ import {
   getAllMarkets,
   getMarketById,
   getPlatformStats,
-  getContractInfo,
   getUserProfile,
   getUserDashboardData,
   getActiveUserPositions,
@@ -209,16 +208,12 @@ export default function UserDashboardPage() {
 
       // Fetch platform stats using your flow-wager-scripts
       let platformStats = null;
-      let contractInfo = null;
       try {
         const platformStatsScript = await getPlatformStats();
         platformStats = await fcl.query({
           cadence: platformStatsScript,
         });
-        const contractInfoScript = await getContractInfo();
-        contractInfo = await fcl.query({
-          cadence: contractInfoScript,
-        });
+      
       } catch (statsError) {
         console.warn("Could not fetch platform stats:", statsError);
       }
@@ -268,7 +263,6 @@ export default function UserDashboardPage() {
           createdMarkets: createdMarkets || [],
           watchlistMarkets: [], // Populate if available in dashboardDataRaw
           platformStats,
-          contractInfo,
           claimableWinnings: dashboardDataRaw.claimableWinnings || [], // Populate claimable winnings
         };
       } else {
@@ -290,7 +284,7 @@ export default function UserDashboardPage() {
           createdMarkets: createdMarkets || [],
           watchlistMarkets: [],
           platformStats,
-          contractInfo,
+  
           claimableWinnings: [],
         };
       }
