@@ -1248,6 +1248,14 @@ access(all) fun resolveMarket(
         return claimable
     }
 
+        access(all) fun createUserPositions(): @UserPositions {
+            return <- create UserPositions()
+        }
+
+    access(all) fun createUserStatsResource(): @UserStatsResource {
+         return <- create UserStatsResource()
+    }
+
 
     // ... [everything else stays the same, including all contract logic, helpers, and the initializer below] ...
 

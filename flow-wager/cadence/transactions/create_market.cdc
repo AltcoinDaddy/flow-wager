@@ -1,11 +1,11 @@
-import FlowWager from "FlowWager"
-import FlowToken from "FlowToken"
-import FungibleToken from "FungibleToken"
+import "FlowWager"
+import "FungibleToken"
+import "FlowToken"
 
 transaction(
     title: String,
     description: String,
-    category: UInt8,
+    categoryRaw: UInt8,
     optionA: String,
     optionB: String,
     endTime: UFix64,
@@ -13,44 +13,52 @@ transaction(
     maxBet: UFix64,
     imageUrl: String
 ) {
-    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault?
+    let flowVault: @FlowToken.Vault?
+    let category: FlowWager.MarketCategory
+    let signerAddress: Address
+    let isDeployer: Bool
     
-    prepare(signer: auth(Storage) &Account) {
-        // Check if this is the deployer (no fee required)
-        if signer.address == 0xb17b2ac32498a3f9 {
-            self.flowVault = nil
-        } else {
-            self.flowVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+    prepare(signer: auth(BorrowValue) &Account) {
+        // Store the category and signer address for use in execute
+        self.category = FlowWager.MarketCategory(rawValue: categoryRaw)!
+        self.signerAddress = signer.address
+        
+        // Check if signer is the deployer (gets contract deployer address)
+        let deployerAddress = FlowWager.deployerAddress
+        self.isDeployer = signer.address == deployerAddress
+        
+        // Only prepare creation fee if user is NOT the deployer
+        if !self.isDeployer {
+            let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
                 from: /storage/flowTokenVault
             ) ?? panic("Could not borrow FlowToken vault")
+            
+            // Get the current market creation fee from contract
+            let marketCreationFee = FlowWager.marketCreationFee
+            self.flowVault <- vault.withdraw(amount: marketCreationFee) as! @FlowToken.Vault
+            
+            log("Creation fee of ".concat(marketCreationFee.toString()).concat(" FLOW will be charged"))
+        } else {
+            self.flowVault <- nil
+            log("No creation fee required for deployer")
         }
     }
     
     execute {
-        // Prepare creation fee vault
-        var creationFeeVault: @FlowToken.Vault? <- nil
-        
-        if let vault = self.flowVault {
-            creationFeeVault <-! vault.withdraw(amount: 10.0) as! @FlowToken.Vault
-        }
-        
-        let marketCategory = FlowWager.MarketCategory(rawValue: category)!
-        
-        // Call createMarket WITHOUT imageUrl parameter (since your contract doesn't support it yet)nil, // Not stored in the contract
         let marketId = FlowWager.createMarket(
             title: title,
             description: description,
-            category: marketCategory,
+            category: self.category,
             optionA: optionA,
             optionB: optionB,
             endTime: endTime,
             minBet: minBet,
             maxBet: maxBet,
             imageUrl: imageUrl,
-            creationFeeVault: <-creationFeeVault
+            creationFeeVault: <-self.flowVault,
+            address: self.signerAddress
         )
         
         log("Market created with ID: ".concat(marketId.toString()))
-        log("Image URL (not stored): ".concat(imageUrl))
     }
 }
