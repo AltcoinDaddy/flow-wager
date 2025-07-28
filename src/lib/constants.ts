@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { MarketCategory, MarketStatus } from "@/types/market";
 
 export function formatCurrency(value: string | number, currency = "FLOW"): string {
@@ -95,7 +96,7 @@ export function getMarketStatusColor(status: MarketStatus): string {
   switch (status) {
     case MarketStatus.Active:
       return "text-green-600";
-    case MarketStatus.Closed:
+    case MarketStatus.Paused:
       return "text-yellow-600";
     case MarketStatus.Resolved:
       return "text-blue-600";
@@ -146,10 +147,6 @@ export function calculateImpliedProbability(price: string | number): number {
   return Math.max(0, Math.min(100, num * 100));
 }
 
-export function calculatePotentialPayout(shares: string | number, side: "yes" | "no"): number {
-  const shareCount = typeof shares === "string" ? parseFloat(shares) : shares;
-  return shareCount * 1; // Each share pays $1 if correct
-}
 
 export function calculateROI(currentValue: string | number, originalCost: string | number): number {
   const current = typeof currentValue === "string" ? parseFloat(currentValue) : currentValue;
@@ -258,7 +255,7 @@ export const MARKET_CATEGORIES: { value: MarketCategory; label: string; emoji: s
 // Market status options
 export const MARKET_STATUSES: { value: MarketStatus; label: string; color: string }[] = [
   { value: MarketStatus.Active, label: "Active", color: "green" },
-  { value: MarketStatus.Closed, label: "Closed", color: "yellow" },
+  { value: MarketStatus.Cancelled, label: "Closed", color: "yellow" },
   { value: MarketStatus.Resolved, label: "Resolved", color: "blue" },
   { value: MarketStatus.Cancelled, label: "Cancelled", color: "red" }
 ];

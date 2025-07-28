@@ -1,24 +1,43 @@
-import FlowWager from "FlowWager"
-import FlowToken from "FlowToken"
-import FungibleToken from "FungibleToken"
+import "FlowWager"
+import "FungibleToken"
+import "FlowToken"
 
 transaction(marketId: UInt64) {
     let flowVault: &FlowToken.Vault
+    let signerAddress: Address
+    let userPositionsCap: Capability<&FlowWager.UserPositions>
     
-    prepare(signer: auth(Storage) &Account) {
+    prepare(signer: auth(BorrowValue, Capabilities) &Account) {
+        self.signerAddress = signer.address
+        
+        // Get the vault to receive winnings
         self.flowVault = signer.storage.borrow<&FlowToken.Vault>(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow FlowToken vault")
+        
+        // Get the UserPositions capability
+        self.userPositionsCap = signer.capabilities.storage.issue<&FlowWager.UserPositions>(
+            FlowWager.UserPositionsStoragePath
+        )
+        
+        // Verify the capability is valid
+        assert(
+            self.userPositionsCap.check(),
+            message: "UserPositions capability is not valid. Make sure you're registered and have initialized your account."
+        )
     }
     
     execute {
-        let winnings <- FlowWager.claimWinnings(marketId: marketId)
+        // Claim winnings for the specific market
+        let winnings <- FlowWager.claimWinnings(
+            marketId: marketId,
+            claimerAddress: self.signerAddress,
+            userPositionsCap: self.userPositionsCap
+        )
         
-        let amount = winnings.balance
+        // Deposit the winnings to user's vault
         self.flowVault.deposit(from: <-winnings)
         
-        log("Winnings claimed successfully!")
-        log("Market ID: ".concat(marketId.toString()))
-        log("Amount: ".concat(amount.toString()))
+        log("Successfully claimed winnings for market ".concat(marketId.toString()))
     }
 }

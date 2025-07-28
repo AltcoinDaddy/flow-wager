@@ -694,96 +694,95 @@ init(
         emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.PendingResolution.rawValue)
     }
     
-    access(all) fun placeBet(
-        userAddress: Address,
-        marketId: UInt64,
-        option: UInt8,
-        betVault: @FlowToken.Vault
-    ) {
-        pre {
-            !self.paused: "Contract is paused for migration/upgrade"
-            FlowWager.markets.containsKey(marketId): "Market does not exist"
-            option == MarketOutcome.OptionA.rawValue || option == MarketOutcome.OptionB.rawValue: "Option must be 0 (A) or 1 (B)"
-            betVault.balance > 0.0: "Bet amount must be positive"
-            FlowWager.registeredUsers.containsKey(self.account.address): "Bettor must be a registered user."
-        }
-        
-        let market = FlowWager.markets[marketId]!
-        let betAmount = betVault.balance
-        let bettor = userAddress
-        
-        assert(market.status == MarketStatus.Active, message: "Market is not active for betting")
-        assert(getCurrentBlock().timestamp < market.endTime, message: "Betting has ended for this market")
-        assert(betAmount >= market.minBet, message: "Bet amount is below the minimum required for this market")
-        assert(betAmount <= market.maxBet, message: "Bet amount exceeds the maximum allowed for this market") 
-        
-        let userPositionsRef = FlowWager.account.storage.borrow<&FlowWager.UserPositions>(
-            from: FlowWager.UserPositionsStoragePath
-        ) ?? panic("User positions resource not found for account. Please ensure your account is set up correctly.")
-        
-        if !userPositionsRef.positions.containsKey(marketId) {
-             assert(UInt64(userPositionsRef.positions.length) < FlowWager.maxPositionsPerUser, message: "User has reached the maximum number of distinct market positions.")
-        }
-       
-        self.flowVault.deposit(from: <-betVault)
-
-        self.totalVolumeTraded = self.totalVolumeTraded + betAmount
-
-        let shares = betAmount
-        
-        let updatedMarket = Market(
-            id: market.id,
-            title: market.title,
-            description: market.description,
-            category: market.category,
-            optionA: market.optionA,
-            optionB: market.optionB,
-            creator: market.creator,
-            endTime: market.endTime,
-            minBet: market.minBet,
-            maxBet: market.maxBet, // This 'maxBet' refers to the field from the existing 'market' struct
-            status: market.status,
-            outcome: market.outcome,
-            resolved: market.resolved,
-            totalOptionAShares: market.totalOptionAShares,
-            totalOptionBShares: market.totalOptionBShares,
-            totalPool: market.totalPool + betAmount,
-            imageUrl: market.imageUrl,
-        )
-        
-        FlowWager.markets[marketId] = updatedMarket
-        
-        let newPosition = UserPosition(
-            marketId: marketId,
-            optionAShares: option == MarketOutcome.OptionA.rawValue ? shares : 0.0,
-            optionBShares: option == MarketOutcome.OptionB.rawValue ? shares : 0.0,
-            totalInvested: betAmount,
-            claimed: false
-        )
-        
-        userPositionsRef.addPosition(newPosition)
-        
-        if FlowWager.marketParticipants[marketId] == nil {
-            FlowWager.marketParticipants[marketId] = {}
-        }
-        var participants = FlowWager.marketParticipants[marketId]!
-        participants[bettor] = true
-        FlowWager.marketParticipants[marketId] = participants
-        
-        self.updateUserStatsAfterBet(user: bettor, betAmount: betAmount, marketId: marketId)
-        
-        let currentPoints = FlowWager.wagerPoints[bettor] ?? 0
-        FlowWager.wagerPoints[bettor] = currentPoints + UInt64(betAmount)
-        
-        emit SharesPurchased(
-            marketId: marketId,
-            buyer: bettor,
-            option: option,
-            shares: shares,
-            amount: betAmount
-        )
-        emit WagerPointsEarned(user: bettor, points: UInt64(betAmount))
+access(all) fun placeBet(
+    userAddress: Address,
+    marketId: UInt64,
+    option: UInt8,
+    betVault: @FlowToken.Vault,
+    userPositionsCap: Capability<&FlowWager.UserPositions>,
+    newPosition: UserPosition
+) {
+    pre {
+        !self.paused: "Contract is paused for migration/upgrade"
+        FlowWager.markets.containsKey(marketId): "Market does not exist"
+        option == MarketOutcome.OptionA.rawValue || option == MarketOutcome.OptionB.rawValue: "Option must be 0 (A) or 1 (B)"
+        betVault.balance > 0.0: "Bet amount must be positive"
+        FlowWager.registeredUsers.containsKey(userAddress): "Bettor must be a registered user."
+        userPositionsCap.check(): "Invalid UserPositions capability"
+        newPosition.marketId == marketId: "Position market ID must match"
+        newPosition.totalInvested == betVault.balance: "Position totalInvested must match bet amount"
     }
+    
+    let market = FlowWager.markets[marketId]!
+    let betAmount = betVault.balance
+    let bettor = userAddress
+    
+    assert(market.status == MarketStatus.Active, message: "Market is not active for betting")
+    assert(getCurrentBlock().timestamp < market.endTime, message: "Betting has ended for this market")
+    assert(betAmount >= market.minBet, message: "Bet amount is below the minimum required for this market")
+    assert(betAmount <= market.maxBet, message: "Bet amount exceeds the maximum allowed for this market") 
+    
+    // Borrow UserPositions using the provided capability
+    let userPositionsRef = userPositionsCap.borrow()
+        ?? panic("Could not borrow UserPositions from capability")
+    
+    // Deposit bet amount to contract's vault
+    self.flowVault.deposit(from: <-betVault)
+
+    self.totalVolumeTraded = self.totalVolumeTraded + betAmount
+
+    let shares = betAmount
+    
+    // Update market shares and pool
+    let updatedMarket = Market(
+        id: market.id,
+        title: market.title,
+        description: market.description,
+        category: market.category,
+        optionA: market.optionA,
+        optionB: market.optionB,
+        creator: market.creator,
+        endTime: market.endTime,
+        minBet: market.minBet,
+        maxBet: market.maxBet,
+        status: market.status,
+        outcome: market.outcome,
+        resolved: market.resolved,
+        totalOptionAShares: option == MarketOutcome.OptionA.rawValue ? market.totalOptionAShares + shares : market.totalOptionAShares,
+        totalOptionBShares: option == MarketOutcome.OptionB.rawValue ? market.totalOptionBShares + shares : market.totalOptionBShares,
+        totalPool: market.totalPool + betAmount,
+        imageUrl: market.imageUrl
+    )
+    
+    FlowWager.markets[marketId] = updatedMarket
+    
+    // Add position to user's UserPositions
+    userPositionsRef.addPosition(newPosition)
+    
+    // Update market participants
+    if FlowWager.marketParticipants[marketId] == nil {
+        FlowWager.marketParticipants[marketId] = {}
+    }
+    var participants = FlowWager.marketParticipants[marketId]!
+    participants[bettor] = true
+    FlowWager.marketParticipants[marketId] = participants
+    
+    // Update stats and points
+    self.updateUserStatsAfterBet(user: bettor, betAmount: betAmount, marketId: marketId)
+    
+    let currentPoints = FlowWager.wagerPoints[bettor] ?? 0
+    FlowWager.wagerPoints[bettor] = currentPoints + UInt64(betAmount)
+    
+    emit SharesPurchased(
+        marketId: marketId,
+        buyer: bettor,
+        option: option,
+        shares: shares,
+        amount: betAmount
+    )
+    emit WagerPointsEarned(user: bettor, points: UInt64(betAmount))
+}
+
     
 access(all) fun resolveMarket(
     marketId: UInt64,
@@ -924,62 +923,68 @@ access(all) fun resolveMarket(
         emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.Active.rawValue)
     }
     
-    access(all) fun claimWinnings(marketId: UInt64, claimerAddress: Address): @FlowToken.Vault {
-        pre {
-            !self.paused: "Contract is paused for migration/upgrade"
-            FlowWager.markets.containsKey(marketId): "Market does not exist"
-            FlowWager.registeredUsers.containsKey(claimerAddress): "Claimer must be a registered user."
-        }
-        
-        let market = FlowWager.markets[marketId]!
-        let claimer = claimerAddress
-        
-        assert(market.resolved, message: "Market not resolved yet")
-        
-        let userPositionsRef = FlowWager.account.storage.borrow<&FlowWager.UserPositions>(
-            from: FlowWager.UserPositionsStoragePath
-        ) ?? panic("User positions resource not found for account. Please ensure your account is set up correctly.")
-        
-        let position = userPositionsRef.getPosition(marketId: marketId)
-            ?? panic("No position found for this market for the current user.")
-        
-        assert(!position.claimed, message: "Winnings for this market already claimed.")
-        
-        let payout = self.calculatePayoutForPosition(marketId: marketId, position: position)
-        assert(payout > 0.0, message: "No winnings to claim for this market or position.")
-        
-        userPositionsRef.markClaimed(marketId: marketId)
-        
-        if let currentStats = FlowWager.userStats[claimer] {
-            if payout > position.totalInvested {
-                FlowWager.updateUserStatsAfterWin(user: claimer, payout: payout, invested: position.totalInvested)
-            } else if payout < position.totalInvested {
-                let loss = position.totalInvested - payout
-                FlowWager.updateUserStatsAfterLoss(user: claimer, lossAmount: loss)
-            } else {
-                let updatedStats = UserStats(
-                    totalMarketsParticipated: currentStats.totalMarketsParticipated,
-                    totalWinnings: currentStats.totalWinnings,
-                    totalLosses: currentStats.totalLosses,
-                    winStreak: 0,
-                    currentStreak: 0,
-                    longestWinStreak: currentStats.longestWinStreak,
-                    roi: currentStats.roi,
-                    averageBetSize: currentStats.averageBetSize,
-                    totalStaked: currentStats.totalStaked
-                )
-                FlowWager.userStats[claimer] = updatedStats
-            }
-        } else {
-             panic("User stats not found for registered user ".concat(claimer.toString()))
-        }
-        
-        let payoutVault <- self.flowVault.withdraw(amount: payout) as! @FlowToken.Vault
-        
-        emit WinningsClaimed(marketId: marketId, claimer: claimer, amount: payout)
-        
-        return <-payoutVault
+   access(all) fun claimWinnings(
+    marketId: UInt64, 
+   claimerAddress: Address,
+    userPositionsCap: Capability<&FlowWager.UserPositions>,
+   ): @FlowToken.Vault {
+    pre {
+        !self.paused: "Contract is paused for migration/upgrade"
+        FlowWager.markets.containsKey(marketId): "Market does not exist"
+        FlowWager.registeredUsers.containsKey(claimerAddress): "Claimer must be a registered user."
+         userPositionsCap.check(): "Invalid UserPositions capability"
     }
+    
+    let market = FlowWager.markets[marketId]!
+    let claimer = claimerAddress
+    
+    assert(market.resolved, message: "Market not resolved yet")
+    
+    let userAcct = getAccount(claimer)
+ // Borrow UserPositions using the provided capability
+    let userPositionsRef = userPositionsCap.borrow()
+        ?? panic("Could not borrow UserPositions from capability")
+    
+    let position = userPositionsRef.getPosition(marketId: marketId)
+        ?? panic("No position found for this market for the current user.")
+    
+    assert(!position.claimed, message: "Winnings for this market already claimed.")
+    
+    let payout = self.calculatePayoutForPosition(marketId: marketId, position: position)
+    assert(payout > 0.0, message: "No winnings to claim for this market or position.")
+    
+    userPositionsRef.markClaimed(marketId: marketId)
+    
+    if let currentStats = FlowWager.userStats[claimer] {
+        if payout > position.totalInvested {
+            FlowWager.updateUserStatsAfterWin(user: claimer, payout: payout, invested: position.totalInvested)
+        } else if payout < position.totalInvested {
+            let loss = position.totalInvested - payout
+            FlowWager.updateUserStatsAfterLoss(user: claimer, lossAmount: loss)
+        } else {
+            let updatedStats = UserStats(
+                totalMarketsParticipated: currentStats.totalMarketsParticipated,
+                totalWinnings: currentStats.totalWinnings,
+                totalLosses: currentStats.totalLosses,
+                winStreak: 0,
+                currentStreak: 0,
+                longestWinStreak: currentStats.longestWinStreak,
+                roi: currentStats.roi,
+                averageBetSize: currentStats.averageBetSize,
+                totalStaked: currentStats.totalStaked
+            )
+            FlowWager.userStats[claimer] = updatedStats
+        }
+    } else {
+         panic("User stats not found for registered user ".concat(claimer.toString()))
+    }
+    
+    let payoutVault <- self.flowVault.withdraw(amount: payout) as! @FlowToken.Vault
+    
+    emit WinningsClaimed(marketId: marketId, claimer: claimer, amount: payout)
+    
+    return <-payoutVault
+}
     
 
 

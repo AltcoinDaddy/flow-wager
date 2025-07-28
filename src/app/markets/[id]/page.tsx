@@ -159,28 +159,28 @@ export default function MarketDetailPage() {
     return Object.values(MarketStatus)[status] || "Unknown";
   };
 
-  const getCategoryColor = (category: number) => {
-    switch (category) {
-      case 0: // Politics
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-      case 1: // Sports
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case 2: // Economics
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      case 3: // Technology
-        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-      case 4: // Entertainment
-        return "bg-pink-500/20 text-pink-400 border-pink-500/30";
-      case 5: // Crypto
-        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-      case 6: // Weather
-        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
-      case 7: // BreakingNews
-        return "bg-red-500/20 text-red-400 border-red-500/30";
-      default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-    }
-  };
+  // const getCategoryColor = (category: number) => {
+  //   switch (category) {
+  //     case 0: // Politics
+  //       return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  //     case 1: // Sports
+  //       return "bg-green-500/20 text-green-400 border-green-500/30";
+  //     case 2: // Economics
+  //       return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  //     case 3: // Technology
+  //       return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+  //     case 4: // Entertainment
+  //       return "bg-pink-500/20 text-pink-400 border-pink-500/30";
+  //     case 5: // Crypto
+  //       return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+  //     case 6: // Weather
+  //       return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
+  //     case 7: // BreakingNews
+  //       return "bg-red-500/20 text-red-400 border-red-500/30";
+  //     default:
+  //       return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+  //   }
+  // };
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -245,7 +245,7 @@ export default function MarketDetailPage() {
 
   const volume = parseFloat(market.totalPool);
   const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
-  const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
+  // const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
 
   console.log("Market Data:", market);
 
