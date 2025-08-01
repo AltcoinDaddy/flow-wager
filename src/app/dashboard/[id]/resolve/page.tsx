@@ -95,7 +95,7 @@ export default function UserResolvePage() {
       console.log(result, "This is the queried result");
 
       const formattedMarkets: Market[] = (Array.isArray(result) ? result : [])
-        .filter((market: any) => market?.creator === `0xa31988b743c4219e`)
+        .filter((market: any) => market?.creator === userAddress)
         .map((marketObj: any) => {
           const market = marketObj.market ?? marketObj;
           return {

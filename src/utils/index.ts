@@ -10,3 +10,16 @@ export const getStatusColor = (status: number) => {
         return "text-gray-400 bg-gray-500/20 border-gray-500/30";
     }
   };
+
+  export const getStatusName = (status: number): string => {
+    switch (status) {
+      case 0:
+        return "Active";
+      case 1:
+        return "Resolved";
+      case 2:
+        return "Cancelled";
+      default:
+        return "Unknown";
+    }
+  }; 
