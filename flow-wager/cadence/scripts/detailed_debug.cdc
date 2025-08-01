@@ -1,34 +1,53 @@
 import FlowWager from "FlowWager"
 
-/// Script to fetch resolution evidence for a specific market with additional context
-/// @param marketId: The ID of the market to get evidence for
-/// @return AnyStruct: A structured response with evidence and market info
-access(all) fun main(marketId: UInt64): AnyStruct {
-    // First check if the market exists
-    let market = FlowWager.getMarketById(marketId: marketId)
-    if market == nil {
-        return {
-            "success": false,
-            "error": "Market with ID ".concat(marketId.toString()).concat(" does not exist"),
-            "evidence": nil,
-            "marketInfo": nil
+access(all) struct PendingMarketDetails {
+    access(all) let market: FlowWager.Market
+    access(all) let evidence: FlowWager.ResolutionEvidence?
+    access(all) let totalVolume: UFix64
+    access(all) let participantCount: UInt64
+    access(all) let daysSinceEnded: UFix64
+    access(all) let hasEvidence: Bool
+    
+    init(
+        market: FlowWager.Market,
+        evidence: FlowWager.ResolutionEvidence?,
+        totalVolume: UFix64,
+        participantCount: UInt64,
+        daysSinceEnded: UFix64,
+        hasEvidence: Bool
+    ) {
+        self.market = market
+        self.evidence = evidence
+        self.totalVolume = totalVolume
+        self.participantCount = participantCount
+        self.daysSinceEnded = daysSinceEnded
+        self.hasEvidence = hasEvidence
+    }
+}
+
+access(all) fun main(): [PendingMarketDetails] {
+    let allMarkets = FlowWager.getPendingResolutionMarkets()
+    let pendingMarkets: [PendingMarketDetails] = []
+    let currentTime = getCurrentBlock().timestamp
+    
+    for market in allMarkets {
+        let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
+        if evidence != nil {
+            let totalVolume = market.totalOptionAShares + market.totalOptionBShares
+            let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
+            let daysSinceEnded = secondsSinceEnded / 86400.0
+            let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
+            
+            pendingMarkets.append(PendingMarketDetails(
+                market: market,
+                evidence: evidence,
+                totalVolume: totalVolume,
+                participantCount: participantCount,
+                daysSinceEnded: daysSinceEnded,
+                hasEvidence: true
+            ))
         }
     }
     
-    // Get the resolution evidence
-    let evidence = FlowWager.getResolutionEvidence(marketId: marketId)
-    
-    return {
-        "success": true,
-        "error": nil,
-        "evidence": evidence,
-        "marketInfo": {
-            "id": market!.id,
-            "title": market!.title,
-            "status": market!.status,
-            "resolved": market!.resolved,
-            "endTime": market!.endTime,
-            "creator": market!.creator
-        }
-    }
+    return pendingMarkets
 }
