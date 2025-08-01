@@ -836,7 +836,7 @@ export default function MarketDetailPage() {
                   </Avatar>
                   <div className="flex-1">
                     <Link
-                      href={`/profile/${market.creator}`}
+                      href={"#"}
                       className="font-semibold text-[#9b87f5] hover:text-[#8b5cf6] transition-colors"
                     >
                       {market.creator.slice(0, 6)}...{market.creator.slice(-4)}

@@ -31,6 +31,7 @@ import {
   BarChart3,
   Bell,
   Calendar,
+  CheckCircle,
   DollarSign,
   Download,
   ExternalLink,
@@ -201,8 +202,7 @@ export default function UserDashboardPage() {
   const [claimSuccess, setClaimSuccess] = useState<string | null>(null);
 
   const isOwnProfile = currentUser?.addr === userAddress;
-  const isContractOwner =
-    currentUser?.addr === `${getFlowTokenAddress()}`;
+  const isContractOwner = currentUser?.addr === `${getFlowTokenAddress()}`;
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -590,8 +590,7 @@ export default function UserDashboardPage() {
                     <Star className="h-4 w-4 text-[#9b87f5]" />
                     <span>{data.profile.reputation.toFixed(1)} reputation</span>
                   </div>
-                  {userAddress ===
-                    `${getFlowTokenAddress}` && (
+                  {userAddress === `${getFlowTokenAddress}` && (
                     <div className="flex items-center space-x-1">
                       <Settings className="h-4 w-4 text-green-400" />
                       <span className="text-green-400 font-medium">
@@ -1055,7 +1054,6 @@ export default function UserDashboardPage() {
                         Browse Markets
                       </Link>
                     </Button>
-
                     {isContractOwner && (
                       <Button
                         variant="outline"
@@ -1068,7 +1066,16 @@ export default function UserDashboardPage() {
                         </Link>
                       </Button>
                     )}
-
+                    <Button
+                      variant="outline"
+                      className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start w-full"
+                      asChild
+                    >
+                      <Link href={`/dashboard/${userAddress}/resolve`}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Submit Resolution Evidence
+                      </Link>
+                    </Button>
                     {isContractOwner && (
                       <Button
                         variant="outline"
@@ -1164,7 +1171,8 @@ export default function UserDashboardPage() {
                             <div>
                               <p className="text-gray-400">Claimable</p>
                               <p className="text-white font-medium">
-                                {formatCurrency(`${position.claimableAmount}`)} FLOW
+                                {formatCurrency(`${position.claimableAmount}`)}{" "}
+                                FLOW
                               </p>
                               <p className="text-gray-400">Claimed</p>
                               <p className="text-white font-medium">

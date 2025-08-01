@@ -289,7 +289,7 @@ export default function HomePage() {
                 Featured Markets
               </h2>
               <p className="text-gray-400">
-                Most popular and trending prediction markets (using market-api)
+                Most popular and trending prediction markets
               </p>
             </div>
             <Button

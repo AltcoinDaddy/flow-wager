@@ -628,71 +628,52 @@ init(
         return code
     }
     
-    access(all) fun submitResolutionEvidence(
-        address: Address,
-        marketId: UInt64,
-        evidence: String,
-        requestedOutcome: UInt8
-    ) {
-        pre {
-            !self.paused: "Contract is paused for migration/upgrade"
-            FlowWager.markets.containsKey(marketId): "Market does not exist"
-            evidence.length >= 50: "Evidence must be at least 50 characters"
-            evidence.length <= 1000: "Evidence too long (max 1000 characters)"
-            requestedOutcome == MarketOutcome.OptionA.rawValue ||
-            requestedOutcome == MarketOutcome.OptionB.rawValue ||
-            requestedOutcome == MarketOutcome.Draw.rawValue ||
-            requestedOutcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
-        }
-        
-        let market = FlowWager.markets[marketId]!
-        let submitter =  address
-        
-        assert(submitter == market.creator, message: "Only market creator can submit evidence")
-        assert(market.status == MarketStatus.Active, message: "Market is not active for evidence submission")
-        assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
-        assert(!market.resolved, message: "Market already resolved")
-        assert(FlowWager.resolutionEvidence[marketId] == nil, message: "Evidence already submitted for this market")
-        
-        let evidenceStruct = ResolutionEvidence(
-            marketId: marketId,
-            creator: submitter,
-            evidence: evidence,
-            requestedOutcome: requestedOutcome
-        )
-        
-        FlowWager.resolutionEvidence[marketId] = evidenceStruct
-        
-        let updatedMarket = Market(
-            id: market.id,
-            title: market.title,
-            description: market.description,
-            category: market.category,
-            optionA: market.optionA,
-            optionB: market.optionB,
-            creator: market.creator,
-            endTime: market.endTime,
-            minBet: market.minBet,
-            maxBet: market.maxBet, // This 'maxBet' refers to the field from the existing 'market' struct
-            status: MarketStatus.PendingResolution,
-            outcome: market.outcome,
-            resolved: market.resolved,
-            totalOptionAShares: market.totalOptionAShares,
-            totalOptionBShares: market.totalOptionBShares,
-            totalPool: market.totalPool,
-            imageUrl: market.imageUrl
-        )
-        
-        FlowWager.markets[marketId] = updatedMarket
-        
-        emit EvidenceSubmitted(
-            marketId: marketId,
-            creator: submitter,
-            evidence: evidence,
-            requestedOutcome: requestedOutcome
-        )
-        emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.PendingResolution.rawValue)
+access(all) fun submitResolutionEvidence(
+    address: Address,
+    marketId: UInt64,
+    evidence: String,
+    requestedOutcome: UInt8
+) {
+    pre {
+        !self.paused: "Contract is paused for migration/upgrade"
+        FlowWager.markets.containsKey(marketId): "Market does not exist"
+        evidence.length <= 1000: "Evidence too long (max 1000 characters)"
+        requestedOutcome == MarketOutcome.OptionA.rawValue ||
+        requestedOutcome == MarketOutcome.OptionB.rawValue ||
+        requestedOutcome == MarketOutcome.Draw.rawValue ||
+        requestedOutcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
     }
+    
+    let market = FlowWager.markets[marketId]!
+    let submitter = address
+    
+    assert(submitter == market.creator, message: "Only market creator can submit evidence")
+    assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
+    assert(!market.resolved, message: "Market already resolved")
+    
+    // Auto-transition if market is still Active but has ended
+    if market.status == MarketStatus.Active {
+        self.transitionEndedMarketToPendingResolution(marketId: marketId)
+    } else {
+        assert(market.status == MarketStatus.PendingResolution, message: "Market must be in PendingResolution status")
+    }
+    
+    let evidenceStruct = ResolutionEvidence(
+        marketId: marketId,
+        creator: submitter,
+        evidence: evidence,
+        requestedOutcome: requestedOutcome
+    )
+    
+    FlowWager.resolutionEvidence[marketId] = evidenceStruct
+    
+    emit EvidenceSubmitted(
+        marketId: marketId,
+        creator: submitter,
+        evidence: evidence,
+        requestedOutcome: requestedOutcome
+    )
+}
     
 access(all) fun placeBet(
     userAddress: Address,
@@ -1216,7 +1197,17 @@ access(all) fun resolveMarket(
     access(all) fun getUserStats(address: Address): UserStats? {
         return FlowWager.userStats[address]
     }
+
+
+    access(all) fun getMarketParticipantCount(marketId: UInt64): UInt64 {
+    if let participants = FlowWager.marketParticipants[marketId] {
+        return UInt64(participants.length)
+    }
+    return 0
+    }
+
     
+
     access(all) fun getUserPositions(address: Address): {UInt64: UserPosition} {
         let acct = getAccount(address)
         let ref = acct.capabilities.get<&{FlowWager.UserPositionsPublic}>(FlowWager.UserPositionsPublicPath)
@@ -1261,6 +1252,42 @@ access(all) fun resolveMarket(
          return <- create UserStatsResource()
     }
 
+    access(all) fun transitionEndedMarketToPendingResolution(marketId: UInt64) {
+    pre {
+        !self.paused: "Contract is paused for migration/upgrade"
+        FlowWager.markets.containsKey(marketId): "Market does not exist"
+    }
+    
+    let market = FlowWager.markets[marketId]!
+    
+    assert(market.status == MarketStatus.Active, message: "Market is not in Active status")
+    assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
+    assert(!market.resolved, message: "Market already resolved")
+    
+    let updatedMarket = Market(
+        id: market.id,
+        title: market.title,
+        description: market.description,
+        category: market.category,
+        optionA: market.optionA,
+        optionB: market.optionB,
+        creator: market.creator,
+        endTime: market.endTime,
+        minBet: market.minBet,
+        maxBet: market.maxBet,
+        status: MarketStatus.PendingResolution,
+        outcome: market.outcome,
+        resolved: market.resolved,
+        totalOptionAShares: market.totalOptionAShares,
+        totalOptionBShares: market.totalOptionBShares,
+        totalPool: market.totalPool,
+        imageUrl: market.imageUrl
+    )
+    
+    FlowWager.markets[marketId] = updatedMarket
+    
+    emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.PendingResolution.rawValue)
+}
 
     // ... [everything else stays the same, including all contract logic, helpers, and the initializer below] ...
 

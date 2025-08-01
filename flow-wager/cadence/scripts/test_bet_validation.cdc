@@ -1,58 +1,56 @@
-import FlowWager from "FlowWager"
-import FlowToken from "FlowToken"
+// get_pending_unresolved_markets.cdc
+import "FlowWager"
 
-access(all) fun main(
-    userAddress: Address,
-    marketId: UInt64,
-    option: UInt8,
-    betAmount: UFix64
-): {String: AnyStruct} {
-
-    let market = FlowWager.getMarket(marketId: marketId)
-    if market == nil {
-        return {"error": "Market not found"}
+// Get markets created by user that are on Pending Resolution but not resolved
+access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
+    let allMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+    let pendingUnresolvedMarkets: [FlowWager.Market] = []
+    
+    for market in allMarkets {
+        if market.status == FlowWager.MarketStatus.PendingResolution && !market.resolved {
+            pendingUnresolvedMarkets.append(market)
+        }
     }
     
-    let m = market!
+    return pendingUnresolvedMarkets
+}
+
+// Alternative with additional details
+access(all) struct PendingMarketDetails {
+    access(all) let market: FlowWager.Market
+    access(all) let evidence: FlowWager.ResolutionEvidence?
+    access(all) let daysSincePending: UFix64
+    access(all) let participantCount: UInt64
+    access(all) let hasEvidence: Bool
+    
+    init(market: FlowWager.Market, evidence: FlowWager.ResolutionEvidence?, daysSincePending: UFix64, participantCount: UInt64) {
+        self.market = market
+        self.evidence = evidence
+        self.daysSincePending = daysSincePending
+        self.participantCount = participantCount
+        self.hasEvidence = evidence != nil
+    }
+}
+
+access(all) fun getPendingMarketsWithDetails(creatorAddress: Address): [PendingMarketDetails] {
+    let allMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+    let pendingDetails: [PendingMarketDetails] = []
     let currentTime = getCurrentBlock().timestamp
     
-    // Validation checks
-    if m.status != FlowWager.MarketStatus.Active {
-        return {"error": "Market is not active", "status": m.status.rawValue}
+    for market in allMarkets {
+        if market.status == FlowWager.MarketStatus.PendingResolution && !market.resolved {
+            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
+            let daysSincePending = (currentTime - market.endTime) / 86400.0
+            let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
+            
+            pendingDetails.append(PendingMarketDetails(
+                market: market,
+                evidence: evidence,
+                daysSincePending: daysSincePending,
+                participantCount: participantCount
+            ))
+        }
     }
     
-    if currentTime >= m.endTime {
-        return {"error": "Market has ended", "currentTime": currentTime, "endTime": m.endTime}
-    }
-    
-    if option != 0 && option != 1 {
-        return {"error": "Option must be 0 (A) or 1 (B)"}
-    }
-    
-    if betAmount < m.minBet {
-        return {"error": "Bet below minimum", "betAmount": betAmount, "minBet": m.minBet}
-    }
-    
-    if betAmount > m.maxBet {
-        return {"error": "Bet exceeds maximum", "betAmount": betAmount, "maxBet": m.maxBet}
-    }
-    
-    // Get user's Flow balance
-    let userAccount = getAccount(userAddress)
-    let flowVaultRef = userAccount.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance).borrow()
-    var userBalance: UFix64 = 0.0
-    if flowVaultRef != nil {
-        userBalance = flowVaultRef!.balance
-    }
-    
-    if userBalance < betAmount {
-        return {"error": "Insufficient Flow balance", "userBalance": userBalance, "requiredAmount": betAmount}
-    }
-    
-    return {
-        "status": "valid",
-        "market": {"id": m.id, "title": m.title, "optionA": m.optionA, "optionB": m.optionB},
-        "bet": {"option": option == 0 ? "A" : "B", "amount": betAmount},
-        "userBalance": userBalance
-    }
+    return pendingDetails
 }

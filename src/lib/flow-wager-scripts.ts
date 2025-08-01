@@ -23,6 +23,67 @@ export const getFungibleTokenAddress = () => {
 };
 
 const CADENCE_SCRIPTS = {
+  getAllPendingMarkets: `
+    import FlowWager from ${getFlowWagerAddress()}
+     access(all) struct PendingMarketDetails {
+    access(all) let market: FlowWager.Market
+    access(all) let evidence: FlowWager.ResolutionEvidence?
+    access(all) let totalVolume: UFix64
+    access(all) let participantCount: UInt64
+    access(all) let daysSinceEnded: UFix64
+    access(all) let hasEvidence: Bool
+    
+    init(
+        market: FlowWager.Market,
+        evidence: FlowWager.ResolutionEvidence?,
+        totalVolume: UFix64,
+        participantCount: UInt64,
+        daysSinceEnded: UFix64,
+        hasEvidence: Bool
+    ) {
+        self.market = market
+        self.evidence = evidence
+        self.totalVolume = totalVolume
+        self.participantCount = participantCount
+        self.daysSinceEnded = daysSinceEnded
+        self.hasEvidence = hasEvidence
+    }
+}
+        access(all) fun main(creatorAddress: Address): [PendingMarketDetails] {
+    let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+    let pendingMarkets: [PendingMarketDetails] = []
+    let currentTime = getCurrentBlock().timestamp
+    
+    for market in creatorMarkets {
+        // Check if market is in pending resolution status
+        if market.status == FlowWager.MarketStatus.PendingResolution {
+            // Get evidence if it exists
+            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
+            
+            // Calculate total volume
+            let totalVolume = market.totalOptionAShares + market.totalOptionBShares
+            
+            // Calculate days since market ended
+            let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
+            let daysSinceEnded = secondsSinceEnded / 86400.0 // Convert seconds to days
+            
+            // Get actual participant count from contract's marketParticipants mapping
+            let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
+            
+            pendingMarkets.append(PendingMarketDetails(
+                market: market,
+                evidence: evidence,
+                totalVolume: totalVolume,
+                participantCount: participantCount,
+                daysSinceEnded: daysSinceEnded,
+                hasEvidence: evidence != nil
+            ))
+        }
+    }
+    
+    return pendingMarkets
+}
+    `,
   getUserTrades: `
     import FlowWager from ${getFlowWagerAddress()}
     import FlowToken from ${getFlowTokenAddress()}
@@ -247,7 +308,6 @@ access(all) fun main(userAddress: Address): UserTrades {
     }
   `,
 
-
   getActiveMarkets: `
     import FlowWager from ${getFlowWagerAddress()}
 
@@ -318,30 +378,23 @@ access(all) fun main(address: Address): &{FlowWager.UserProfilePublic}? {
   `,
 
   getPendingMarketsWithEvidence: `
-    import FlowWager from ${getFlowWagerAddress()}
+  import FlowWager from ${getFlowWagerAddress()}
 
-    access(all) struct PendingMarketWithEvidence {
-        access(all) let market: FlowWager.Market
-        access(all) let evidence: FlowWager.ResolutionEvidence?
-        
-        init(market: FlowWager.Market, evidence: FlowWager.ResolutionEvidence?) {
-            self.market = market
-            self.evidence = evidence
-        }
-    }
-
-    access(all) fun main(): [PendingMarketWithEvidence] {
-        let pendingMarkets = FlowWager.getPendingResolutionMarkets()
-        let result: [PendingMarketWithEvidence] = []
-        
-        for market in pendingMarkets {
-            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-            result.append(PendingMarketWithEvidence(market: market, evidence: evidence))
-        }
-        
-        return result
-    }
-  `,
+  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
+      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+      let pendingWithEvidence: [FlowWager.Market] = []
+      
+      for market in creatorMarkets {
+          if market.status == FlowWager.MarketStatus.PendingResolution {
+              if FlowWager.getResolutionEvidence(marketId: market.id) != nil {
+                  pendingWithEvidence.append(market)
+              }
+          }
+      }
+      
+      return pendingWithEvidence
+  }
+`,
 
   getUserPositions: `
   import FlowWager from ${getFlowWagerAddress()}
@@ -854,6 +907,39 @@ access(all) fun isUserRegistered(userAddress: Address): Bool {
     }
   `,
 
+  getMarketEvidence: `
+    import FlowWager from ${getFlowWagerAddress()}
+
+access(all) fun main(marketId: UInt64): AnyStruct {
+    // First check if the market exists
+    let market = FlowWager.getMarketById(marketId: marketId)
+    if market == nil {
+        return {
+            "success": false,
+            "error": "Market with ID ".concat(marketId.toString()).concat(" does not exist"),
+            "evidence": nil,
+            "marketInfo": nil
+        }
+    }
+    
+    // Get the resolution evidence
+    let evidence = FlowWager.getResolutionEvidence(marketId: marketId)
+    
+    return {
+        "success": true,
+        "error": nil,
+        "evidence": evidence,
+        "marketInfo": {
+            "id": market!.id,
+            "title": market!.title,
+            "status": market!.status,
+            "resolved": market!.resolved,
+            "endTime": market!.endTime,
+            "creator": market!.creator
+        }
+    }
+}
+    `,
   resolveMarket: `
     import FlowWager from ${getFlowWagerAddress()}
 
@@ -900,23 +986,23 @@ access(all) fun isUserRegistered(userAddress: Address): Bool {
   `,
 
   submitResolutionEvidence: `
-    import FlowWager from ${getFlowWagerAddress()}
+  import FlowWager from ${getFlowWagerAddress()}
 
-    transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
-        prepare(signer: auth(Storage, Capabilities) &Account) {
-            FlowWager.submitResolutionEvidence(
-                address: signer.address,
-                marketId: marketId,
-                evidence: evidence,
-                requestedOutcome: requestedOutcome
-            )
-        }
+  transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
+      prepare(signer: auth(Storage, Capabilities) &Account) {
+          FlowWager.submitResolutionEvidence(
+              address: signer.address,
+              marketId: marketId,
+              evidence: evidence,
+              requestedOutcome: requestedOutcome
+          )
+      }
 
-        execute {
-            log("Evidence submitted successfully")
-        }
-    }
-  `,
+      execute {
+          log("Evidence submitted successfully")
+      }
+  }
+`,
 
   withdrawPlatformFees: `
     import FlowWager from ${getFlowWagerAddress()}
@@ -961,6 +1047,127 @@ access(all) fun isUserRegistered(userAddress: Address): Bool {
         }
     }
   `,
+
+  getPendingMarketDetails: `
+  import FlowWager from ${getFlowWagerAddress()}
+
+  access(all) struct PendingMarketDetails {
+      access(all) let market: FlowWager.Market
+      access(all) let evidence: FlowWager.ResolutionEvidence?
+      access(all) let totalVolume: UFix64
+      access(all) let participantCount: UInt64
+      access(all) let daysSinceEnded: UFix64
+      access(all) let hasEvidence: Bool
+      
+      init(
+          market: FlowWager.Market,
+          evidence: FlowWager.ResolutionEvidence?,
+          totalVolume: UFix64,
+          participantCount: UInt64,
+          daysSinceEnded: UFix64,
+          hasEvidence: Bool
+      ) {
+          self.market = market
+          self.evidence = evidence
+          self.totalVolume = totalVolume
+          self.participantCount = participantCount
+          self.daysSinceEnded = daysSinceEnded
+          self.hasEvidence = hasEvidence
+      }
+  }
+
+  access(all) fun main(creatorAddress: Address): [PendingMarketDetails] {
+      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+      let pendingMarkets: [PendingMarketDetails] = []
+      let currentTime = getCurrentBlock().timestamp
+      
+      for market in creatorMarkets {
+          if market.status == FlowWager.MarketStatus.PendingResolution {
+              let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
+              
+              let totalVolume = market.totalOptionAShares + market.totalOptionBShares
+              
+              let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
+              let daysSinceEnded = secondsSinceEnded / 86400.0
+              
+              let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
+              
+              pendingMarkets.append(PendingMarketDetails(
+                  market: market,
+                  evidence: evidence,
+                  totalVolume: totalVolume,
+                  participantCount: participantCount,
+                  daysSinceEnded: daysSinceEnded,
+                  hasEvidence: evidence != nil
+              ))
+          }
+      }
+      
+      return pendingMarkets
+  }
+`,
+
+  getPendingMarketsBasic: `
+  import FlowWager from ${getFlowWagerAddress()}
+
+  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
+      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+      let pendingMarkets: [FlowWager.Market] = []
+      
+      for market in creatorMarkets {
+          if market.status == FlowWager.MarketStatus.PendingResolution {
+              pendingMarkets.append(market)
+          }
+      }
+      
+      return pendingMarkets
+  }
+`,
+
+  getPendingMarketsWithoutEvidence: `
+  import FlowWager from ${getFlowWagerAddress()}
+
+  access(all) struct PendingMarketDetails {
+    access(all) let market: FlowWager.Market
+    access(all) let evidence: FlowWager.ResolutionEvidence?
+    access(all) let totalVolume: UFix64
+    access(all) let participantCount: UInt64
+    access(all) let daysSinceEnded: UFix64
+    access(all) let hasEvidence: Bool
+    
+    init(
+        market: FlowWager.Market,
+        evidence: FlowWager.ResolutionEvidence?,
+        totalVolume: UFix64,
+        participantCount: UInt64,
+        daysSinceEnded: UFix64,
+        hasEvidence: Bool
+    ) {
+        self.market = market
+        self.evidence = evidence
+        self.totalVolume = totalVolume
+        self.participantCount = participantCount
+        self.daysSinceEnded = daysSinceEnded
+        self.hasEvidence = hasEvidence
+    }
+}
+
+  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
+    let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
+    let pendingWithoutEvidence: [FlowWager.Market] = []
+    
+    for market in creatorMarkets {
+        if market.status == FlowWager.MarketStatus.PendingResolution {
+            // Check if evidence does NOT exist for this market
+            if FlowWager.getResolutionEvidence(marketId: market.id) == nil {
+                pendingWithoutEvidence.append(market)
+            }
+        }
+    }
+    
+    return pendingWithoutEvidence
+}
+`,
 };
 
 export class FlowWagerScripts {
@@ -1025,7 +1232,20 @@ export const getClaimableWinnings = () =>
   FlowWagerScripts.getScript("getClaimableWinnings");
 export const checkUserRegistered = () =>
   FlowWagerScripts.getScript("checkUserRegistered");
-export const getUserTrades = ()=> FlowWagerScripts.getScript("getUserTrades")
+export const getUserTrades = () => FlowWagerScripts.getScript("getUserTrades");
+export const getPendingMarketDetails = () =>
+  FlowWagerScripts.getScript("getPendingMarketDetails");
+export const getPendingMarketsBasic = () =>
+  FlowWagerScripts.getScript("getPendingMarketsBasic");
+// export const getPendingMarketsWithEvidence = () => FlowWagerScripts.getScript("getPendingMarketsWithEvidence");
+export const getPendingMarketsWithoutEvidence = () =>
+  FlowWagerScripts.getScript("getPendingMarketsWithoutEvidence");
+export const getAllPendingMarkets = () =>
+  FlowWagerScripts.getScript("getAllPendingMarkets");
+export const getMarketEvidence = () =>
+  FlowWagerScripts.getScript("getMarketEvidence");
+
+// export const submitResolutionEvidenceTransaction = () => FlowWagerScripts.getTransaction("submitResolutionEvidence");
 // export const checkUsernameAvailability = () =>
 //   FlowWagerScripts.getScript("checkUsernameAvailability");
 
@@ -1061,6 +1281,10 @@ export type TransactionName =
   | "checkUsernameAvailability";
 
 export type QueryName =
+  | "getPendingMarketDetails"
+  | "getPendingMarketsBasic"
+  | "getPendingMarketsWithEvidence"
+  | "getPendingMarketsWithoutEvidence"
   | "getActiveMarkets"
   | "getAllMarkets"
   | "getMarketById"
@@ -1069,11 +1293,10 @@ export type QueryName =
   | "getUserFlowBalance"
   | "getUserProfile"
   | "getPendingMarkets"
-  | "getPendingMarketsWithEvidence"
   | "getUserPositions"
   | "getUserDashboardData"
   | "activeUserPositions"
   | "getClaimableWinnings"
   | "checkUserRegistered"
   | "checkUsernameAvailability"
-  | "getUserTrades"
+  | "getUserTrades";

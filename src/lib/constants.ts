@@ -115,12 +115,12 @@ export function getCategoryColor(category: MarketCategory): string {
       return "bg-red-100 text-red-800 border-red-200";
     case MarketCategory.Entertainment:
       return "bg-purple-100 text-purple-800 border-purple-200";
-    // case "Technology":
-    //   return "bg-green-100 text-green-800 border-green-200";
-    // case "Economics":
-    //   return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    // case "Science":
-    //   return "bg-indigo-100 text-indigo-800 border-indigo-200";
+    case MarketCategory.Technology:
+      return "bg-green-100 text-green-800 border-green-200";
+    case MarketCategory.Economics:
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    case MarketCategory.Crypto:
+      return "bg-indigo-100 text-indigo-800 border-indigo-200";
     default:
       return "bg-gray-100 text-gray-800 border-gray-200";
   }
@@ -169,148 +169,11 @@ export function debounce<T extends (...args: any[]) => any>(
   };
 }
 
-// Local storage utilities
-export function getStorageItem<T>(key: string, defaultValue: T): T {
-  if (typeof window === "undefined") return defaultValue;
-  
-  try {
-    const item = window.localStorage.getItem(key);
-    return item ? JSON.parse(item) : defaultValue;
-  } catch (error) {
-    console.error(`Error reading localStorage key "${key}":`, error);
-    return defaultValue;
-  }
-}
 
-export function setStorageItem<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
-  
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error setting localStorage key "${key}":`, error);
-  }
-}
 
-export function removeStorageItem(key: string): void {
-  if (typeof window === "undefined") return;
-  
-  try {
-    window.localStorage.removeItem(key);
-  } catch (error) {
-    console.error(`Error removing localStorage key "${key}":`, error);
-  }
-}
 
-// =========================
-// CONSTANTS
-// =========================
 
-// Flow network configuration
-export const FLOW_CONFIG = {
-  MAINNET: {
-    accessNode: "https://rest-mainnet.onflow.org",
-    discoveryWallet: "https://fcl-discovery.onflow.org/testnet/authn",
-    chainId: "flow-mainnet"
-  },
-  TESTNET: {
-    accessNode: "https://rest-testnet.onflow.org", 
-    discoveryWallet: "https://fcl-discovery.onflow.org/testnet/authn",
-    chainId: "flow-testnet"
-  },
-  EMULATOR: {
-    accessNode: "http://localhost:8888",
-    discoveryWallet: "http://localhost:8701/fcl/authn",
-    chainId: "flow-emulator"
-  }
-} as const;
 
-// Contract addresses (update these with your deployed addresses)
-export const CONTRACT_ADDRESSES = {
-  MAINNET: {
-    FlowWager: "0x6c1b12e35dca8863",
-    MarketFactory: "0x6c1b12e35dca8863", 
-    UserRegistry: "0x6c1b12e35dca8863",
-    FlowTokenHelper: "0x6c1b12e35dca8863"
-  },
-  TESTNET: {
-    FlowWager: "0x6c1b12e35dca8863",
-    MarketFactory: "0x6c1b12e35dca8863",
-    UserRegistry: "0x6c1b12e35dca8863", 
-    FlowTokenHelper: "0x6c1b12e35dca8863"
-  }
-} as const;
 
-// Market categories
-export const MARKET_CATEGORIES: { value: MarketCategory; label: string; emoji: string }[] = [
-  { value: MarketCategory.Sports, label: "Sports", emoji: "⚽" },
-  { value: MarketCategory.Politics, label: "Politics", emoji: "🗳️" },
-  { value: MarketCategory.Entertainment, label: "Entertainment", emoji: "🎬" },
-//   { value: "Technology", label: "Technology", emoji: "💻" },
-//   { value: "Economics", label: "Economics", emoji: "💰" },
-//   { value: "Science", label: "Science", emoji: "🔬" },
-//   { value: "Other", label: "Other", emoji: "📋" }
-];
 
-// Market status options
-export const MARKET_STATUSES: { value: MarketStatus; label: string; color: string }[] = [
-  { value: MarketStatus.Active, label: "Active", color: "green" },
-  { value: MarketStatus.Cancelled, label: "Closed", color: "yellow" },
-  { value: MarketStatus.Resolved, label: "Resolved", color: "blue" },
-  { value: MarketStatus.Cancelled, label: "Cancelled", color: "red" }
-];
 
-// Trading limits
-export const TRADING_LIMITS = {
-  MIN_BET_AMOUNT: 0.01,
-  MAX_BET_AMOUNT: 10000,
-  MIN_MARKET_DURATION: 60 * 60, // 1 hour in seconds
-  MAX_MARKET_DURATION: 365 * 24 * 60 * 60, // 1 year in seconds
-  MAX_SLIPPAGE: 0.05 // 5%
-} as const;
-
-// UI Constants
-export const UI_CONFIG = {
-  ITEMS_PER_PAGE: 20,
-  SEARCH_DEBOUNCE_MS: 300,
-  TOAST_DURATION: 5000,
-  REFRESH_INTERVAL: 30000, // 30 seconds
-  COMPACT_NUMBER_THRESHOLD: 1000
-} as const;
-
-// Error messages
-export const ERROR_MESSAGES = {
-  WALLET_NOT_CONNECTED: "Please connect your wallet to continue",
-  INSUFFICIENT_BALANCE: "Insufficient balance for this transaction",
-  MARKET_CLOSED: "This market is no longer accepting bets",
-  INVALID_AMOUNT: "Please enter a valid amount",
-  TRANSACTION_FAILED: "Transaction failed. Please try again.",
-  NETWORK_ERROR: "Network error. Please check your connection.",
-  UNKNOWN_ERROR: "An unexpected error occurred"
-} as const;
-
-// Success messages  
-export const SUCCESS_MESSAGES = {
-  BET_PLACED: "Bet placed successfully!",
-  MARKET_CREATED: "Market created successfully!",
-  MARKET_RESOLVED: "Market resolved successfully!",
-  WINNINGS_CLAIMED: "Winnings claimed successfully!"
-} as const;
-
-// Social links
-export const SOCIAL_LINKS = {
-  TWITTER: "https://twitter.com/flowwager",
-  DISCORD: "https://discord.gg/flowwager", 
-  GITHUB: "https://github.com/flowwager",
-  TELEGRAM: "https://t.me/flowwager",
-  DOCS: "https://docs.flowwager.com"
-} as const;
-
-// Feature flags
-export const FEATURE_FLAGS = {
-  ENABLE_MARKET_CREATION: true,
-  ENABLE_SOCIAL_FEATURES: true,
-  ENABLE_ADVANCED_CHARTS: true,
-  ENABLE_NOTIFICATIONS: true,
-  ENABLE_DARK_MODE: true
-} as const;
