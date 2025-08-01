@@ -95,7 +95,10 @@ export default function UserResolvePage() {
       console.log(result, "This is the queried result");
 
       const formattedMarkets: Market[] = (Array.isArray(result) ? result : [])
-        .filter((market: any) => market?.creator === userAddress)
+        .filter(
+          (market: any) =>
+            market?.creator === userAddress && market.resolved !== true
+        )
         .map((marketObj: any) => {
           const market = marketObj.market ?? marketObj;
           return {
@@ -105,6 +108,7 @@ export default function UserResolvePage() {
             optionA: market.optionA ?? "",
             optionB: market.optionB ?? "",
             endTime: market.endTime ?? "0",
+            status: market.status.rawValue ?? "0",
           };
         });
 

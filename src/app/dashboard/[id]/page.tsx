@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   claimWinningsTransaction,
-  getActiveUserPositions,
+  getAllUserTrades,
   getAllMarkets,
   getFlowTokenAddress,
   getMarketCreator,
@@ -25,6 +25,7 @@ import {
 import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
 import type { Market, MarketStatus } from "@/types/market";
+import { generateShortNameFromWallet } from "@/utils";
 import * as fcl from "@onflow/fcl";
 import {
   Activity,
@@ -348,11 +349,12 @@ export default function UserDashboardPage() {
 
   const fetchUserTrades = async (userAddress: string) => {
     try {
-      const script = await getActiveUserPositions();
+      const script = await getAllUserTrades();
       const tradesRaw = await fcl.query({
         cadence: script,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
+      console.log("tradesRaw:", tradesRaw); // Debug log
       const trades: UserTrades = {
         activeTrades: (tradesRaw.activeTrades || []).map((trade: any) => ({
           marketId: trade.marketId?.toString() ?? "",
@@ -370,12 +372,14 @@ export default function UserDashboardPage() {
         })),
         totalDeposited: tradesRaw.totalDeposited?.toString() ?? "0.0",
       };
+      console.log("Parsed trades:", trades); // Debug log
       setUserTrades(trades);
     } catch (err) {
       console.warn("Could not fetch user trades:", err);
       setUserTrades({ activeTrades: [], totalDeposited: "0.0" });
     }
   };
+
 
   const fetchAllPositions = async (userAddress: string) => {
     try {
@@ -384,6 +388,9 @@ export default function UserDashboardPage() {
         cadence: script,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
+
+
+      console.log(positionsRaw, "This is the Raw Positions")
       const positions: UserPosition[] = (positionsRaw || []).map(
         (pos: any) => ({
           marketId: pos.marketId?.toString() ?? "",
@@ -554,7 +561,7 @@ export default function UserDashboardPage() {
 
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">
-                  {isOwnProfile ? "Your Dashboard" : "User Profile"}
+                  {isOwnProfile ? `${generateShortNameFromWallet(userAddress)} Dashboard` : "User Profile"}
                 </h1>
                 <div className="flex items-center space-x-2 mb-3">
                   <code className="text-[#9b87f5] bg-gray-800/50 px-2 py-1 rounded text-sm font-mono">
@@ -610,12 +617,12 @@ export default function UserDashboardPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-center space-x-3 gap-4">
               <Button
                 variant="outline"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
+                className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#8b5cf6]  hover:to-[#7c3aed] text-white w-full sm:w-auto border-0 hover:text-white"
               >
                 <RefreshCw
                   className={`h-4 w-4 mr-2 ${
@@ -629,7 +636,7 @@ export default function UserDashboardPage() {
                 <Button
                   variant="outline"
                   onClick={handleExportData}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
+                  className="border-gray-700 text-gray-300 hover:text-gray-300 bg-[#1A1F2C] hover:bg-[#1A1F2C] w-full sm:w-auto"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export
@@ -639,7 +646,7 @@ export default function UserDashboardPage() {
               {isOwnProfile && isContractOwner && (
                 <Button
                   asChild
-                  className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white w-full sm:w-auto"
+                  className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#8b5cf6]  hover:to-[#7c3aed] text-white w-full sm:w-auto border-0 hover:text-white"
                 >
                   <Link href="/admin">
                     <Settings className="h-4 w-4 mr-2" />
@@ -677,7 +684,7 @@ export default function UserDashboardPage() {
                   <DollarSign className="h-5 w-5 text-green-400" />
                 </div>
                 <span className="text-sm font-medium text-gray-400">
-                  Total Deposited
+                  Current Deposit
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
@@ -765,11 +772,18 @@ export default function UserDashboardPage() {
                       <td className="px-2 py-2 text-white">
                         <Button
                           size="sm"
-                          className="text-white"
+                          className="text-white bg-black hover:bg-black"
                           disabled={
-                            claimingMarketId === win.marketId.toString()
+                            claimingMarketId === win.marketId.toString() ||
+                            parseFloat(win.amount) <= 0
                           }
                           onClick={async () => {
+                            // Check if already claimed before proceeding
+                            if (win.claimed === true) {
+                              setClaimError("Winnings already claimed");
+                              return;
+                            }
+
                             setClaimingMarketId(win.marketId.toString());
                             setClaimError(null);
                             setClaimSuccess(null);

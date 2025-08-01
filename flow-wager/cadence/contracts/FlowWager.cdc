@@ -1094,23 +1094,27 @@ access(all) fun resolveMarket(
 
 
     // HELPER FUNCTIONS
-    access(all) fun getPlatformFeesAvailable(): UFix64 {
-        var totalObligations: UFix64 = 0.0
+   access(all) fun getPlatformFeesAvailable(): UFix64 {
+    var totalObligations: UFix64 = 0.0
+    
+    for marketId in FlowWager.markets.keys {
+        let market = FlowWager.markets[marketId]!
         
-        for marketId in FlowWager.markets.keys {
-            let market = FlowWager.markets[marketId]!
-            
-            if !market.resolved {
-                 totalObligations = totalObligations + market.totalPool
-            }
+        if !market.resolved {
+            totalObligations = totalObligations + market.totalPool
         }
-        
-        let contractBalance = FlowWager.flowVault.balance
-        
-        let liquidBalance = contractBalance - totalObligations
-        
-        return liquidBalance > FlowWager.totalPlatformFees ? FlowWager.totalPlatformFees : liquidBalance
     }
+    
+    let contractBalance = FlowWager.flowVault.balance
+    
+    if totalObligations > contractBalance {
+        return 0.0 // Avoid underflow by returning 0 if obligations exceed balance
+    }
+    
+    let liquidBalance = contractBalance - totalObligations
+    
+    return liquidBalance > FlowWager.totalPlatformFees ? FlowWager.totalPlatformFees : liquidBalance
+}
 
     access(all) fun updateUserStatsAfterWin(user: Address, payout: UFix64, invested: UFix64) {}
 
