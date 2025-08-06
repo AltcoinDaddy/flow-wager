@@ -1,258 +1,228 @@
-# 🌊 FlowWager
+# 🧠 FlowWager
 
-**The First Prediction Market Platform on Flow Blockchain**
+> A decentralized prediction market platform built on the Flow blockchain using Cadence smart contracts.
 
-> **⚠️ Important**: Trading on prediction markets involves financial risk. Please ensure compliance with local regulations and only participate with funds you can afford to lose.
-
-## 🎯 What is FlowWager?
-
-FlowWager is a revolutionary prediction market platform where users can bet real money on the outcomes of future events. Think you know what will happen next? Put your money where your predictions are!
-
-**Bet on anything:**
-- 🏀 Sports outcomes ("Will the Lakers win tonight?")
-- 💰 Crypto prices ("Will Bitcoin hit $100k this year?")
-- 🎬 Entertainment ("Will Taylor Swift release a new album?")
-- 🗳️ Political events ("Who will win the next election?")
-- 🌤️ Weather ("Will it rain tomorrow?")
-
-## ✨ Why FlowWager?
-
-### 🚀 First on Flow Blockchain
-- **Pioneer advantage**: Only prediction market on Flow
-- **Ultra-low fees**: Trade for less than $0.01 vs $50+ on Ethereum
-- **Lightning fast**: Instant transactions, no waiting
-- **Mobile-first**: Perfect experience on your phone
-
-### 🛡️ Built Different
-- **Secure**: Flow's resource-oriented programming prevents asset loss
-- **Fair**: Automated market resolution via smart contracts
-- **Transparent**: All trades recorded on Flow blockchain
-- **Community-owned**: Decentralized governance and revenue sharing
-
-### 💡 Key Features
-- **Real-time trading** with live price updates
-- **Creator economy** - earn money by creating markets
-- **Social features** - discuss predictions with community
-- **Portfolio tracking** - monitor your performance
-- **Mobile-optimized** - trade anywhere, anytime
-
-## 🏗️ Technical Stack
-
-### Smart Contracts (Cadence)
-- **FlowWager.cdc** - Core prediction market logic
-- **MarketFactory.cdc** - Market creation and management
-- **UserRegistry.cdc** - User profiles and statistics
-- **FlowTokenHelper.cdc** - Payment processing
-
-### Frontend (Next.js)
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript for type safety
-- **Styling**: Tailwind CSS for responsive design
-- **Blockchain**: Flow Client Library (FCL) integration
-- **UI Components**: Shadcn/ui for consistent design
-
-## 📋 Smart Contract Addresses
-
-| Network | Address | Explorer |
-|---------|---------|----------|
-| **Mainnet** | `0x6c1b12e35dca8863` | [View on FlowScan](https://flowscan.org/account/0x6c1b12e35dca8863) |
-
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+ and npm/yarn
-- Flow CLI ([Installation Guide](https://developers.flow.com/tools/flow-cli))
-- Git
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/flowwager.git
-   cd flowwager
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Environment setup**
-   ```bash
-   cp .env.example .env.local
-   ```
-   Update the environment variables:
-   ```env
-   NEXT_PUBLIC_FLOW_NETWORK=mainnet
-   NEXT_PUBLIC_CONTRACT_ADDRESS=0x6c1b12e35dca8863
-   ```
-
-4. **Start development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-5. **Open in browser**
-   ```
-   http://localhost:3000
-   ```
-
-## 🛠️ Development
-
-### Project Structure
-```
-flowwager/
-├── src/
-│   ├── app/              # Next.js app router pages
-│   ├── components/       # React components
-│   │   ├── ui/          # Base UI components
-│   │   ├── markets/     # Market-specific components
-│   │   ├── dashboard/   # User dashboard components
-│   │   └── admin/       # Admin panel components
-│   ├── types/           # TypeScript type definitions
-│   ├── utils/           # Utility functions
-│   └── styles/          # Global styles
-├── contracts/           # Cadence smart contracts
-├── flow.json           # Flow configuration
-└── public/             # Static assets
-```
-
-### Available Scripts
-
-```bash
-# Development
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run start        # Start production server
-
-# Flow Commands
-npm run flow:deploy  # Deploy contracts to testnet
-npm run flow:test    # Run contract tests
-
-# Code Quality
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
-```
-
-## 🔧 How It Works
-
-### 1. Market Creation
-Users can create prediction markets by:
-- Defining a clear question with binary outcomes
-- Setting market parameters (end time, minimum bet, etc.)
-- Adding an image and description
-- Paying a small creation fee
-
-### 2. Trading Mechanics
-- **Automated Market Maker**: Liquidity provided by smart contracts
-- **Real-time Pricing**: Prices adjust based on supply and demand
-- **Outcome Tokens**: Each prediction outcome is a tradeable token
-- **Portfolio Management**: Track all positions in your dashboard
-
-### 3. Market Resolution
-- **Automated Resolution**: Markets resolve using reliable data sources
-- **Fair Payouts**: Winners automatically receive losers' stakes
-- **Dispute System**: Community governance for contested outcomes
-- **Instant Settlement**: Winnings distributed immediately
-
-## 🏆 Beta Testing
-
-We're actively seeking beta testers! Join our community to:
-- Test new features before public release
-- Provide feedback to shape the platform
-- Earn early adopter rewards
-- Be part of Flow blockchain history
-
-**How to join:**
-1. Join our [Discord community](coming soon)
-2. Follow us on [Twitter](https://twitter.com/flowwager)
-3. Sign up for beta access in our Discord
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### Bug Reports
-- Use GitHub Issues to report bugs
-- Provide detailed reproduction steps
-- Include screenshots if applicable
-
-### Feature Requests
-- Discuss new ideas in our Discord
-- Submit detailed proposals via GitHub Issues
-- Consider the impact on user experience
-
-### Code Contributions
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow TypeScript best practices
-- Write tests for new features
-- Ensure mobile responsiveness
-- Update documentation as needed
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-## 🛡️ Security
-
-### Reporting Security Issues
-If you discover a security vulnerability, please email us at security@flowwager.com instead of using the issue tracker.
-
-### Security Features
-- Non-custodial architecture
-- Regular security audits
-- Multi-signature governance
-- Emergency pause mechanisms
-
-## 🗺️ Roadmap
-
-### ✅ Completed
-- Smart contracts deployed on mainnet
-- Core betting functionality
-- User dashboard and portfolio tracking
-- Admin panel for market management
-- Mobile-optimized UI
-
-### 🚧 In Progress
-- Beta testing program
-- Security audit completion
-- Advanced analytics features
-- Mobile app development
-
-### 📅 Coming Soon
-- iOS/Android native apps
-- Advanced market types
-- Social features expansion
-- Governance token launch
-- Creator monetization program
-
-## 📞 Contact & Community
-
-- **Website**: [flowwager.com](https://flowwager.xyz)
-- **Discord**: [Join our community](coming soon)
-- **Twitter**: [@flowwager](https://twitter.com/flowwager)
-
-
-## 🙏 Acknowledgments
-
-- [Flow Foundation](https://onflow.org) for the amazing blockchain technology
-- [Cadence](https://cadence-lang.org) for secure smart contract development
-- Flow community for ongoing support and feedback
-- Beta testers for their valuable contributions
+FlowWager enables users to **create**, **participate in**, and **resolve** binary prediction markets using FLOW tokens. The platform includes category filtering, evidence-based resolutions, referral incentives, wager points, and robust administrative controls.
 
 ---
 
-**Built with ❤️ on Flow Blockchain**
+## 🚀 Overview
 
-*FlowWager - Where predictions meet profits*
+FlowWager is a smart contract suite enabling:
+
+- Market creation & resolution.
+- FLOW-based betting.
+- Evidence-backed outcome verification.
+- User stats tracking.
+- Platform-level analytics.
+- Referral systems & wager incentives.
+
+Built on **Flow** blockchain with **Cadence**, FlowWager emphasizes transparency, scalability, and user engagement.
+
+---
+
+## 🧩 Core Components
+
+### 🔢 Enums
+
+- `MarketCategory`: `Sports`, `Entertainment`, `Technology`, `Economics`, `Weather`, `Crypto`, `Politics`, `BreakingNews`, `Other`
+- `MarketStatus`: `Active`, `PendingResolution`, `Resolved`, `Cancelled`
+- `MarketOutcome`: `OptionA`, `OptionB`, `Draw`, `Cancelled`
+
+### 🧱 Structs
+
+<details>
+<summary><strong>Click to view structs</strong></summary>
+
+- `ResolutionEvidence`: Evidence from creators for market resolution.
+- `Market`: A prediction market object with metadata, stats, and state.
+- `UserPosition`: A user's shares and position in a specific market.
+- `UserStats`: Tracks individual stats like ROI, wins, losses.
+- `PlatformStats`: Aggregate metrics across all users & markets.
+- `ClaimableWinnings`: Tracks user's unclaimed funds.
+- `ResolutionDetails`: Stores how a market was resolved.
+
+</details>
+
+### 🧾 Resources
+
+- `UserProfile`: User’s account metadata.
+- `UserPositions`: Market positions for each user.
+- `UserStatsResource`: Updatable user statistics.
+- `Admin`: Platform management operations (pause, fees, etc.)
+
+---
+
+## 🛠️ Functional Overview
+
+### 👤 User Management
+
+- `createUserAccount()`: Register with username/display name.
+- `generateReferralCode()`: Get a unique code to earn wager points.
+- `adminUpdateUserDisplayName()`: Admin-only display name update.
+
+---
+
+### 🧮 Market Creation
+
+- `createMarket(...)`: Supply title, options, category, time, min/max bets, and image.
+- Fee: 10 FLOW (for non-deployers).
+- Max limits enforced (e.g., total markets, string lengths).
+
+---
+
+### 💰 Betting
+
+- `placeBet(...)`: Bet on Option A or B using FLOW tokens.
+- Vaulted per-market.
+- Updates: `UserPositions`, `MarketShares`, and `UserStats`.
+
+---
+
+### 🧾 Resolution
+
+- `submitResolutionEvidence(...)`: Market creator submits proof.
+- `resolveMarket(...)`: Admin validates and resolves outcome.
+- Resolution types:
+  - Approved (evidence-based)
+  - Override (admin decision)
+  - Emergency (admin-only)
+- Fee structure:
+  - 1% → Platform
+  - 2% → Creator (for approved evidence)
+
+---
+
+### 🏆 Winnings
+
+- `claimWinnings(...)`: Based on user's stake in winning outcome.
+- Payout is proportional and net of fees.
+- Stats updated post-claim.
+
+---
+
+### 🛡️ Admin Functions
+
+- `pauseContract()` / `unpauseContract()`
+- `updatePlatformFee(...)`
+- `withdrawPlatformFees(...)`
+- Admin role transfer system:
+  - `AdminTransferProposed`
+  - `AdminTransferred`
+
+---
+
+### 📊 Query Functions
+
+- `getPlatformStats()`, `getAllMarkets()`, `getActiveMarkets()`
+- `getMarketsByCreator(...)`, `getUserProfile(...)`, etc.
+- Vault balances and claimable earnings.
+
+---
+
+## 📢 Events
+
+```
+ContractInitialized
+MarketCreated
+SharesPurchased
+MarketResolved
+WinningsClaimed
+UserRegistered
+ReferralCodeGenerated
+EvidenceSubmitted
+EvidenceRejected
+MarketStatusChanged
+CreatorIncentivePaid
+PlatformFeesWithdrawn
+AdminTransferProposed
+AdminTransferred
+MarketCreationFeeUpdated
+ContractUpgraded
+```
+
+---
+
+## 🎯 Real-World Examples
+
+### ✅ Sports Market — Super Bowl
+
+```
+Market: Will the Kansas City Chiefs win Super Bowl 2026?
+- Bob bets 50 FLOW on "Yes"
+- Charlie bets 30 FLOW on "No"
+- Alice submits evidence → Admin approves → Option A wins
+- Bob wins 77.6 FLOW (after fees)
+```
+
+### ✅ Crypto Market — BTC Price
+
+```
+Market: Will BTC exceed $100k by Dec 31, 2025?
+- Dave bets 100 FLOW on "Yes"
+- Eve bets 50 FLOW on "No"
+- Evidence initially rejected → Eve resubmits → Admin overrides to Option A
+- Dave wins 145.5 FLOW
+```
+
+### ❌ Cancelled Market — Weather
+
+```
+Market: Will it snow in NYC on Christmas?
+- Admin cancels due to unverifiable data
+- Alice and Charlie refunded their bets
+```
+
+---
+
+## 📂 Storage Paths
+
+| Resource | Storage Path | Public Interface |
+|----------|--------------|------------------|
+| `UserProfile` | `/storage/FlowWagerUserProfile` | `/public/FlowWagerUserProfile` |
+| `UserPositions` | `/storage/FlowWagerUserPositions` | `/public/FlowWagerUserPositions` |
+| `UserStats` | `/storage/FlowWagerUserStats` | `/public/FlowWagerUserStats` |
+| `Admin` | `/storage/FlowWagerAdmin` | _N/A_ |
+
+---
+
+## 🔒 Security & Constraints
+
+- Validations for user inputs, IDs, and roles.
+- Contract-wide pause system.
+- Unique usernames/display names.
+- Vaulted asset system (isolated per market).
+
+---
+
+## 🔭 Future Roadmap
+
+- Contract upgrade mechanism with `UpgradePrepared`, `UpgradeExecuted`
+- More incentives for referrals.
+- Multi-option and conditional markets.
+- Gas optimization for larger markets.
+
+---
+
+## 🧠 TL;DR Usage Flow
+
+```
+1. User registers account.
+2. User creates a market.
+3. Participants place FLOW token bets.
+4. Creator submits resolution evidence.
+5. Admin resolves market.
+6. Users claim winnings.
+```
+
+---
+
+## 📜 License
+
+MIT — open source. Built for decentralized betting on the Flow blockchain.
+
+---
+
+## 🤝 Contributions
+
+Pull requests welcome. Open issues to propose new market types or features. Let’s make decentralized predictions better together.

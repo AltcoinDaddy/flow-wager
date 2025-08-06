@@ -36,7 +36,7 @@ import { toast } from "sonner";
 
 // Import your Flow Wager scripts
 import {
-  getAllPendingMarketsWithEvidence, // New script
+  getAllPendingMarketsWithEvidence, getFlowWagerAddress, // New script
   resolveMarketTransaction,
 } from "@/lib/flow-wager-scripts";
 
@@ -81,7 +81,7 @@ function AdminResolveContent(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Simple admin check (update to match your admin address)
-  const isAdmin = loggedIn && user?.addr === "0xa31988b743c4219e"
+  const isAdmin = loggedIn && user?.addr === `${getFlowWagerAddress()}`
 
   // Initialize Flow configuration
   useEffect(() => {

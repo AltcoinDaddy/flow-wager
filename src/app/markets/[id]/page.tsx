@@ -2,8 +2,8 @@
 
 import { BetDialog } from "@/components/market/bet-dialog";
 import { CountdownTimer } from "@/components/market/countdown-timer";
-import { MarketLoading } from "@/components/market/market-loading";
 import { MarketError } from "@/components/market/market-error";
+import { MarketLoading } from "@/components/market/market-loading";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,17 +11,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
+import { extractImageFromMarket, getOptimizedImageUrl, isValidImageUrl } from "@/lib/flow/market";
 import { useAuth } from "@/providers/auth-provider";
 import { MarketCategory, MarketStatus } from "@/types/market";
-import { getOptimizedImageUrl, isValidImageUrl, extractImageFromMarket } from "@/lib/flow/market";
 import {
   BarChart3,
   Bookmark,
   Calendar,
   CheckCircle,
   Clock,
-  ExternalLink,
   Flag,
+  Flame,
+  Image as ImageIcon,
   Lock,
   Pause,
   RefreshCw,
@@ -29,13 +30,11 @@ import {
   TrendingUp,
   Users,
   Volume2,
-  Zap,
-  Image as ImageIcon,
-  Flame
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function MarketDetailPage() {
   const params = useParams();
@@ -843,16 +842,6 @@ export default function MarketDetailPage() {
                     </Link>
                     <p className="text-xs text-gray-400">Market Creator</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all"
-                  >
-                    <Link href={`/profile/${market.creator}`}>
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </Button>
                 </div>
               </CardContent>
             </Card>

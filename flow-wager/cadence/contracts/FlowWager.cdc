@@ -196,7 +196,7 @@ access(all) contract FlowWager {
         access(all) let totalFees: UFix64
         access(all) let availableFeesForWithdrawal: UFix64
 
-init(
+        init(
             totalMarkets: UInt64,
             activeMarkets: UInt64,
             pendingResolutionMarkets: UInt64,
@@ -321,7 +321,10 @@ init(
     access(all) var evidenceResolutionCreatorIncentivePercentage: UFix64
     access(all) var totalPlatformFees: UFix64
     access(all) var totalVolumeTraded: UFix64
-    access(self) var flowVault: @FlowToken.Vault
+    
+    // NEW: Platform vault for fees and individual market vaults
+    access(self) var platformVault: @FlowToken.Vault
+    access(contract) var marketVaults: @{UInt64: FlowToken.Vault}
 
     access(all) let deployerAddress: Address
     access(all) var adminAddress: Address
@@ -425,7 +428,6 @@ init(
                 longestWinStreak: 0,
                 roi: 0.0,
                 averageBetSize: 0.0,
-
                 totalStaked: 0.0
             )
         }
@@ -470,8 +472,9 @@ init(
             
             let availableFees = FlowWager.totalPlatformFees
             assert(amount <= availableFees, message: "Insufficient platform fees available for withdrawal")
+            assert(amount <= FlowWager.platformVault.balance, message: "Insufficient balance in platform vault")
             
-            let feeVault <- FlowWager.flowVault.withdraw(amount: amount) as! @FlowToken.Vault
+            let feeVault <- FlowWager.platformVault.withdraw(amount: amount) as! @FlowToken.Vault
             FlowWager.totalPlatformFees = FlowWager.totalPlatformFees - amount
             
             emit PlatformFeesWithdrawn(admin: self.owner!.address, amount: amount)
@@ -508,7 +511,7 @@ init(
     }
 
     // CONTRACT LEVEL FUNCTIONS
-        access(contract) fun determineResolution(
+    access(contract) fun determineResolution(
         marketId: UInt64,
         adminOutcome: UInt8,
         adminJustification: String
@@ -537,12 +540,17 @@ init(
         }
     }
 
-
+    // NEW: Helper function to get market vault balance
+    access(all) fun getMarketVaultBalance(marketId: UInt64): UFix64 {
+        if let vault = &FlowWager.marketVaults[marketId] as &FlowToken.Vault? {
+            return vault.balance
+        }
+        return 0.0
+    }
 
     // =====================================
     // HELPER FUNCTIONS  
     // =====================================
-    // ... [all unchanged] ...
 
     access(contract) fun calculatePayoutForPosition(marketId: UInt64, position: UserPosition): UFix64 {
         let market = FlowWager.markets[marketId] ?? panic("Market does not exist")
@@ -572,8 +580,7 @@ init(
         return distributablePool * (winningShares / totalWinningShares)
     }
 
-
-     access(contract) fun updateUserStatsAfterBet(user: Address, betAmount: UFix64, marketId: UInt64) {
+    access(contract) fun updateUserStatsAfterBet(user: Address, betAmount: UFix64, marketId: UInt64) {
         if let currentStats = FlowWager.userStats[user] {
             var isNewMarket = false
             if FlowWager.userMarketParticipation[user] == nil {
@@ -607,9 +614,7 @@ init(
         }
     }
 
-
-
-     access(all) fun generateReferralCode(address: Address): String {
+    access(all) fun generateReferralCode(address: Address): String {
         pre {
             !self.paused: "Contract is paused for migration/upgrade"
             FlowWager.registeredUsers.containsKey(self.account.address): "User must be registered to generate referral code"
@@ -628,238 +633,245 @@ init(
         return code
     }
     
-access(all) fun submitResolutionEvidence(
-    address: Address,
-    marketId: UInt64,
-    evidence: String,
-    requestedOutcome: UInt8
-) {
-    pre {
-        !self.paused: "Contract is paused for migration/upgrade"
-        FlowWager.markets.containsKey(marketId): "Market does not exist"
-        evidence.length <= 1000: "Evidence too long (max 1000 characters)"
-        requestedOutcome == MarketOutcome.OptionA.rawValue ||
-        requestedOutcome == MarketOutcome.OptionB.rawValue ||
-        requestedOutcome == MarketOutcome.Draw.rawValue ||
-        requestedOutcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
-    }
-    
-    let market = FlowWager.markets[marketId]!
-    let submitter = address
-    
-    assert(submitter == market.creator, message: "Only market creator can submit evidence")
-    assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
-    assert(!market.resolved, message: "Market already resolved")
-    
-    // Auto-transition if market is still Active but has ended
-    if market.status == MarketStatus.Active {
-        self.transitionEndedMarketToPendingResolution(marketId: marketId)
-    } else {
-        assert(market.status == MarketStatus.PendingResolution, message: "Market must be in PendingResolution status")
-    }
-    
-    let evidenceStruct = ResolutionEvidence(
-        marketId: marketId,
-        creator: submitter,
-        evidence: evidence,
-        requestedOutcome: requestedOutcome
-    )
-    
-    FlowWager.resolutionEvidence[marketId] = evidenceStruct
-    
-    emit EvidenceSubmitted(
-        marketId: marketId,
-        creator: submitter,
-        evidence: evidence,
-        requestedOutcome: requestedOutcome
-    )
-}
-    
-access(all) fun placeBet(
-    userAddress: Address,
-    marketId: UInt64,
-    option: UInt8,
-    betVault: @FlowToken.Vault,
-    userPositionsCap: Capability<&FlowWager.UserPositions>,
-    newPosition: UserPosition
-) {
-    pre {
-        !self.paused: "Contract is paused for migration/upgrade"
-        FlowWager.markets.containsKey(marketId): "Market does not exist"
-        option == MarketOutcome.OptionA.rawValue || option == MarketOutcome.OptionB.rawValue: "Option must be 0 (A) or 1 (B)"
-        betVault.balance > 0.0: "Bet amount must be positive"
-        FlowWager.registeredUsers.containsKey(userAddress): "Bettor must be a registered user."
-        userPositionsCap.check(): "Invalid UserPositions capability"
-        newPosition.marketId == marketId: "Position market ID must match"
-        newPosition.totalInvested == betVault.balance: "Position totalInvested must match bet amount"
-    }
-    
-    let market = FlowWager.markets[marketId]!
-    let betAmount = betVault.balance
-    let bettor = userAddress
-    
-    assert(market.status == MarketStatus.Active, message: "Market is not active for betting")
-    assert(getCurrentBlock().timestamp < market.endTime, message: "Betting has ended for this market")
-    assert(betAmount >= market.minBet, message: "Bet amount is below the minimum required for this market")
-    assert(betAmount <= market.maxBet, message: "Bet amount exceeds the maximum allowed for this market") 
-    
-    // Borrow UserPositions using the provided capability
-    let userPositionsRef = userPositionsCap.borrow()
-        ?? panic("Could not borrow UserPositions from capability")
-    
-    // Deposit bet amount to contract's vault
-    self.flowVault.deposit(from: <-betVault)
-
-    self.totalVolumeTraded = self.totalVolumeTraded + betAmount
-
-    let shares = betAmount
-    
-    // Update market shares and pool
-    let updatedMarket = Market(
-        id: market.id,
-        title: market.title,
-        description: market.description,
-        category: market.category,
-        optionA: market.optionA,
-        optionB: market.optionB,
-        creator: market.creator,
-        endTime: market.endTime,
-        minBet: market.minBet,
-        maxBet: market.maxBet,
-        status: market.status,
-        outcome: market.outcome,
-        resolved: market.resolved,
-        totalOptionAShares: option == MarketOutcome.OptionA.rawValue ? market.totalOptionAShares + shares : market.totalOptionAShares,
-        totalOptionBShares: option == MarketOutcome.OptionB.rawValue ? market.totalOptionBShares + shares : market.totalOptionBShares,
-        totalPool: market.totalPool + betAmount,
-        imageUrl: market.imageUrl
-    )
-    
-    FlowWager.markets[marketId] = updatedMarket
-    
-    // Add position to user's UserPositions
-    userPositionsRef.addPosition(newPosition)
-    
-    // Update market participants
-    if FlowWager.marketParticipants[marketId] == nil {
-        FlowWager.marketParticipants[marketId] = {}
-    }
-    var participants = FlowWager.marketParticipants[marketId]!
-    participants[bettor] = true
-    FlowWager.marketParticipants[marketId] = participants
-    
-    // Update stats and points
-    self.updateUserStatsAfterBet(user: bettor, betAmount: betAmount, marketId: marketId)
-    
-    let currentPoints = FlowWager.wagerPoints[bettor] ?? 0
-    FlowWager.wagerPoints[bettor] = currentPoints + UInt64(betAmount)
-    
-    emit SharesPurchased(
-        marketId: marketId,
-        buyer: bettor,
-        option: option,
-        shares: shares,
-        amount: betAmount
-    )
-    emit WagerPointsEarned(user: bettor, points: UInt64(betAmount))
-}
-
-    
-access(all) fun resolveMarket(
-    marketId: UInt64,
-    outcome: UInt8,
-    justification: String
-) {
-    pre {
-        !self.paused: "Contract is paused for migration/upgrade"
-        FlowWager.markets.containsKey(marketId): "Market does not exist"
-        outcome == MarketOutcome.OptionA.rawValue ||
-        outcome == MarketOutcome.OptionB.rawValue ||
-        outcome == MarketOutcome.Draw.rawValue ||
-        outcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
-        justification.length > 0: "Justification required"
-    }
-    let market = FlowWager.markets[marketId]!
-    let resolver = self.account.address
-    assert(resolver == self.adminAddress, message: "Only admin can resolve markets")
-    assert(!market.resolved, message: "Market already resolved")
-    assert(getCurrentBlock().timestamp >= market.endTime, message: "Market not ended yet")
-
-    // Determine the resolution type
-    let resolutionDetails = FlowWager.determineResolution(
-        marketId: marketId,
-        adminOutcome: outcome,
-        adminJustification: justification
-    )
-
-    let finalOutcomeRaw = resolutionDetails.outcome
-    let finalJustification = resolutionDetails.justification
-    let resolutionType = resolutionDetails.resolutionType // "approved", "override", "emergency"
-
-    let marketOutcome = MarketOutcome(rawValue: finalOutcomeRaw)!
-    let totalPool = market.totalPool
-
-    var platformFeeAmount: UFix64 = 0.0
-    var creatorIncentiveAmount: UFix64 = 0.0
-
-    // Calculate fees based on resolution type
-    if resolutionType == "approved" {
-        // Evidence was approved, apply 1% platform fee and 2% creator incentive
-        platformFeeAmount = totalPool * (self.evidenceResolutionPlatformFeePercentage / 100.0)
-        creatorIncentiveAmount = totalPool * (self.evidenceResolutionCreatorIncentivePercentage / 100.0)
-
-        // Transfer creator incentive
-        if creatorIncentiveAmount > 0.0 {
-            let creatorAcct = getAccount(market.creator)
-            if let creatorVault = creatorAcct.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver).borrow() {
-                let payoutVault <- self.flowVault.withdraw(amount: creatorIncentiveAmount) as! @FlowToken.Vault
-                creatorVault.deposit(from: <-payoutVault)
-                emit CreatorIncentivePaid(marketId: market.id, creator: market.creator, amount: creatorIncentiveAmount)
-            } else {
-                // Handle case where creator doesn't have a public receiver
-                platformFeeAmount = platformFeeAmount + creatorIncentiveAmount
-                log("Creator does not have a FlowToken.Receiver capability. Creator incentive added to platform fees.")
-            }
+    access(all) fun submitResolutionEvidence(
+        address: Address,
+        marketId: UInt64,
+        evidence: String,
+        requestedOutcome: UInt8
+    ) {
+        pre {
+            !self.paused: "Contract is paused for migration/upgrade"
+            FlowWager.markets.containsKey(marketId): "Market does not exist"
+            evidence.length <= 1000: "Evidence too long (max 1000 characters)"
+            requestedOutcome == MarketOutcome.OptionA.rawValue ||
+            requestedOutcome == MarketOutcome.OptionB.rawValue ||
+            requestedOutcome == MarketOutcome.Draw.rawValue ||
+            requestedOutcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
         }
-    } else {
-        // Standard resolution (admin override or emergency), apply standard platform fee
-        platformFeeAmount = totalPool * (self.platformFeePercentage / 100.0)
+        
+        let market = FlowWager.markets[marketId]!
+        let submitter = address
+        
+        assert(submitter == market.creator, message: "Only market creator can submit evidence")
+        assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
+        assert(!market.resolved, message: "Market already resolved")
+        
+        // Auto-transition if market is still Active but has ended
+        if market.status == MarketStatus.Active {
+            self.transitionEndedMarketToPendingResolution(marketId: marketId)
+        } else {
+            assert(market.status == MarketStatus.PendingResolution, message: "Market must be in PendingResolution status")
+        }
+        
+        let evidenceStruct = ResolutionEvidence(
+            marketId: marketId,
+            creator: submitter,
+            evidence: evidence,
+            requestedOutcome: requestedOutcome
+        )
+        
+        FlowWager.resolutionEvidence[marketId] = evidenceStruct
+        
+        emit EvidenceSubmitted(
+            marketId: marketId,
+            creator: submitter,
+            evidence: evidence,
+            requestedOutcome: requestedOutcome
+        )
+    }
+    
+    access(all) fun placeBet(
+        userAddress: Address,
+        marketId: UInt64,
+        option: UInt8,
+        betVault: @FlowToken.Vault,
+        userPositionsCap: Capability<&FlowWager.UserPositions>,
+        newPosition: UserPosition
+    ) {
+        pre {
+            !self.paused: "Contract is paused for migration/upgrade"
+            FlowWager.markets.containsKey(marketId): "Market does not exist"
+            option == MarketOutcome.OptionA.rawValue || option == MarketOutcome.OptionB.rawValue: "Option must be 0 (A) or 1 (B)"
+            betVault.balance > 0.0: "Bet amount must be positive"
+            FlowWager.registeredUsers.containsKey(userAddress): "Bettor must be a registered user."
+            userPositionsCap.check(): "Invalid UserPositions capability"
+            newPosition.marketId == marketId: "Position market ID must match"
+            newPosition.totalInvested == betVault.balance: "Position totalInvested must match bet amount"
+        }
+        
+        let market = FlowWager.markets[marketId]!
+        let betAmount = betVault.balance
+        let bettor = userAddress
+        
+        assert(market.status == MarketStatus.Active, message: "Market is not active for betting")
+        assert(getCurrentBlock().timestamp < market.endTime, message: "Betting has ended for this market")
+        assert(betAmount >= market.minBet, message: "Bet amount is below the minimum required for this market")
+        assert(betAmount <= market.maxBet, message: "Bet amount exceeds the maximum allowed for this market") 
+        
+        // Borrow UserPositions using the provided capability
+        let userPositionsRef = userPositionsCap.borrow()
+            ?? panic("Could not borrow UserPositions from capability")
+        
+        // NEW: Deposit bet amount to the specific market's vault
+        let marketVaultRef = &FlowWager.marketVaults[marketId] as &FlowToken.Vault?
+            ?? panic("Market vault not found")
+        marketVaultRef.deposit(from: <-betVault)
+
+        self.totalVolumeTraded = self.totalVolumeTraded + betAmount
+
+        let shares = betAmount
+        
+        // Update market shares and pool
+        let updatedMarket = Market(
+            id: market.id,
+            title: market.title,
+            description: market.description,
+            category: market.category,
+            optionA: market.optionA,
+            optionB: market.optionB,
+            creator: market.creator,
+            endTime: market.endTime,
+            minBet: market.minBet,
+            maxBet: market.maxBet,
+            status: market.status,
+            outcome: market.outcome,
+            resolved: market.resolved,
+            totalOptionAShares: option == MarketOutcome.OptionA.rawValue ? market.totalOptionAShares + shares : market.totalOptionAShares,
+            totalOptionBShares: option == MarketOutcome.OptionB.rawValue ? market.totalOptionBShares + shares : market.totalOptionBShares,
+            totalPool: market.totalPool + betAmount,
+            imageUrl: market.imageUrl
+        )
+        
+        FlowWager.markets[marketId] = updatedMarket
+        
+        // Add position to user's UserPositions
+        userPositionsRef.addPosition(newPosition)
+        
+        // Update market participants
+        if FlowWager.marketParticipants[marketId] == nil {
+            FlowWager.marketParticipants[marketId] = {}
+        }
+        var participants = FlowWager.marketParticipants[marketId]!
+        participants[bettor] = true
+        FlowWager.marketParticipants[marketId] = participants
+        
+        // Update stats and points
+        self.updateUserStatsAfterBet(user: bettor, betAmount: betAmount, marketId: marketId)
+        
+        let currentPoints = FlowWager.wagerPoints[bettor] ?? 0
+        FlowWager.wagerPoints[bettor] = currentPoints + UInt64(betAmount)
+        
+        emit SharesPurchased(
+            marketId: marketId,
+            buyer: bettor,
+            option: option,
+            shares: shares,
+            amount: betAmount
+        )
+        emit WagerPointsEarned(user: bettor, points: UInt64(betAmount))
     }
 
-    // Accumulate the platform's share of fees
-    self.totalPlatformFees = self.totalPlatformFees + platformFeeAmount
+   access(all) fun resolveMarket(
+        marketId: UInt64,
+        outcome: UInt8,
+        justification: String
+    ) {
+        pre {
+            !self.paused: "Contract is paused for migration/upgrade"
+            FlowWager.markets.containsKey(marketId): "Market does not exist"
+            outcome == MarketOutcome.OptionA.rawValue ||
+            outcome == MarketOutcome.OptionB.rawValue ||
+            outcome == MarketOutcome.Draw.rawValue ||
+            outcome == MarketOutcome.Cancelled.rawValue : "Invalid outcome"
+            justification.length > 0: "Justification required"
+        }
+        let market = FlowWager.markets[marketId]!
+        let resolver = self.account.address
+        assert(resolver == self.adminAddress, message: "Only admin can resolve markets")
+        assert(!market.resolved, message: "Market already resolved")
+        assert(getCurrentBlock().timestamp >= market.endTime, message: "Market not ended yet")
 
-    let resolvedMarket = Market(
-        id: market.id,
-        title: market.title,
-        description: market.description,
-        category: market.category,
-        optionA: market.optionA,
-        optionB: market.optionB,
-        creator: market.creator,
-        endTime: market.endTime,
-        minBet: market.minBet,
-        maxBet: market.maxBet,
-        status: MarketStatus.Resolved,
-        outcome: marketOutcome,
-        resolved: true,
-        totalOptionAShares: market.totalOptionAShares,
-        totalOptionBShares: market.totalOptionBShares,
-        totalPool: market.totalPool,
-        imageUrl: market.imageUrl
-    )
+        let resolutionDetails = FlowWager.determineResolution(
+            marketId: marketId,
+            adminOutcome: outcome,
+            adminJustification: justification
+        )
 
-    FlowWager.markets[marketId] = resolvedMarket
+        let finalOutcomeRaw = resolutionDetails.outcome
+        let finalJustification = resolutionDetails.justification
+        let resolutionType = resolutionDetails.resolutionType // "approved", "override", "emergency"
 
-    let _ = FlowWager.resolutionEvidence.remove(key: marketId)
+        let marketOutcome = MarketOutcome(rawValue: finalOutcomeRaw)!
+        let totalPool = market.totalPool
 
-    emit MarketResolved(
-        marketId: marketId,
-        outcome: finalOutcomeRaw,
-        resolver: resolver,
-        justification: finalJustification
-    )
-}  
+        var platformFeeAmount: UFix64 = 0.0
+        var creatorIncentiveAmount: UFix64 = 0.0
+
+        if resolutionType == "approved" {
+            platformFeeAmount = totalPool * (self.evidenceResolutionPlatformFeePercentage / 100.0)
+            creatorIncentiveAmount = totalPool * (self.evidenceResolutionCreatorIncentivePercentage / 100.0)
+
+            if creatorIncentiveAmount > 0.0 {
+                let creatorAcct = getAccount(market.creator)
+                if let creatorVault = creatorAcct.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver).borrow() {
+                    let marketVaultRef = &FlowWager.marketVaults[marketId] as auth(FungibleToken.Withdraw) &FlowToken.Vault?
+                        ?? panic("Market vault not found")
+                    let payoutVault <- marketVaultRef.withdraw(amount: creatorIncentiveAmount) as! @FlowToken.Vault
+                    creatorVault.deposit(from: <-payoutVault)
+                    emit CreatorIncentivePaid(marketId: market.id, creator: market.creator, amount: creatorIncentiveAmount)
+                } else {
+                    platformFeeAmount = platformFeeAmount + creatorIncentiveAmount
+                    log("Creator does not have a FlowToken.Receiver capability. Creator incentive added to platform fees.")
+                }
+            }
+        } else {
+            platformFeeAmount = totalPool * (self.platformFeePercentage / 100.0)
+        }
+
+        if platformFeeAmount > 0.0 {
+            let marketVaultRef = &FlowWager.marketVaults[marketId] as auth(FungibleToken.Withdraw) &FlowToken.Vault?
+                ?? panic("Market vault not found")
+            let feeVault <- marketVaultRef.withdraw(amount: platformFeeAmount) as! @FlowToken.Vault
+            let platformVaultRef = &FlowWager.platformVault as &FlowToken.Vault
+            platformVaultRef.deposit(from: <-feeVault)
+        }
+
+        self.totalPlatformFees = self.totalPlatformFees + platformFeeAmount
+
+        let resolvedMarket = Market(
+            id: market.id,
+            title: market.title,
+            description: market.description,
+            category: market.category,
+            optionA: market.optionA,
+            optionB: market.optionB,
+            creator: market.creator,
+            endTime: market.endTime,
+            minBet: market.minBet,
+            maxBet: market.maxBet,
+            status: MarketStatus.Resolved,
+            outcome: marketOutcome,
+            resolved: true,
+            totalOptionAShares: market.totalOptionAShares,
+            totalOptionBShares: market.totalOptionBShares,
+            totalPool: market.totalPool,
+            imageUrl: market.imageUrl
+        )
+
+        FlowWager.markets[marketId] = resolvedMarket
+
+        let _ = FlowWager.resolutionEvidence.remove(key: marketId)
+
+        emit MarketResolved(
+            marketId: marketId,
+            outcome: finalOutcomeRaw,
+            resolver: resolver,
+            justification: finalJustification
+        )
+    }
+
+    
+    
     access(all) fun rejectEvidence(marketId: UInt64, rejectionReason: String) {
         pre {
             !self.paused: "Contract is paused for migration/upgrade"
@@ -884,7 +896,7 @@ access(all) fun resolveMarket(
             creator: market.creator,
             endTime: market.endTime,
             minBet: market.minBet,
-            maxBet: market.maxBet, // This 'maxBet' refers to the field from the existing 'market' struct
+            maxBet: market.maxBet,
             status: MarketStatus.Active,
             outcome: market.outcome,
             resolved: market.resolved,
@@ -904,70 +916,69 @@ access(all) fun resolveMarket(
         emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.Active.rawValue)
     }
     
-   access(all) fun claimWinnings(
-    marketId: UInt64, 
-   claimerAddress: Address,
-    userPositionsCap: Capability<&FlowWager.UserPositions>,
-   ): @FlowToken.Vault {
-    pre {
-        !self.paused: "Contract is paused for migration/upgrade"
-        FlowWager.markets.containsKey(marketId): "Market does not exist"
-        FlowWager.registeredUsers.containsKey(claimerAddress): "Claimer must be a registered user."
-         userPositionsCap.check(): "Invalid UserPositions capability"
-    }
-    
-    let market = FlowWager.markets[marketId]!
-    let claimer = claimerAddress
-    
-    assert(market.resolved, message: "Market not resolved yet")
-    
-    let userAcct = getAccount(claimer)
- // Borrow UserPositions using the provided capability
-    let userPositionsRef = userPositionsCap.borrow()
-        ?? panic("Could not borrow UserPositions from capability")
-    
-    let position = userPositionsRef.getPosition(marketId: marketId)
-        ?? panic("No position found for this market for the current user.")
-    
-    assert(!position.claimed, message: "Winnings for this market already claimed.")
-    
-    let payout = self.calculatePayoutForPosition(marketId: marketId, position: position)
-    assert(payout > 0.0, message: "No winnings to claim for this market or position.")
-    
-    userPositionsRef.markClaimed(marketId: marketId)
-    
-    if let currentStats = FlowWager.userStats[claimer] {
-        if payout > position.totalInvested {
-            FlowWager.updateUserStatsAfterWin(user: claimer, payout: payout, invested: position.totalInvested)
-        } else if payout < position.totalInvested {
-            let loss = position.totalInvested - payout
-            FlowWager.updateUserStatsAfterLoss(user: claimer, lossAmount: loss)
-        } else {
-            let updatedStats = UserStats(
-                totalMarketsParticipated: currentStats.totalMarketsParticipated,
-                totalWinnings: currentStats.totalWinnings,
-                totalLosses: currentStats.totalLosses,
-                winStreak: 0,
-                currentStreak: 0,
-                longestWinStreak: currentStats.longestWinStreak,
-                roi: currentStats.roi,
-                averageBetSize: currentStats.averageBetSize,
-                totalStaked: currentStats.totalStaked
-            )
-            FlowWager.userStats[claimer] = updatedStats
+  access(all) fun claimWinnings(
+        marketId: UInt64, 
+        claimerAddress: Address,
+        userPositionsCap: Capability<&FlowWager.UserPositions>,
+    ): @FlowToken.Vault {
+        pre {
+            !self.paused: "Contract is paused for migration/upgrade"
+            FlowWager.markets.containsKey(marketId): "Market does not exist"
+            FlowWager.registeredUsers.containsKey(claimerAddress): "Claimer must be a registered user."
+            userPositionsCap.check(): "Invalid UserPositions capability"
         }
-    } else {
-         panic("User stats not found for registered user ".concat(claimer.toString()))
+        
+        let market = FlowWager.markets[marketId]!
+        let claimer = claimerAddress
+        
+        assert(market.resolved, message: "Market not resolved yet")
+        
+        let userAcct = getAccount(claimer)
+        let userPositionsRef = userPositionsCap.borrow()
+            ?? panic("Could not borrow UserPositions from capability")
+        
+        let position = userPositionsRef.getPosition(marketId: marketId)
+            ?? panic("No position found for this market for the current user.")
+        
+        assert(!position.claimed, message: "Winnings for this market already claimed.")
+        
+        let payout = self.calculatePayoutForPosition(marketId: marketId, position: position)
+        assert(payout > 0.0, message: "No winnings to claim for this market or position.")
+        
+        userPositionsRef.markClaimed(marketId: marketId)
+        
+        if let currentStats = FlowWager.userStats[claimer] {
+            if payout > position.totalInvested {
+                FlowWager.updateUserStatsAfterWin(user: claimer, payout: payout, invested: position.totalInvested)
+            } else if payout < position.totalInvested {
+                let loss = position.totalInvested - payout
+                FlowWager.updateUserStatsAfterLoss(user: claimer, lossAmount: loss)
+            } else {
+                let updatedStats = UserStats(
+                    totalMarketsParticipated: currentStats.totalMarketsParticipated,
+                    totalWinnings: currentStats.totalWinnings,
+                    totalLosses: currentStats.totalLosses,
+                    winStreak: 0,
+                    currentStreak: 0,
+                    longestWinStreak: currentStats.longestWinStreak,
+                    roi: currentStats.roi,
+                    averageBetSize: currentStats.averageBetSize,
+                    totalStaked: currentStats.totalStaked
+                )
+                FlowWager.userStats[claimer] = updatedStats
+            }
+        } else {
+            panic("User stats not found for registered user ".concat(claimer.toString()))
+        }
+        
+        let marketVaultRef = &FlowWager.marketVaults[marketId] as auth(FungibleToken.Withdraw) &FlowToken.Vault?
+            ?? panic("Market vault not found")
+        let payoutVault <- marketVaultRef.withdraw(amount: payout) as! @FlowToken.Vault
+        
+        emit WinningsClaimed(marketId: marketId, claimer: claimer, amount: payout)
+        
+        return <-payoutVault
     }
-    
-    let payoutVault <- self.flowVault.withdraw(amount: payout) as! @FlowToken.Vault
-    
-    emit WinningsClaimed(marketId: marketId, claimer: claimer, amount: payout)
-    
-    return <-payoutVault
-}
-    
-
 
     // =====================================
     // PATCHED: USER REGISTRATION (NO STORAGE SAVE)
@@ -1003,9 +1014,7 @@ access(all) fun resolveMarket(
 
         emit UserRegistered(address: userAddress, username: username)
     }
-
-
-     access(all) fun createMarket(
+access(all) fun createMarket(
         title: String,
         description: String,
         category: MarketCategory,
@@ -1032,32 +1041,31 @@ access(all) fun resolveMarket(
         }
         
         let marketId = FlowWager.nextMarketId
-        let creator =  address
+        let creator = address
         
         let isDeployer = creator == FlowWager.deployerAddress
 
         if isDeployer {
             if let vault <- creationFeeVault {
-                destroy vault // Deployer doesn't pay, so destroy any sent vault
+                destroy vault
             }
         } else {
             if let vault <- creationFeeVault {
                 assert(vault.balance >= FlowWager.marketCreationFee, message: "Insufficient creation fee")
                 
-                let feeVault <- vault.withdraw(amount: FlowWager.marketCreationFee)
-                FlowWager.flowVault.deposit(from: <-feeVault)
-                
-                if vault.balance > 0.0 {
-                    destroy vault 
-                } else {
-                    destroy vault
-                }
-                
+                let feeVault <- vault.withdraw(amount: FlowWager.marketCreationFee) as! @FlowToken.Vault
+                let platformVaultRef = &FlowWager.platformVault as &FlowToken.Vault
+                platformVaultRef.deposit(from: <-feeVault)
+                FlowWager.totalPlatformFees = FlowWager.totalPlatformFees + FlowWager.marketCreationFee
+                destroy vault
                 emit MarketCreationFeePaid(creator: creator, amount: FlowWager.marketCreationFee)
             } else {
                 panic("Creation fee required for non-deployers")
             }
         }
+        
+        let newMarketVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+        FlowWager.marketVaults[marketId] <-! newMarketVault
         
         let market = Market(
             id: marketId,
@@ -1069,14 +1077,14 @@ access(all) fun resolveMarket(
             creator: creator,
             endTime: endTime,
             minBet: minBet,
-            maxBet: maxBet, // This 'maxBet' refers to the parameter passed to the function
+            maxBet: maxBet,
             status: MarketStatus.Active,
             outcome: nil,
             resolved: false,
             totalOptionAShares: 0.0,
             totalOptionBShares: 0.0,
             totalPool: 0.0,
-            imageUrl: imageUrl,
+            imageUrl: imageUrl
         )
         
         FlowWager.markets[marketId] = market
@@ -1094,33 +1102,25 @@ access(all) fun resolveMarket(
 
 
     // HELPER FUNCTIONS
-   access(all) fun getPlatformFeesAvailable(): UFix64 {
-    var totalObligations: UFix64 = 0.0
-    
-    for marketId in FlowWager.markets.keys {
-        let market = FlowWager.markets[marketId]!
-        
-        if !market.resolved {
-            totalObligations = totalObligations + market.totalPool
+    access(all) fun getPlatformFeesAvailable(): UFix64 {
+        let contractBalance = FlowWager.platformVault.balance
+        return contractBalance > FlowWager.totalPlatformFees ? FlowWager.totalPlatformFees : contractBalance
+    }
+
+    // NEW: Function to get total funds across all market vaults
+    access(all) fun getTotalMarketFunds(): UFix64 {
+        var totalFunds: UFix64 = 0.0
+        for marketId in FlowWager.marketVaults.keys {
+            if let vault = &FlowWager.marketVaults[marketId] as &FlowToken.Vault? {
+                totalFunds = totalFunds + vault.balance
+            }
         }
+        return totalFunds
     }
-    
-    let contractBalance = FlowWager.flowVault.balance
-    
-    if totalObligations > contractBalance {
-        return 0.0 // Avoid underflow by returning 0 if obligations exceed balance
-    }
-    
-    let liquidBalance = contractBalance - totalObligations
-    
-    return liquidBalance > FlowWager.totalPlatformFees ? FlowWager.totalPlatformFees : liquidBalance
-}
 
     access(all) fun updateUserStatsAfterWin(user: Address, payout: UFix64, invested: UFix64) {}
 
     access(all) fun updateUserStatsAfterLoss(user: Address, lossAmount: UFix64) {}
-
-    // access(all) fun determineResolution(marketId: UInt64, adminOutcome: UInt8, adminJustification: String) {}
 
     access(all) fun getPlatformStats(): PlatformStats {
         var activeMarketsCount: UInt64 = 0
@@ -1144,7 +1144,7 @@ access(all) fun resolveMarket(
         )
     }
 
-     access(all) fun getMarketById(marketId: UInt64): Market? {
+    access(all) fun getMarketById(marketId: UInt64): Market? {
         return FlowWager.markets[marketId]
     }
     
@@ -1172,7 +1172,6 @@ access(all) fun resolveMarket(
         return pendingMarkets
     }
     
-    // Fixed: Typo in argument name
     access(all) fun getResolutionEvidence(marketId: UInt64): ResolutionEvidence? {
         return FlowWager.resolutionEvidence[marketId]
     }
@@ -1202,15 +1201,12 @@ access(all) fun resolveMarket(
         return FlowWager.userStats[address]
     }
 
-
     access(all) fun getMarketParticipantCount(marketId: UInt64): UInt64 {
-    if let participants = FlowWager.marketParticipants[marketId] {
-        return UInt64(participants.length)
+        if let participants = FlowWager.marketParticipants[marketId] {
+            return UInt64(participants.length)
+        }
+        return 0
     }
-    return 0
-    }
-
-    
 
     access(all) fun getUserPositions(address: Address): {UInt64: UserPosition} {
         let acct = getAccount(address)
@@ -1248,52 +1244,50 @@ access(all) fun resolveMarket(
         return claimable
     }
 
-        access(all) fun createUserPositions(): @UserPositions {
-            return <- create UserPositions()
-        }
+    access(all) fun createUserPositions(): @UserPositions {
+        return <- create UserPositions()
+    }
 
     access(all) fun createUserStatsResource(): @UserStatsResource {
-         return <- create UserStatsResource()
+        return <- create UserStatsResource()
     }
 
     access(all) fun transitionEndedMarketToPendingResolution(marketId: UInt64) {
-    pre {
-        !self.paused: "Contract is paused for migration/upgrade"
-        FlowWager.markets.containsKey(marketId): "Market does not exist"
+        pre {
+            !self.paused: "Contract is paused for migration/upgrade"
+            FlowWager.markets.containsKey(marketId): "Market does not exist"
+        }
+        
+        let market = FlowWager.markets[marketId]!
+        
+        assert(market.status == MarketStatus.Active, message: "Market is not in Active status")
+        assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
+        assert(!market.resolved, message: "Market already resolved")
+        
+        let updatedMarket = Market(
+            id: market.id,
+            title: market.title,
+            description: market.description,
+            category: market.category,
+            optionA: market.optionA,
+            optionB: market.optionB,
+            creator: market.creator,
+            endTime: market.endTime,
+            minBet: market.minBet,
+            maxBet: market.maxBet,
+            status: MarketStatus.PendingResolution,
+            outcome: market.outcome,
+            resolved: market.resolved,
+            totalOptionAShares: market.totalOptionAShares,
+            totalOptionBShares: market.totalOptionBShares,
+            totalPool: market.totalPool,
+            imageUrl: market.imageUrl
+        )
+        
+        FlowWager.markets[marketId] = updatedMarket
+        
+        emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.PendingResolution.rawValue)
     }
-    
-    let market = FlowWager.markets[marketId]!
-    
-    assert(market.status == MarketStatus.Active, message: "Market is not in Active status")
-    assert(getCurrentBlock().timestamp >= market.endTime, message: "Market hasn't ended yet")
-    assert(!market.resolved, message: "Market already resolved")
-    
-    let updatedMarket = Market(
-        id: market.id,
-        title: market.title,
-        description: market.description,
-        category: market.category,
-        optionA: market.optionA,
-        optionB: market.optionB,
-        creator: market.creator,
-        endTime: market.endTime,
-        minBet: market.minBet,
-        maxBet: market.maxBet,
-        status: MarketStatus.PendingResolution,
-        outcome: market.outcome,
-        resolved: market.resolved,
-        totalOptionAShares: market.totalOptionAShares,
-        totalOptionBShares: market.totalOptionBShares,
-        totalPool: market.totalPool,
-        imageUrl: market.imageUrl
-    )
-    
-    FlowWager.markets[marketId] = updatedMarket
-    
-    emit MarketStatusChanged(marketId: marketId, newStatus: MarketStatus.PendingResolution.rawValue)
-}
-
-    // ... [everything else stays the same, including all contract logic, helpers, and the initializer below] ...
 
     // =====================================
     // CONTRACT INITIALIZATION
@@ -1336,7 +1330,9 @@ access(all) fun resolveMarket(
         self.UserProfilePublicPath = /public/FlowWagerUserProfile
         self.AdminStoragePath = /storage/FlowWagerAdmin
         
-        self.flowVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+        // NEW: Initialize platform vault and market vaults dictionary
+        self.platformVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+        self.marketVaults <- {}
         
         let admin <- create Admin()
         self.account.storage.save(<-admin, to: self.AdminStoragePath)

@@ -259,6 +259,8 @@ export default function UserDashboardPage() {
           cadence: createdMarketsScript,
           args: (arg, t) => [arg(userAddress, t.Address)],
         });
+
+        console.log(createdMarkets, "This is the Created Markets")
       } catch (err) {
         console.warn("Could not fetch created markets:", err);
       }
