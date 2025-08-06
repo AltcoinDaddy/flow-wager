@@ -58,8 +58,8 @@ export const copyToClipboard = async (text: string): Promise<void> => {
 export const getFlowscanUrl = (address: string): string => {
   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet';
   const baseUrl = network === 'mainnet' 
-    ? 'https://flowscan.org' 
-    : 'https://testnet.flowscan.org';
+    ? 'https://flowscan.io' 
+    : 'https://testnet.flowscan.io';
   return `${baseUrl}/account/${address}`;
 };
 

@@ -7,7 +7,7 @@ access(all) struct PendingMarketDetails {
     access(all) let participantCount: UInt64
     access(all) let daysSinceEnded: UFix64
     access(all) let hasEvidence: Bool
-    
+
     init(
         market: FlowWager.Market,
         evidence: FlowWager.ResolutionEvidence?,
@@ -26,28 +26,28 @@ access(all) struct PendingMarketDetails {
 }
 
 access(all) fun main(): [PendingMarketDetails] {
-    let allMarkets = FlowWager.getPendingResolutionMarkets()
+    let allMarkets = FlowWager.getAllMarkets()
     let pendingMarkets: [PendingMarketDetails] = []
     let currentTime = getCurrentBlock().timestamp
-    
+
     for market in allMarkets {
-        let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-        if evidence != nil {
+        if market.status == FlowWager.MarketStatus.PendingResolution {
+            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
             let totalVolume = market.totalOptionAShares + market.totalOptionBShares
             let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
             let daysSinceEnded = secondsSinceEnded / 86400.0
             let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
-            
+
             pendingMarkets.append(PendingMarketDetails(
                 market: market,
                 evidence: evidence,
                 totalVolume: totalVolume,
                 participantCount: participantCount,
                 daysSinceEnded: daysSinceEnded,
-                hasEvidence: true
+                hasEvidence: evidence != nil
             ))
         }
     }
-    
+
     return pendingMarkets
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { OwnerOnly } from "@/components/auth/owner-only";
@@ -211,7 +212,7 @@ export default function HomePage() {
       </section>
 
       {/* User Dashboard Section (only show if logged in and stats available) */}
-      {user?.loggedIn && (
+      {/* {user?.loggedIn && (
         <section className="py-16 px-4 bg-[#1A1F2C]">
           <div className="container mx-auto">
             <div className="flex items-center justify-between mb-8">
@@ -277,7 +278,7 @@ export default function HomePage() {
             )}
           </div>
         </section>
-      )}
+      )} */}
 
       {/* Featured Markets Section */}
       <section className="py-16 px-4 bg-[#0A0C14]">
@@ -288,7 +289,7 @@ export default function HomePage() {
                 Featured Markets
               </h2>
               <p className="text-gray-400">
-                Most popular and trending prediction markets (using market-api)
+                Most popular and trending prediction markets
               </p>
             </div>
             <Button

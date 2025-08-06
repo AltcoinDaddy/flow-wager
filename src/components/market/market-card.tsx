@@ -61,7 +61,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
 
   // Format odds like Polymarket (e.g., 67¢)
   const formatOdds = (percentage: number) => {
-    return `${Math.round(percentage)}¢`;
+    return `${Math.round(percentage)}% `;
   };
 
   // Calculate volume (approximation)

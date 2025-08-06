@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import flowConfig from '@/lib/flow/config';
 import { 
   createMarketTransaction,
+  getFlowWagerAddress,
   getUserProfile,
 } from '@/lib/flow-wager-scripts';
 import Image from "next/image";
@@ -1054,8 +1055,7 @@ export function CreateMarketForm({
                   (waived for contract deployer)
                 </p>
                 <p>
-                  • <strong className="text-gray-300">Platform Fee:</strong> 2.5%
-                  of winnings
+                  • <strong className="text-gray-300">Platform Fee:</strong> {`${getFlowWagerAddress() === user.addr ? "3% of  market winnings goes to the market creator": "2% of the winnings goes to you, 1% for platform maintenance"}`}
                 </p>
               </div>
             </div>

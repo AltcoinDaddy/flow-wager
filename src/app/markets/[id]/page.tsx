@@ -2,8 +2,8 @@
 
 import { BetDialog } from "@/components/market/bet-dialog";
 import { CountdownTimer } from "@/components/market/countdown-timer";
-import { MarketLoading } from "@/components/market/market-loading";
 import { MarketError } from "@/components/market/market-error";
+import { MarketLoading } from "@/components/market/market-loading";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,17 +11,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
+import { extractImageFromMarket, getOptimizedImageUrl, isValidImageUrl } from "@/lib/flow/market";
 import { useAuth } from "@/providers/auth-provider";
 import { MarketCategory, MarketStatus } from "@/types/market";
-import { getOptimizedImageUrl, isValidImageUrl, extractImageFromMarket } from "@/lib/flow/market";
 import {
   BarChart3,
   Bookmark,
   Calendar,
   CheckCircle,
   Clock,
-  ExternalLink,
   Flag,
+  Flame,
+  Image as ImageIcon,
   Lock,
   Pause,
   RefreshCw,
@@ -29,13 +30,11 @@ import {
   TrendingUp,
   Users,
   Volume2,
-  Zap,
-  Image as ImageIcon,
-  Flame
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function MarketDetailPage() {
   const params = useParams();
@@ -159,28 +158,28 @@ export default function MarketDetailPage() {
     return Object.values(MarketStatus)[status] || "Unknown";
   };
 
-  const getCategoryColor = (category: number) => {
-    switch (category) {
-      case 0: // Politics
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-      case 1: // Sports
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case 2: // Economics
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      case 3: // Technology
-        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-      case 4: // Entertainment
-        return "bg-pink-500/20 text-pink-400 border-pink-500/30";
-      case 5: // Crypto
-        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-      case 6: // Weather
-        return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
-      case 7: // BreakingNews
-        return "bg-red-500/20 text-red-400 border-red-500/30";
-      default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-    }
-  };
+  // const getCategoryColor = (category: number) => {
+  //   switch (category) {
+  //     case 0: // Politics
+  //       return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  //     case 1: // Sports
+  //       return "bg-green-500/20 text-green-400 border-green-500/30";
+  //     case 2: // Economics
+  //       return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  //     case 3: // Technology
+  //       return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+  //     case 4: // Entertainment
+  //       return "bg-pink-500/20 text-pink-400 border-pink-500/30";
+  //     case 5: // Crypto
+  //       return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+  //     case 6: // Weather
+  //       return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
+  //     case 7: // BreakingNews
+  //       return "bg-red-500/20 text-red-400 border-red-500/30";
+  //     default:
+  //       return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+  //   }
+  // };
 
   const handleImageLoad = () => {
     setImageLoading(false);
@@ -245,7 +244,7 @@ export default function MarketDetailPage() {
 
   const volume = parseFloat(market.totalPool);
   const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
-  const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
+  // const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
 
   console.log("Market Data:", market);
 
@@ -836,23 +835,13 @@ export default function MarketDetailPage() {
                   </Avatar>
                   <div className="flex-1">
                     <Link
-                      href={`/profile/${market.creator}`}
+                      href={"#"}
                       className="font-semibold text-[#9b87f5] hover:text-[#8b5cf6] transition-colors"
                     >
                       {market.creator.slice(0, 6)}...{market.creator.slice(-4)}
                     </Link>
                     <p className="text-xs text-gray-400">Market Creator</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all"
-                  >
-                    <Link href={`/profile/${market.creator}`}>
-                      <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </Button>
                 </div>
               </CardContent>
             </Card>

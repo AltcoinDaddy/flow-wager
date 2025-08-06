@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
@@ -10,29 +11,28 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  claimWinningsTransaction,
+  getAllUserTrades,
+  getAllMarkets,
+  getFlowTokenAddress,
+  getMarketCreator,
+  getPlatformStats,
+  getUserDashboardData,
+  getUserPositions,
+} from "@/lib/flow-wager-scripts";
 import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
-import type {
-  Market,
-  MarketStatus
-} from "@/types/market";
+import type { Market, MarketStatus } from "@/types/market";
+import { generateShortNameFromWallet } from "@/utils";
 import * as fcl from "@onflow/fcl";
-import {
-  getAllMarkets,
-  getMarketById,
-  getPlatformStats,
-  getUserProfile,
-  getUserDashboardData,
-  getActiveUserPositions,
-  getMarketCreator,
-  claimWinningsTransaction,
-} from "@/lib/flow-wager-scripts";
 import {
   Activity,
   BarChart3,
   Bell,
   Calendar,
+  CheckCircle,
   DollarSign,
   Download,
   ExternalLink,
@@ -44,11 +44,11 @@ import {
   TrendingDown,
   TrendingUp,
   Trophy,
-  Wallet
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Types for user dashboard data
 interface UserDashboardData {
@@ -70,7 +70,7 @@ interface UserDashboardData {
   watchlistMarkets: Market[];
   platformStats?: any;
   contractInfo?: any;
-  claimableWinnings?: any[]; // Added for claimable winnings
+  claimableWinnings?: any[];
 }
 
 interface UserPosition {
@@ -82,8 +82,10 @@ interface UserPosition {
   currentValue: string;
   pnl: string;
   pnlPercentage: number;
-  status: MarketStatus;
+  status: MarketStatus; // Ensure MarketStatus is a string type in @/types/market
   outcome?: number;
+  claimableAmount?: string;
+  claimed?: boolean;
 }
 
 interface Activity {
@@ -100,9 +102,21 @@ interface Activity {
 interface ActivePosition {
   marketId: string | number;
   marketTitle: string;
+  marketDescription: string;
+  optionA: string;
+  optionB: string;
   optionAShares: string;
   optionBShares: string;
   totalInvested: string;
+  averagePrice: string;
+  endTime: string;
+  currentValue: string;
+  profitLoss: string;
+}
+
+interface UserTrades {
+  activeTrades: ActivePosition[];
+  totalDeposited: string;
 }
 
 function synthesizeRecentActivity(createdMarkets: Market[]): Activity[] {
@@ -119,18 +133,23 @@ function synthesizeRecentActivity(createdMarkets: Market[]): Activity[] {
 function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
   let totalPnL = 0;
   positions.forEach((pos) => {
-    const market = allMarkets.find((m) => m.id.toString() === pos.marketId.toString());
+    const market = allMarkets.find(
+      (m) => m.id.toString() === pos.marketId.toString()
+    );
     if (market && market.resolved) {
-      // Determine if user won or lost
       let payout = 0;
       if (market.outcome !== undefined && market.outcome !== null) {
-        // 0 = OptionA, 1 = OptionB, 2 = Draw, 3 = Cancelled
         if (market.outcome === 0 && parseFloat(pos.optionAShares) > 0) {
-          payout = (parseFloat(pos.optionAShares) / parseFloat(market.totalOptionAShares)) * parseFloat(market.totalPool);
+          payout =
+            (parseFloat(pos.optionAShares) /
+              parseFloat(market.totalOptionAShares)) *
+            parseFloat(market.totalPool);
         } else if (market.outcome === 1 && parseFloat(pos.optionBShares) > 0) {
-          payout = (parseFloat(pos.optionBShares) / parseFloat(market.totalOptionBShares)) * parseFloat(market.totalPool);
+          payout =
+            (parseFloat(pos.optionBShares) /
+              parseFloat(market.totalOptionBShares)) *
+            parseFloat(market.totalPool);
         } else if (market.outcome === 2 || market.outcome === 3) {
-          // Draw or Cancelled: refund minus fee (approximate as full refund here)
           payout = parseFloat(pos.totalInvested);
         }
       }
@@ -140,14 +159,18 @@ function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
   return totalPnL;
 }
 
-function calculateWinRate(positions: UserPosition[], allMarkets: Market[]): number {
+function calculateWinRate(
+  positions: UserPosition[],
+  allMarkets: Market[]
+): number {
   let wins = 0;
   let resolved = 0;
   positions.forEach((pos) => {
-    const market = allMarkets.find((m) => m.id.toString() === pos.marketId.toString());
+    const market = allMarkets.find(
+      (m) => m.id.toString() === pos.marketId.toString()
+    );
     if (market && market.resolved) {
       resolved++;
-      // User wins if they have shares in the winning outcome
       if (
         (market.outcome === 0 && parseFloat(pos.optionAShares) > 0) ||
         (market.outcome === 1 && parseFloat(pos.optionBShares) > 0)
@@ -169,32 +192,31 @@ export default function UserDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [activePositions, setActivePositions] = useState<ActivePosition[]>([]);
+  const [userTrades, setUserTrades] = useState<UserTrades>({
+    activeTrades: [],
+    totalDeposited: "0.0",
+  });
+  const [allPositions, setAllPositions] = useState<UserPosition[]>([]);
   const [allMarkets, setAllMarkets] = useState<Market[]>([]);
-  // Add state for claim winnings
   const [claimingMarketId, setClaimingMarketId] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimSuccess, setClaimSuccess] = useState<string | null>(null);
 
-  // Check if viewing own profile
   const isOwnProfile = currentUser?.addr === userAddress;
+  const isContractOwner = currentUser?.addr === `${getFlowTokenAddress()}`;
 
-  // Check if current user is the contract owner/admin
-  const isContractOwner =
-    currentUser?.addr === process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT;
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize Flow configuration
   const initConfig = async () => {
     flowConfig();
   };
 
-  // Fetch user dashboard data using your flow-wager-scripts
   const fetchUserData = async () => {
     try {
       setError(null);
       await initConfig();
 
-      // Fetch user dashboard data (profile, stats, positions, etc.)
+      // Fetch user dashboard data
       let dashboardDataRaw = null;
       try {
         const userDashboardScript = await getUserDashboardData();
@@ -206,19 +228,18 @@ export default function UserDashboardPage() {
         console.warn("Could not fetch user dashboard data:", err);
       }
 
-      // Fetch platform stats using your flow-wager-scripts
+      // Fetch platform stats
       let platformStats = null;
       try {
         const platformStatsScript = await getPlatformStats();
         platformStats = await fcl.query({
           cadence: platformStatsScript,
         });
-      
       } catch (statsError) {
         console.warn("Could not fetch platform stats:", statsError);
       }
 
-      // Fetch all markets for additional context using your script
+      // Fetch all markets
       let allMarkets: Market[] = [];
       try {
         const allMarketsScript = await getAllMarkets();
@@ -238,32 +259,39 @@ export default function UserDashboardPage() {
           cadence: createdMarketsScript,
           args: (arg, t) => [arg(userAddress, t.Address)],
         });
+
+        console.log(createdMarkets, "This is the Created Markets")
       } catch (err) {
         console.warn("Could not fetch created markets:", err);
       }
 
-      // Transform data with enhanced calculations
+      // Transform data
       let dashboardData: UserDashboardData;
       if (dashboardDataRaw) {
         dashboardData = {
           profile: {
             address: userAddress,
             totalTrades: dashboardDataRaw.stats?.totalMarketsParticipated || 0,
-            totalVolume: dashboardDataRaw.stats?.totalStaked?.toString() || "0.00",
-            totalPnL: dashboardDataRaw.stats?.totalWinnings?.toString() || "0.00",
+            totalVolume:
+              dashboardDataRaw.stats?.totalStaked?.toString() || "0.00",
+            totalPnL:
+              dashboardDataRaw.stats?.totalWinnings?.toString() || "0.00",
             winRate: dashboardDataRaw.stats?.winStreak || 0,
-            activePositions: Object.keys(dashboardDataRaw.positions || {}).length,
-            marketsCreated: dashboardDataRaw.profile?.marketsCreated || 0,
-            joinDate: dashboardDataRaw.profile?.joinedAt?.toString() || Date.now().toString(),
+            activePositions: Object.keys(dashboardDataRaw.positions || {})
+              .length,
+            marketsCreated: dashboardDataRaw.totalMarketsCreated || 0,
+            joinDate:
+              dashboardDataRaw.profile?.joinedAt?.toString() ||
+              Date.now().toString(),
             reputation: dashboardDataRaw.profile?.reputation || 0,
             rank: dashboardDataRaw.profile?.rank || 0,
           },
           positions: Object.values(dashboardDataRaw.positions || {}),
-          recentActivity: [], // Populate if available in dashboardDataRaw
+          recentActivity: synthesizeRecentActivity(createdMarkets),
           createdMarkets: createdMarkets || [],
-          watchlistMarkets: [], // Populate if available in dashboardDataRaw
+          watchlistMarkets: [],
           platformStats,
-          claimableWinnings: dashboardDataRaw.claimableWinnings || [], // Populate claimable winnings
+          claimableWinnings: dashboardDataRaw.claimableWinnings || [],
         };
       } else {
         dashboardData = {
@@ -280,11 +308,10 @@ export default function UserDashboardPage() {
             rank: 0,
           },
           positions: [],
-          recentActivity: [],
+          recentActivity: synthesizeRecentActivity(createdMarkets),
           createdMarkets: createdMarkets || [],
           watchlistMarkets: [],
           platformStats,
-  
           claimableWinnings: [],
         };
       }
@@ -292,7 +319,6 @@ export default function UserDashboardPage() {
       setData(dashboardData);
     } catch (err) {
       console.error("Error fetching user dashboard data:", err);
-      // Provide fallback data on error
       const fallbackData: UserDashboardData = {
         profile: {
           address: userAddress,
@@ -310,6 +336,7 @@ export default function UserDashboardPage() {
         recentActivity: [],
         createdMarkets: [],
         watchlistMarkets: [],
+        platformStats: null,
         claimableWinnings: [],
       };
       setData(fallbackData);
@@ -322,35 +349,83 @@ export default function UserDashboardPage() {
     }
   };
 
-  const fetchActivePositions = async (userAddress: string) => {
+  const fetchUserTrades = async (userAddress: string) => {
     try {
-      const script = await getActiveUserPositions();
+      const script = await getAllUserTrades();
+      const tradesRaw = await fcl.query({
+        cadence: script,
+        args: (arg, t) => [arg(userAddress, t.Address)],
+      });
+      console.log("tradesRaw:", tradesRaw); // Debug log
+      const trades: UserTrades = {
+        activeTrades: (tradesRaw.activeTrades || []).map((trade: any) => ({
+          marketId: trade.marketId?.toString() ?? "",
+          marketTitle: trade.marketTitle ?? "",
+          marketDescription: trade.marketDescription ?? "",
+          optionA: trade.optionA ?? "",
+          optionB: trade.optionB ?? "",
+          optionAShares: trade.optionAShares?.toString() ?? "0",
+          optionBShares: trade.optionBShares?.toString() ?? "0",
+          totalInvested: trade.totalInvested?.toString() ?? "0",
+          averagePrice: trade.averagePrice?.toString() ?? "0",
+          endTime: trade.endTime?.toString() ?? "0",
+          currentValue: trade.currentValue?.toString() ?? "0",
+          profitLoss: trade.profitLoss?.toString() ?? "0",
+        })),
+        totalDeposited: tradesRaw.totalDeposited?.toString() ?? "0.0",
+      };
+      console.log("Parsed trades:", trades); // Debug log
+      setUserTrades(trades);
+    } catch (err) {
+      console.warn("Could not fetch user trades:", err);
+      setUserTrades({ activeTrades: [], totalDeposited: "0.0" });
+    }
+  };
+
+
+  const fetchAllPositions = async (userAddress: string) => {
+    try {
+      const script = await getUserPositions();
       const positionsRaw = await fcl.query({
         cadence: script,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
-      // Map to ActivePosition type, converting numbers to strings if needed
-      const positions: ActivePosition[] = (positionsRaw || []).map((pos: any) => ({
-        marketId: pos.marketId?.toString() ?? "",
-        marketTitle: pos.marketTitle ?? "",
-        optionAShares: pos.optionAShares?.toString() ?? "0",
-        optionBShares: pos.optionBShares?.toString() ?? "0",
-        totalInvested: pos.totalInvested?.toString() ?? "0",
-      }));
-      setActivePositions(positions);
+
+
+      console.log(positionsRaw, "This is the Raw Positions")
+      const positions: UserPosition[] = (positionsRaw || []).map(
+        (pos: any) => ({
+          marketId: pos.marketId?.toString() ?? "",
+          marketTitle: pos.marketTitle ?? "",
+          optionAShares: pos.optionAShares?.toString() ?? "0",
+          optionBShares: pos.optionBShares?.toString() ?? "0",
+          totalInvested: pos.totalInvested?.toString() ?? "0",
+          currentValue: pos.currentValue?.toString() ?? "0",
+          pnl: pos.profitLoss?.toString() ?? "0",
+          pnlPercentage:
+            pos.totalInvested && parseFloat(pos.totalInvested) > 0
+              ? (parseFloat(pos.profitLoss) / parseFloat(pos.totalInvested)) *
+                100
+              : 0,
+          status: pos.status?.rawValue ?? "Unknown",
+          claimableAmount: pos.claimableAmount?.toString() ?? "0",
+          claimed: pos.claimed ?? false,
+        })
+      );
+      setAllPositions(positions);
     } catch (err) {
-      setActivePositions([]);
+      console.warn("Could not fetch all positions:", err);
+      setAllPositions([]);
     }
   };
 
-  // Handle refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchUserData();
-    await fetchActivePositions(userAddress);
+    await fetchUserTrades(userAddress);
+    await fetchAllPositions(userAddress);
   };
 
-  // Export user data
   const handleExportData = async () => {
     if (!data) return;
 
@@ -358,12 +433,14 @@ export default function UserDashboardPage() {
       const exportData = {
         userProfile: data.profile,
         createdMarkets: data.createdMarkets,
-        positions: data.positions,
+        positions: allPositions,
+        activeTrades: userTrades.activeTrades,
+        totalDeposited: userTrades.totalDeposited,
         recentActivity: data.recentActivity,
         platformStats: data.platformStats,
         contractInfo: data.contractInfo,
         exportedAt: new Date().toISOString(),
-        contractAddress: process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT,
+        contractAddress: `${getFlowTokenAddress()}`,
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -383,15 +460,28 @@ export default function UserDashboardPage() {
     }
   };
 
-  // Fetch data on mount
+  // Polling for constant data fetching
   useEffect(() => {
     if (userAddress) {
       fetchUserData();
-      fetchActivePositions(userAddress);
+      fetchUserTrades(userAddress);
+      fetchAllPositions(userAddress);
+
+      // Poll every 30 seconds
+      pollingIntervalRef.current = setInterval(() => {
+        fetchUserData();
+        fetchUserTrades(userAddress);
+        fetchAllPositions(userAddress);
+      }, 30000);
+
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+        }
+      };
     }
   }, [userAddress]);
 
-  // Utility functions
   const formatCurrency = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
     if (isNaN(num)) return "0";
@@ -440,12 +530,10 @@ export default function UserDashboardPage() {
     }
   };
 
-  // Loading state
   if (loading) {
     return <MarketLoading />;
   }
 
-  // Error state
   if (error || !data) {
     return (
       <MarketError error={error || "User not found"} onRetry={fetchUserData} />
@@ -453,9 +541,8 @@ export default function UserDashboardPage() {
   }
 
   const recentActivity = synthesizeRecentActivity(data?.createdMarkets || []);
-  const totalPnL = calculatePnL(data?.positions || [], allMarkets);
-  const totalTrades = data.positions.length; // or data.profile.totalTrades if your backend provides it
-  const winRate = calculateWinRate(data.positions, allMarkets);
+  const totalPnL = calculatePnL(allPositions || [], allMarkets);
+  const winRate = calculateWinRate(allPositions, allMarkets);
   const reputation = data.profile.reputation;
 
   return (
@@ -467,7 +554,7 @@ export default function UserDashboardPage() {
             <div className="flex items-center space-x-6">
               <Avatar className="h-20 w-20 border-2 border-[#9b87f5]/20">
                 <AvatarImage
-                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userAddress}`}
+                  src={`https://api.dicebear.com/9.x/pixel-art/png?seed=${userAddress}&backgroundColor=ff5733,00d4ff,9b87f5&size=256&scale=80&radius=10`}
                 />
                 <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5] text-xl font-bold">
                   {userAddress.slice(2, 4).toUpperCase()}
@@ -476,7 +563,7 @@ export default function UserDashboardPage() {
 
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">
-                  {isOwnProfile ? "Your Dashboard" : "User Profile"}
+                  {isOwnProfile ? `${generateShortNameFromWallet(userAddress)} Dashboard` : "User Profile"}
                 </h1>
                 <div className="flex items-center space-x-2 mb-3">
                   <code className="text-[#9b87f5] bg-gray-800/50 px-2 py-1 rounded text-sm font-mono">
@@ -512,9 +599,7 @@ export default function UserDashboardPage() {
                     <Star className="h-4 w-4 text-[#9b87f5]" />
                     <span>{data.profile.reputation.toFixed(1)} reputation</span>
                   </div>
-                  {/* Show admin badge for contract owner */}
-                  {userAddress ===
-                    process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT && (
+                  {userAddress === `${getFlowTokenAddress}` && (
                     <div className="flex items-center space-x-1">
                       <Settings className="h-4 w-4 text-green-400" />
                       <span className="text-green-400 font-medium">
@@ -522,7 +607,6 @@ export default function UserDashboardPage() {
                       </span>
                     </div>
                   )}
-                  {/* Show platform stats if available */}
                   {data.platformStats && (
                     <div className="flex items-center space-x-1">
                       <Activity className="h-4 w-4 text-blue-400" />
@@ -535,13 +619,12 @@ export default function UserDashboardPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-center space-x-3 gap-4">
               <Button
                 variant="outline"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
+                className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#8b5cf6]  hover:to-[#7c3aed] text-white w-full sm:w-auto border-0 hover:text-white"
               >
                 <RefreshCw
                   className={`h-4 w-4 mr-2 ${
@@ -555,18 +638,17 @@ export default function UserDashboardPage() {
                 <Button
                   variant="outline"
                   onClick={handleExportData}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
+                  className="border-gray-700 text-gray-300 hover:text-gray-300 bg-[#1A1F2C] hover:bg-[#1A1F2C] w-full sm:w-auto"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
               )}
 
-              {/* Show admin panel link for contract owner */}
               {isOwnProfile && isContractOwner && (
                 <Button
                   asChild
-                  className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white w-full sm:w-auto"
+                  className="bg-gradient-to-r from-[#8b5cf6] to-[#7c3aed] hover:from-[#8b5cf6]  hover:to-[#7c3aed] text-white w-full sm:w-auto border-0 hover:text-white"
                 >
                   <Link href="/admin">
                     <Settings className="h-4 w-4 mr-2" />
@@ -578,7 +660,7 @@ export default function UserDashboardPage() {
           </div>
         </div>
 
-        {/* Enhanced Statistics Cards with Platform Data */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
@@ -591,11 +673,9 @@ export default function UserDashboardPage() {
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
-                {totalTrades}
+                {data.profile.totalTrades}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Across all markets
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Across all markets</p>
             </CardContent>
           </Card>
 
@@ -606,14 +686,14 @@ export default function UserDashboardPage() {
                   <DollarSign className="h-5 w-5 text-green-400" />
                 </div>
                 <span className="text-sm font-medium text-gray-400">
-                  Total Volume
+                  Current Deposit
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
-                {formatCurrency(data.profile.totalVolume)} FLOW
+                {formatCurrency(userTrades.totalDeposited)} FLOW
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                From created markets
+                Total invested in markets
               </p>
             </CardContent>
           </Card>
@@ -623,16 +703,12 @@ export default function UserDashboardPage() {
               <div className="flex items-center space-x-3 mb-3">
                 <div
                   className={`p-2 rounded-lg ${
-                    totalPnL >= 0
-                      ? "bg-green-500/20"
-                      : "bg-red-500/20"
+                    totalPnL >= 0 ? "bg-green-500/20" : "bg-red-500/20"
                   }`}
                 >
                   <TrendingUp
                     className={`h-5 w-5 ${
-                      totalPnL >= 0
-                        ? "text-green-400"
-                        : "text-red-400"
+                      totalPnL >= 0 ? "text-green-400" : "text-red-400"
                     }`}
                   />
                 </div>
@@ -640,17 +716,13 @@ export default function UserDashboardPage() {
               </div>
               <p
                 className={`text-2xl font-bold ${
-                  totalPnL >= 0
-                    ? "text-green-400"
-                    : "text-red-400"
+                  totalPnL >= 0 ? "text-green-400" : "text-red-400"
                 }`}
               >
                 {totalPnL >= 0 ? "+" : ""}
                 {formatCurrency(totalPnL)} FLOW
               </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Trading profit/loss
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Trading profit/loss</p>
             </CardContent>
           </Card>
 
@@ -667,14 +739,11 @@ export default function UserDashboardPage() {
               <p className="text-2xl font-bold text-white">
                 {data.createdMarkets.length}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Markets Created
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Markets Created</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Claimable Winnings Section */}
         {data.claimableWinnings && data.claimableWinnings.length > 0 && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 my-6">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
@@ -691,23 +760,39 @@ export default function UserDashboardPage() {
               </thead>
               <tbody>
                 {data.claimableWinnings.map((win: any) => {
-                  const market = allMarkets.find((m) => m.id.toString() === win.marketId.toString());
+                  const market = allMarkets.find(
+                    (m) => m.id.toString() === win.marketId.toString()
+                  );
                   return (
                     <tr key={win.marketId} className="border-b border-gray-800">
-                      <td className="px-2 py-2 text-white">{market ? market.title : `Market #${win.marketId}`}</td>
-                      <td className="px-2 py-2 text-white">{parseFloat(win.amount).toFixed(2)} FLOW</td>
+                      <td className="px-2 py-2 text-white">
+                        {market ? market.title : `Market #${win.marketId}`}
+                      </td>
+                      <td className="px-2 py-2 text-white">
+                        {parseFloat(win.amount).toFixed(2)} FLOW
+                      </td>
                       <td className="px-2 py-2 text-white">
                         <Button
                           size="sm"
-                          className="text-white"
-                          disabled={claimingMarketId === win.marketId.toString()}
+                          className="text-white bg-black hover:bg-black"
+                          disabled={
+                            claimingMarketId === win.marketId.toString() ||
+                            parseFloat(win.amount) <= 0
+                          }
                           onClick={async () => {
+                            // Check if already claimed before proceeding
+                            if (win.claimed === true) {
+                              setClaimError("Winnings already claimed");
+                              return;
+                            }
+
                             setClaimingMarketId(win.marketId.toString());
                             setClaimError(null);
                             setClaimSuccess(null);
                             try {
                               const txScript = await claimWinningsTransaction();
-                              const authorization = fcl.currentUser().authorization;
+                              const authorization =
+                                fcl.currentUser.authorization;
                               await fcl.mutate({
                                 cadence: txScript,
                                 args: (arg, t) => [arg(win.marketId, t.UInt64)],
@@ -718,14 +803,21 @@ export default function UserDashboardPage() {
                               });
                               setClaimSuccess("Winnings claimed successfully!");
                               setTimeout(() => setClaimSuccess(null), 2000);
+                              await fetchUserData();
+                              await fetchUserTrades(userAddress);
+                              await fetchAllPositions(userAddress);
                             } catch (err: any) {
-                              setClaimError(err.message || "Failed to claim winnings");
+                              setClaimError(
+                                err.message || "Failed to claim winnings"
+                              );
                             } finally {
                               setClaimingMarketId(null);
                             }
                           }}
                         >
-                          {claimingMarketId === win.marketId.toString() ? "Claiming..." : "Claim Winnings"}
+                          {claimingMarketId === win.marketId.toString()
+                            ? "Claiming..."
+                            : "Claim Winnings"}
                         </Button>
                       </td>
                     </tr>
@@ -733,12 +825,15 @@ export default function UserDashboardPage() {
                 })}
               </tbody>
             </table>
-            {claimError && <div className="text-red-400 mb-2">{claimError}</div>}
-            {claimSuccess && <div className="text-green-400 mb-2">{claimSuccess}</div>}
+            {claimError && (
+              <div className="text-red-400 mb-2">{claimError}</div>
+            )}
+            {claimSuccess && (
+              <div className="text-green-400 mb-2">{claimSuccess}</div>
+            )}
           </div>
         )}
 
-        {/* Platform Stats Banner for Contract Info */}
         {data.contractInfo && (
           <Card className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
             <CardContent className="p-4">
@@ -777,7 +872,6 @@ export default function UserDashboardPage() {
           </Card>
         )}
 
-        {/* Main Content Tabs */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -794,7 +888,7 @@ export default function UserDashboardPage() {
               value="positions"
               className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
             >
-              Positions ({data.positions.length})
+              Positions ({allPositions.length})
             </TabsTrigger>
             <TabsTrigger
               value="activity"
@@ -812,36 +906,32 @@ export default function UserDashboardPage() {
               value="trades"
               className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
             >
-              Active Trades ({activePositions.length})
+              Active Trades ({userTrades.activeTrades.length})
             </TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Info Banner for Limited Functionality */}
-            {data.positions.length === 0 &&
-              data.recentActivity.length === 0 && (
-                <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/20">
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-3">
-                      <Bell className="h-5 w-5 text-yellow-400" />
-                      <div>
-                        <p className="text-sm font-medium text-yellow-400">
-                          Limited Dashboard Features
-                        </p>
-                        <p className="text-xs text-gray-300">
-                          Position tracking and trading history will be
-                          available once enhanced user tracking is implemented
-                          in the smart contract.
-                        </p>
-                      </div>
+            {allPositions.length === 0 && data.recentActivity.length === 0 && (
+              <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <Bell className="h-5 w-5 text-yellow-400" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-400">
+                        Limited Dashboard Features
+                      </p>
+                      <p className="text-xs text-gray-300">
+                        Position tracking and trading history will be available
+                        once enhanced user tracking is implemented in the smart
+                        contract.
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid lg:grid-cols-2 gap-6">
-              {/* Recent Activity */}
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
                   <CardTitle className="text-white flex items-center justify-between">
@@ -861,7 +951,9 @@ export default function UserDashboardPage() {
                       <div className="text-center py-8 text-gray-400">
                         <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p>No recent activity</p>
-                        <p className="text-xs mt-2">Activity tracking coming soon</p>
+                        <p className="text-xs mt-2">
+                          Activity tracking coming soon
+                        </p>
                       </div>
                     ) : (
                       data.recentActivity.slice(0, 5).map((activity) => (
@@ -911,7 +1003,6 @@ export default function UserDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Performance Breakdown */}
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
                   <CardTitle className="text-white">
@@ -948,7 +1039,7 @@ export default function UserDashboardPage() {
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-800/50">
                     <div className="text-center">
                       <p className="text-2xl font-bold text-white">
-                        {totalTrades}
+                        {data.profile.totalTrades}
                       </p>
                       <p className="text-xs text-gray-400">Total Trades</p>
                     </div>
@@ -963,7 +1054,6 @@ export default function UserDashboardPage() {
               </Card>
             </div>
 
-            {/* Quick Actions */}
             {isOwnProfile && (
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
@@ -980,8 +1070,6 @@ export default function UserDashboardPage() {
                         Browse Markets
                       </Link>
                     </Button>
-
-                    {/* Only show Create Market button for contract owner */}
                     {isContractOwner && (
                       <Button
                         variant="outline"
@@ -994,8 +1082,16 @@ export default function UserDashboardPage() {
                         </Link>
                       </Button>
                     )}
-
-                    {/* Only show Admin Dashboard button for contract owner */}
+                    <Button
+                      variant="outline"
+                      className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] justify-start w-full"
+                      asChild
+                    >
+                      <Link href={`/dashboard/${userAddress}/resolve`}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Submit Resolution Evidence
+                      </Link>
+                    </Button>
                     {isContractOwner && (
                       <Button
                         variant="outline"
@@ -1014,24 +1110,21 @@ export default function UserDashboardPage() {
             )}
           </TabsContent>
 
-          {/* Positions Tab */}
           <TabsContent value="positions">
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
               <CardHeader>
-                <CardTitle className="text-white">Active Positions</CardTitle>
+                <CardTitle className="text-white">All Positions</CardTitle>
               </CardHeader>
               <CardContent>
-                {data.positions.length === 0 ? (
+                {allPositions.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
                     <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium">No active positions</p>
-                    <p className="text-sm">
-                      Position tracking will be available when implemented in the smart contract
-                    </p>
+                    <p className="text-lg font-medium">No positions</p>
+                    <p className="text-sm">No positions found for this user</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {data.positions.map((position) => (
+                    {allPositions.map((position) => (
                       <div
                         key={position.marketId}
                         className="p-4 border border-gray-800/50 rounded-xl hover:bg-gray-800/20 transition-colors"
@@ -1043,18 +1136,22 @@ export default function UserDashboardPage() {
                           >
                             {position.marketTitle}
                           </Link>
-                          <Badge
-                            className={`${
-                              position.pnlPercentage >= 0
-                                ? "bg-green-500/20 text-green-400 border-green-500/30"
-                                : "bg-red-500/20 text-red-400 border-red-500/30"
-                            }`}
-                          >
-                            {position.pnlPercentage >= 0 ? "+" : ""}
-                            {Number.isFinite(Number(position.pnlPercentage)) ? Number(position.pnlPercentage).toFixed(1) : "0.0"}%
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge
+                              className={`${
+                                parseFloat(position.pnl) >= 0
+                                  ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                  : "bg-red-500/20 text-red-400 border-red-500/30"
+                              }`}
+                            >
+                              {parseFloat(position.pnl) >= 0 ? "+" : ""}
+                              {formatCurrency(position.pnl)} FLOW
+                            </Badge>
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                              {position.status}
+                            </Badge>
+                          </div>
                         </div>
-
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
                             <p className="text-gray-400">Option A Shares</p>
@@ -1078,7 +1175,7 @@ export default function UserDashboardPage() {
                             <p className="text-gray-400">Current Value</p>
                             <p
                               className={`font-medium ${
-                                position.pnlPercentage >= 0
+                                parseFloat(position.pnl) >= 0
                                   ? "text-green-400"
                                   : "text-red-400"
                               }`}
@@ -1086,6 +1183,19 @@ export default function UserDashboardPage() {
                               {formatCurrency(position.currentValue)} FLOW
                             </p>
                           </div>
+                          {parseFloat(position.claimableAmount || "0") > 0 && (
+                            <div>
+                              <p className="text-gray-400">Claimable</p>
+                              <p className="text-white font-medium">
+                                {formatCurrency(`${position.claimableAmount}`)}{" "}
+                                FLOW
+                              </p>
+                              <p className="text-gray-400">Claimed</p>
+                              <p className="text-white font-medium">
+                                {position.claimed ? "Yes" : "No"}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1095,7 +1205,6 @@ export default function UserDashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* Activity Tab */}
           <TabsContent value="activity">
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
               <CardHeader>
@@ -1107,7 +1216,9 @@ export default function UserDashboardPage() {
                     <div className="text-center py-8 text-gray-400">
                       <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>No recent activity</p>
-                      <p className="text-xs mt-2">Activity tracking coming soon</p>
+                      <p className="text-xs mt-2">
+                        Activity tracking coming soon
+                      </p>
                     </div>
                   ) : (
                     recentActivity.slice(0, 5).map((activity) => (
@@ -1123,7 +1234,11 @@ export default function UserDashboardPage() {
                             {activity.marketTitle}
                           </p>
                           <div className="flex items-center space-x-2 mt-1">
-                            <span className={`text-sm ${getActivityColor(activity.type)}`}>
+                            <span
+                              className={`text-sm ${getActivityColor(
+                                activity.type
+                              )}`}
+                            >
                               Created market
                             </span>
                           </div>
@@ -1139,7 +1254,6 @@ export default function UserDashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* Created Markets Tab */}
           <TabsContent value="markets">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -1147,11 +1261,8 @@ export default function UserDashboardPage() {
                   <h3 className="text-lg font-semibold text-white">
                     Created Markets
                   </h3>
-                  <p className="text-gray-400">
-                    Markets created by this user
-                  </p>
+                  <p className="text-gray-400">Markets created by this user</p>
                 </div>
-                {/* Only show Create Market button for contract owner viewing their own profile */}
                 {isOwnProfile && (
                   <Button
                     asChild
@@ -1179,11 +1290,10 @@ export default function UserDashboardPage() {
                       No markets created
                     </h3>
                     <p className="text-gray-400 mb-4">
-                      {isOwnProfile 
-                        ? "You haven't created any markets yet" 
+                      {isOwnProfile
+                        ? "You haven't created any markets yet"
                         : "This user hasn't created any markets yet"}
                     </p>
-                    {/* Only show Create Market button for contract owner viewing their own profile */}
                     {isOwnProfile && (
                       <Button
                         asChild
@@ -1200,53 +1310,95 @@ export default function UserDashboardPage() {
             </div>
           </TabsContent>
 
-          {/* Active Trades Tab */}
           <TabsContent value="trades">
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
               <CardHeader>
                 <CardTitle className="text-white">Active Trades</CardTitle>
               </CardHeader>
               <CardContent>
-                {activePositions.length === 0 ? (
+                {userTrades.activeTrades.length === 0 ? (
                   <div className="text-center py-12 text-gray-400">
                     <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-lg font-medium">No active trades</p>
                     <p className="text-sm">
-                      Active trade tracking will be available when implemented in the smart contract
+                      No active trades found for this user
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {activePositions.map((position) => (
+                    {userTrades.activeTrades.map((trade) => (
                       <div
-                        key={position.marketId}
+                        key={trade.marketId}
                         className="p-4 border border-gray-800/50 rounded-xl hover:bg-gray-800/20 transition-colors"
                       >
                         <div className="flex flex-col sm:flex-row items-center justify-between mb-3">
                           <Link
-                            href={`/markets/${position.marketId}`}
+                            href={`/markets/${trade.marketId}`}
                             className="font-medium text-white hover:text-[#9b87f5] transition-colors line-clamp-1"
                           >
-                            {position.marketTitle}
+                            {trade.marketTitle}
                           </Link>
+                          <Badge
+                            className={`${
+                              parseFloat(trade.profitLoss) >= 0
+                                ? "bg-green-500/20 text-green-400 border-green-500/30"
+                                : "bg-red-500/20 text-red-400 border-red-500/30"
+                            }`}
+                          >
+                            {parseFloat(trade.profitLoss) >= 0 ? "+" : ""}
+                            {formatCurrency(trade.profitLoss)} FLOW
+                          </Badge>
                         </div>
+                        <p className="text-sm text-gray-400 mb-2 line-clamp-2">
+                          {trade.marketDescription}
+                        </p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <p className="text-gray-400">Option A Shares</p>
+                            <p className="text-gray-400">Option A</p>
                             <p className="text-white font-medium">
-                              {formatCurrency(position.optionAShares)}
+                              {trade.optionA}
+                            </p>
+                            <p className="text-gray-400">Shares</p>
+                            <p className="text-white font-medium">
+                              {formatCurrency(trade.optionAShares)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-gray-400">Option B Shares</p>
+                            <p className="text-gray-400">Option B</p>
                             <p className="text-white font-medium">
-                              {formatCurrency(position.optionBShares)}
+                              {trade.optionB}
+                            </p>
+                            <p className="text-gray-400">Shares</p>
+                            <p className="text-white font-medium">
+                              {formatCurrency(trade.optionBShares)}
                             </p>
                           </div>
                           <div>
                             <p className="text-gray-400">Invested</p>
                             <p className="text-white font-medium">
-                              {formatCurrency(position.totalInvested)} FLOW
+                              {formatCurrency(trade.totalInvested)} FLOW
+                            </p>
+                            <p className="text-gray-400">Avg. Price</p>
+                            <p className="text-white font-medium">
+                              {formatCurrency(trade.averagePrice)} FLOW
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-gray-400">Current Value</p>
+                            <p
+                              className={`font-medium ${
+                                parseFloat(trade.profitLoss) >= 0
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {formatCurrency(trade.currentValue)} FLOW
+                            </p>
+                            <p className="text-gray-400">Ends</p>
+                            <p className="text-white font-medium">
+                              {new Date(
+                                parseFloat(trade.endTime) * 1000
+                              ).toLocaleString()}
                             </p>
                           </div>
                         </div>

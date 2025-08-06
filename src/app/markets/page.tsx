@@ -80,33 +80,16 @@ export default function MarketsPage() {
             </div>
 
             {/* Contract Owner Only Create Market Button */}
-            <OwnerOnly
-              fallback={
-                <div className="text-center">
-                  <Button
-                    disabled
-                    variant="outline"
-                    className="text-gray-500 border-gray-700 bg-[#1A1F2C] hover:bg-[#1A1F2C]"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Owner Only
-                  </Button>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Only contract owner can create markets
-                  </p>
-                </div>
-              }
-            >
+            
               <Button
                 asChild
                 className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg border-0"
               >
-                <Link href="/admin/create">
+                <Link href="/dashboard/create">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Market
                 </Link>
               </Button>
-            </OwnerOnly>
           </div>
 
           {/* Platform Statistics from Smart Contract */}
