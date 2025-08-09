@@ -698,33 +698,7 @@ export default function UserDashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-3 mb-3">
-                <div
-                  className={`p-2 rounded-lg ${
-                    totalPnL >= 0 ? "bg-green-500/20" : "bg-red-500/20"
-                  }`}
-                >
-                  <TrendingUp
-                    className={`h-5 w-5 ${
-                      totalPnL >= 0 ? "text-green-400" : "text-red-400"
-                    }`}
-                  />
-                </div>
-                <span className="text-sm font-medium text-gray-400">P&L</span>
-              </div>
-              <p
-                className={`text-2xl font-bold ${
-                  totalPnL >= 0 ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {totalPnL >= 0 ? "+" : ""}
-                {formatCurrency(totalPnL)} FLOW
-              </p>
-              <p className="text-xs text-gray-400 mt-1">Trading profit/loss</p>
-            </CardContent>
-          </Card>
+  
 
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
