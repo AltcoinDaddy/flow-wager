@@ -14,26 +14,25 @@ const footerSections: FooterSection[] = [
     {
       title: "Product",
       links: [
-        { label: "How it Works", href: "/how-it-works" },
+        { label: "How it Works", href: "/" },
         { label: "Markets", href: "/markets" },
-        { label: "Create a Market", href: "/create" },
+        { label: "Create a Market", href: "/dashboard/create" },
       ],
     },
     {
       title: "Terms of Use",
       links: [
 
-        { label: "Privacy Policy", href: "/" },
-        { label: "Terms & Condition", href: "/" },
-        { label: "Learn", href: "/" },
+        { label: "Privacy Policy", href: "/privacy-policy" },
+        { label: "Terms & Condition", href: "/terms" },
+        { label: "Learn", href: "/learn" },
       ],
     },
   ];
 
 const socials: FooterLink[] = [
   { label: "X", href: "https://x.com/flowwager" },
-  { label: "Discord", href: "#" },
-  { label: "GitHub", href: "#" },
+  { label: "Discord", href: "https://discord.gg/DA3xrUrADa" }
 ];
 
 export const Footer = () => {
