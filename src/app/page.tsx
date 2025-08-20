@@ -101,6 +101,10 @@ export default function HomePage() {
     allMarketsCount: allMarkets.length,
   });
 
+
+
+   console.log("This is the Featured Markets", featuredMarkets)
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
       {/* Hero Section - Banner Style */}
@@ -372,7 +376,13 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredMarkets.map((market) => (
-                <MarketCard key={market.id} market={market} />
+                <MarketCard
+                  key={market.id}
+                  market={{
+                    ...market,
+                    imageUrl: market.imageURI,
+                  }}
+                />
               ))}
             </div>
           )}

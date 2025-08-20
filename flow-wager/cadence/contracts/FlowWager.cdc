@@ -1030,8 +1030,6 @@ access(all) fun createMarket(
         pre {
             !self.paused: "Contract is paused for migration/upgrade"
             UInt64(FlowWager.markets.length) < FlowWager.maxMarkets: "Market cap reached"
-            title.length > 0 && title.length <= 100: "Title must be 1-100 characters"
-            description.length > 0 && description.length <= 500: "Description must be 1-500 characters"
             optionA.length > 0 && optionA.length <= 50: "Option A must be 1-50 characters"
             optionB.length > 0 && optionB.length <= 50: "Option B must be 1-50 characters"
             endTime > getCurrentBlock().timestamp: "End time must be in the future"

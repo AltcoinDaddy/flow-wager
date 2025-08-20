@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { BetDialog } from "@/components/market/bet-dialog";
@@ -11,7 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketDetail } from "@/hooks/use-market-detail";
-import { extractImageFromMarket, getOptimizedImageUrl, isValidImageUrl } from "@/lib/flow/market";
+import {
+  extractImageFromMarket,
+  getOptimizedImageUrl,
+  isValidImageUrl,
+} from "@/lib/flow/market";
 import { useAuth } from "@/providers/auth-provider";
 import { MarketCategory, MarketStatus } from "@/types/market";
 import {
@@ -30,7 +36,7 @@ import {
   TrendingUp,
   Users,
   Volume2,
-  Zap
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -89,7 +95,11 @@ export default function MarketDetailPage() {
   }
 
   // Extract image from market data
-  const finalImageURI = market.imageURI || (market.description ? extractImageFromMarket(market.description).imageURI : undefined);
+  const finalImageURI =
+    market.imageURI ||
+    (market.description
+      ? extractImageFromMarket(market.description).imageURI
+      : undefined);
   const optimizedImageUrl = getOptimizedImageUrl(finalImageURI, 800, 400);
   const hasValidImage = isValidImageUrl(optimizedImageUrl) && !imageError;
 
@@ -106,17 +116,17 @@ export default function MarketDetailPage() {
   const getActualMarketStatus = () => {
     const now = Date.now();
     const endTime = parseInt(market.endTime) * 1000;
-    
+
     // If resolved, always show resolved
     if (market.status === MarketStatus.Resolved || market.resolved) {
       return MarketStatus.Resolved;
     }
-    
+
     // If past end time but not resolved, it's pending resolution
     if (endTime <= now && market.status === MarketStatus.Active) {
       return MarketStatus.Paused; // Using Paused to represent "Pending Resolution"
     }
-    
+
     // Otherwise use contract status
     return market.status;
   };
@@ -124,7 +134,8 @@ export default function MarketDetailPage() {
   const actualStatus = getActualMarketStatus();
 
   // Check if market allows betting
-  const isBettingDisabled = actualStatus !== MarketStatus.Active || 
+  const isBettingDisabled =
+    actualStatus !== MarketStatus.Active ||
     (market.endTime && parseInt(market.endTime) * 1000 <= Date.now());
 
   const formatCurrency = (value: string | number) => {
@@ -152,7 +163,10 @@ export default function MarketDetailPage() {
 
   const getStatusName = (status: number) => {
     // Override status names for better UX
-    if (status === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()) {
+    if (
+      status === MarketStatus.Paused &&
+      parseInt(market.endTime) * 1000 <= Date.now()
+    ) {
       return "Pending Resolution";
     }
     return Object.values(MarketStatus)[status] || "Unknown";
@@ -193,7 +207,7 @@ export default function MarketDetailPage() {
   const handleBet = (side: "optionA" | "optionB") => {
     // Double check betting is allowed
     if (isBettingDisabled) return;
-    
+
     setSelectedSide(side);
     setBetDialogOpen(true);
   };
@@ -233,7 +247,11 @@ export default function MarketDetailPage() {
     if (actualStatus === MarketStatus.Resolved) {
       return "Market has been resolved";
     }
-    if (market.endTime && parseInt(market.endTime) * 1000 <= Date.now() && actualStatus !== MarketStatus.Resolved) {
+    if (
+      market.endTime &&
+      parseInt(market.endTime) * 1000 <= Date.now() &&
+      actualStatus !== MarketStatus.Resolved
+    ) {
       return "Market has ended - awaiting resolution";
     }
     if (actualStatus === MarketStatus.Paused) {
@@ -246,7 +264,7 @@ export default function MarketDetailPage() {
   const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
   // const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
 
-  console.log("Market Data:", market);
+  console.log("Market Data:", market.imageUrl);
 
   return (
     <div className="min-h-screen bg-[#0A0C14]">
@@ -286,30 +304,18 @@ export default function MarketDetailPage() {
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center space-x-4">
                 {/* ✅ Small logo-style image */}
-                {hasValidImage ? (
-                  <div className="relative w-16 h-16 flex-shrink-0">
-                    {imageLoading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-xl">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9b87f5]"></div>
-                      </div>
-                    )}
-                    <img
-                      src={optimizedImageUrl}
-                      alt={market.title}
-                      className={`w-full h-full object-cover rounded-xl transition-all duration-300 ${
-                        imageLoading ? 'opacity-0' : 'opacity-100'
-                      }`}
-                      onLoad={handleImageLoad}
-                      onError={handleImageError}
-                      loading="lazy"
-                    />
-                  </div>
-                ) : (
-                  // ✅ Placeholder logo
-                  <div className="w-16 h-16 flex-shrink-0 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-xl flex items-center justify-center border border-gray-700/50">
-                    <ImageIcon className="h-7 w-7 text-gray-600" />
-                  </div>
-                )}
+                <div className="relative w-16 h-16 flex-shrink-0">
+                  {/* {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-xl">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9b87f5]"></div>
+                    </div>
+                  )} */}
+                  <img
+                    src={market.imageUrl}
+                    alt={market.title}
+                    className={`w-full h-full object-cover rounded-xl transition-all duration-300`}
+                  />
+                </div>
 
                 <div className="flex items-center space-x-3">
                   <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium">
@@ -326,7 +332,8 @@ export default function MarketDetailPage() {
                         ? "bg-green-500/20 text-green-400 border-green-500/30 font-medium"
                         : actualStatus === MarketStatus.Resolved
                         ? "bg-blue-500/20 text-blue-400 border-blue-500/30 font-medium"
-                        : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
+                        : actualStatus === MarketStatus.Paused &&
+                          parseInt(market.endTime) * 1000 <= Date.now()
                         ? "bg-orange-500/20 text-orange-400 border-orange-500/30 font-medium"
                         : "font-medium"
                     }
@@ -465,17 +472,21 @@ export default function MarketDetailPage() {
                 </div>
 
                 {/* Show resolved outcome if available */}
-                {actualStatus === MarketStatus.Resolved && market.outcome !== undefined && (
-                  <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <CheckCircle className="h-5 w-5 text-blue-400" />
-                      <span className="font-semibold text-blue-400">Market Resolved</span>
+                {actualStatus === MarketStatus.Resolved &&
+                  market.outcome !== undefined && (
+                    <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <CheckCircle className="h-5 w-5 text-blue-400" />
+                        <span className="font-semibold text-blue-400">
+                          Market Resolved
+                        </span>
+                      </div>
+                      <p className="text-white font-bold text-lg">
+                        Winner:{" "}
+                        {market.outcome === 0 ? market.optionA : market.optionB}
+                      </p>
                     </div>
-                    <p className="text-white font-bold text-lg">
-                      Winner: {market.outcome === 0 ? market.optionA : market.optionB}
-                    </p>
-                  </div>
-                )}
+                  )}
 
                 {/* Enhanced User Position Display */}
                 {userPosition && (
@@ -518,7 +529,9 @@ export default function MarketDetailPage() {
                   <div className="bg-gradient-to-r from-gray-700/10 to-gray-600/10 rounded-xl p-4 border border-gray-600/20">
                     <div className="flex items-center space-x-2 text-gray-400">
                       <Lock className="h-4 w-4" />
-                      <span className="text-sm font-medium">{getDisabledMessage()}</span>
+                      <span className="text-sm font-medium">
+                        {getDisabledMessage()}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -777,7 +790,8 @@ export default function MarketDetailPage() {
                         ? "bg-green-500/20 text-green-400 border-green-500/30"
                         : actualStatus === MarketStatus.Resolved
                         ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                        : actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now()
+                        : actualStatus === MarketStatus.Paused &&
+                          parseInt(market.endTime) * 1000 <= Date.now()
                         ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
                         : "bg-gray-700/50 text-gray-300"
                     }`}
@@ -795,13 +809,14 @@ export default function MarketDetailPage() {
                       </p>
                     </div>
                   )}
-                  {actualStatus === MarketStatus.Paused && parseInt(market.endTime) * 1000 <= Date.now() && (
-                    <div className="text-center bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
-                      <p className="text-orange-400 font-semibold text-sm">
-                        Market has ended and is awaiting admin resolution
-                      </p>
-                    </div>
-                  )}
+                  {actualStatus === MarketStatus.Paused &&
+                    parseInt(market.endTime) * 1000 <= Date.now() && (
+                      <div className="text-center bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
+                        <p className="text-orange-400 font-semibold text-sm">
+                          Market has ended and is awaiting admin resolution
+                        </p>
+                      </div>
+                    )}
                   {actualStatus === MarketStatus.Resolved &&
                     market.outcome !== undefined &&
                     market.outcome !== null && (

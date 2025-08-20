@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @next/next/no-img-element */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,7 +42,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
   }, [market]);
 
   // Use extracted image URI or fallback to market.imageURI
-  const finalImageURI = extractedImageURI || market.imageURI;
+  const finalImageURI =  market.imageUrl
   
   // Get optimized image URL - smaller size for compact display
   const optimizedImageUrl = getOptimizedImageUrl(finalImageURI, 120, 120);
@@ -153,7 +155,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({
                         </div>
                       )}
                       <img
-                        src={optimizedImageUrl}
+                        src={market.imageUrl}
                         alt={market.title}
                         className={`w-full h-full object-cover rounded-lg transition-all duration-300 group-hover:scale-105 ${
                           imageLoading ? 'opacity-0' : 'opacity-100'

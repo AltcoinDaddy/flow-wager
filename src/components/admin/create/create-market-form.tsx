@@ -959,7 +959,7 @@ export function CreateMarketForm({
 
             <div className="space-y-2">
               <Label htmlFor="rules" className="text-gray-300">
-                Resolution Rules
+                Resolution Rules*
               </Label>
               <Textarea
                 id="rules"
