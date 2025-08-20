@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // app/markets/[id]/page.tsx
 import * as fcl from "@onflow/fcl";
 import flowConfig from "@/lib/flow/config";
 import { getScript } from "@/lib/flow-wager-scripts"; // Import from your scripts
-import { getOptimizedImageUrl, isValidImageUrl } from "@/lib/flow/market";
+import { getOptimizedImageUrl } from "@/lib/flow/market"; // Use only getOptimizedImageUrl for server safety
 import { Metadata } from "next";
 import MarketDetailPage from "@/components/market/mark-detail-page"; // Your client-side component
 import { MarketCategory } from "@/types/market";
@@ -79,10 +79,14 @@ export async function generateMetadata({
       };
     }
 
-    ;
+    // Server-safe image URL handling using getOptimizedImageUrl
+    const imageUrl =
+      market.imageUrl && market.imageUrl.trim().length > 0
+        ? getOptimizedImageUrl(market.imageUrl, 1280, 680) // Match your specified dimensions
+        : "https://flowwager.xyz/vercel.svg"; // Replace with your actual large default image
 
     // Construct canonical URL
-    const canonicalUrl = `https://your-site.com/markets/${marketId}`; // Replace with your domain
+    const canonicalUrl = `https://flowwager.xyz/markets/${marketId}`; // Your domain
 
     // Get category name
     const categoryName =
@@ -108,18 +112,18 @@ export async function generateMetadata({
         type: "website",
         images: [
           {
-            url: `${market.imageUrl}`,
-            width: 1200,
-            height: 630,
+            url: imageUrl as string,
+            width: 1280,
+            height: 680,
             alt: market.title,
           },
         ],
       },
       twitter: {
-        card: "summary_large_image",
+        card: "summary_large_image", // Ensures a large image on Twitter
         title: market.title,
         description: market.description,
-        images: [`${market.imageUrl}`],
+        images: [imageUrl as string], // Large image for Twitter preview
       },
     };
   } catch (error) {
