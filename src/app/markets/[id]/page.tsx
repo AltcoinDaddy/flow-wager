@@ -71,7 +71,7 @@ async function fetchMarketById(marketId: number): Promise<any | null> {
       totalOptionAShares: rawMarket.totalOptionAShares.toString(),
       totalOptionBShares: rawMarket.totalOptionBShares.toString(),
       totalPool: rawMarket.totalPool.toString(),
-      imageUrl: rawMarket.imageUrl || 'https://res.cloudinary.com/dymrvo8sq/image/upload/v1754933182/rxofzfyp9od5yezqxcsp.svg', // Use provided SVG as default
+      imageUrl: rawMarket.imageUrl || 'https://res.cloudinary.com/dymrvo8sq/image/upload/v1754933182/rxofzfyp9od5yezqxcsp.svg',
     };
   } catch (error) {
     console.error('Failed to fetch market by ID:', error);
@@ -80,9 +80,10 @@ async function fetchMarketById(marketId: number): Promise<any | null> {
 }
 
 // Generate dynamic metadata
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
-    const marketId = parseInt(params.id, 10);
+    const resolvedParams = await params; // Await params to access id
+    const marketId = parseInt(resolvedParams.id, 10);
     const market = await fetchMarketById(marketId);
 
     if (!market) {
@@ -92,14 +93,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       };
     }
 
-    const originalImageUrl = market.imageUrl;
-    const imageUrl = market.imageUrl && market.imageUrl.trim().length > 0
-      ? getOptimizedImageUrl(market.imageUrl, 1280, 680)
-      : 'https://res.cloudinary.com/dymrvo8sq/image/upload/w_1280,h_680,c_fill,f_png/v1754933182/rxofzfyp9od5yezqxcsp.svg'; // Optimized SVG to PNG fallback
-
-    console.log('Original image URL:', originalImageUrl); // Debug log
-    console.log('Optimized image URL:', imageUrl); // Debug log
-    const canonicalUrl = `https://flowwager.xyz/markets/${marketId}`;
+    const ogImage = `https://www.flowwager.xyz/api/markets/og/${marketId}?v=${market.createdAt || Date.now()}`; // Updated path
+    const canonicalUrl = `https://www.flowwager.xyz/markets/${marketId}`;
 
     const categoryName = Object.values(MarketCategory)[market.category] || 'Other';
 
@@ -123,9 +118,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
         type: 'website',
         images: [
           {
-            url: imageUrl as string,
-            width: 1280,
-            height: 680,
+            url: ogImage,
+            width: 1200,
+            height: 630,
             alt: market.title,
           },
         ],
@@ -134,7 +129,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
         card: 'summary_large_image',
         title: market.title,
         description: market.description,
-        images: [imageUrl as string],
+        images: [ogImage],
+      },
+      alternates: {
+        canonical: canonicalUrl,
       },
     };
   } catch (error) {
