@@ -218,7 +218,7 @@ export default function MarketDetailPage() {
         await navigator.share({
           title: market.title,
           text: market.description,
-          url: window.location.href,
+          url: `https://flowwager.xyz/markets/${marketId}`,
         });
       } catch (err) {
         console.log("Error sharing:", err);
