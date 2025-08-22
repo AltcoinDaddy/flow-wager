@@ -160,7 +160,7 @@ export default function HomePage() {
               </Button>
 
               <button
-                className="border border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200"
+                className="border border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200 max-sm:w-[60%]"
                 onClick={() =>
                   window.scrollTo({
                     top: window.innerHeight,
@@ -287,8 +287,8 @@ export default function HomePage() {
       {/* Featured Markets Section */}
       <section className="py-16 px-4 bg-[#0A0C14]">
         <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
+          <div className="flex items-center md:justify-between mb-8 max-sm:flex-col max-sm:gap-4">
+            <div className="max-sm:text-center">
               <h2 className="text-3xl font-bold text-white mb-2">
                 Featured Markets
               </h2>

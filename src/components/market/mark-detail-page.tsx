@@ -172,29 +172,6 @@ export default function MarketDetailPage() {
     return Object.values(MarketStatus)[status] || "Unknown";
   };
 
-  // const getCategoryColor = (category: number) => {
-  //   switch (category) {
-  //     case 0: // Politics
-  //       return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-  //     case 1: // Sports
-  //       return "bg-green-500/20 text-green-400 border-green-500/30";
-  //     case 2: // Economics
-  //       return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-  //     case 3: // Technology
-  //       return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-  //     case 4: // Entertainment
-  //       return "bg-pink-500/20 text-pink-400 border-pink-500/30";
-  //     case 5: // Crypto
-  //       return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-  //     case 6: // Weather
-  //       return "bg-cyan-500/20 text-cyan-400 border-cyan-500/30";
-  //     case 7: // BreakingNews
-  //       return "bg-red-500/20 text-red-400 border-red-500/30";
-  //     default:
-  //       return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-  //   }
-  // };
-
   const handleImageLoad = () => {
     setImageLoading(false);
   };
@@ -262,63 +239,60 @@ export default function MarketDetailPage() {
 
   const volume = parseFloat(market.totalPool);
   const isHot = volume > 1000; // Consider markets with >1000 FLOW as "hot"
-  // const timeRemaining = new Date(parseInt(market.endTime) * 1000) > new Date();
 
   console.log("Market Data:", market.imageUrl);
 
   return (
     <div className="min-h-screen bg-[#0A0C14]">
-      {/* Live Data Indicator */}
+      {/* Live Data Indicator - Mobile optimized */}
       <div className="fixed top-4 right-4 z-50">
-        <div className="bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-lg px-3 py-2 backdrop-blur-sm">
-          <div className="flex items-center space-x-2 text-xs text-gray-400">
+        <div className="bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-lg px-2 sm:px-3 py-1 sm:py-2 backdrop-blur-sm">
+          <div className="flex items-center space-x-1 sm:space-x-2 text-xs text-gray-400">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>Live Data</span>
+            <span className="hidden sm:inline">Live Data</span>
+            <span className="sm:hidden">Live</span>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Enhanced Breadcrumb */}
-        <div className="flex items-center space-x-2 text-sm text-gray-400">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+        {/* Enhanced Breadcrumb - Mobile optimized */}
+        <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-400 overflow-x-auto">
           <Link
             href="/markets"
-            className="hover:text-[#9b87f5] transition-colors"
+            className="hover:text-[#9b87f5] transition-colors whitespace-nowrap"
           >
             Markets
           </Link>
           <span>/</span>
           <Link
             href={`/markets?category=${getCategoryName(market.category)}`}
-            className="hover:text-[#9b87f5] transition-colors"
+            className="hover:text-[#9b87f5] transition-colors whitespace-nowrap"
           >
             {getCategoryName(market.category)}
           </Link>
           <span>/</span>
-          <span className="text-white font-medium">{market.title}</span>
+          <span className="text-white font-medium truncate">{market.title}</span>
         </div>
 
-        {/* ✅ Enhanced Market Header with Small Logo Image */}
+        {/* Enhanced Market Header - Mobile responsive */}
         <div className="space-y-6">
-          <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                {/* ✅ Small logo-style image */}
-                <div className="relative w-16 h-16 flex-shrink-0">
-                  {/* {imageLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 rounded-xl">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#9b87f5]"></div>
-                    </div>
-                  )} */}
+          <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-4 sm:p-8 shadow-2xl">
+            {/* Mobile-first header layout */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                {/* Small logo-style image - responsive sizing */}
+                <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0">
                   <img
                     src={market.imageUrl}
                     alt={market.title}
-                    className={`w-full h-full object-cover rounded-xl transition-all duration-300`}
+                    className="w-full h-full object-cover rounded-xl transition-all duration-300"
                   />
                 </div>
 
-                <div className="flex items-center space-x-3">
-                  <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium">
+                {/* Badges - wrap on mobile */}
+                <div className="flex flex-wrap items-center gap-2 sm:space-x-3">
+                  <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium text-xs sm:text-sm">
                     {getCategoryName(market.category)}
                   </Badge>
                   <Badge
@@ -327,16 +301,16 @@ export default function MarketDetailPage() {
                         ? "default"
                         : "secondary"
                     }
-                    className={
+                    className={`text-xs sm:text-sm font-medium ${
                       actualStatus === MarketStatus.Active
-                        ? "bg-green-500/20 text-green-400 border-green-500/30 font-medium"
+                        ? "bg-green-500/20 text-green-400 border-green-500/30"
                         : actualStatus === MarketStatus.Resolved
-                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30 font-medium"
+                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
                         : actualStatus === MarketStatus.Paused &&
                           parseInt(market.endTime) * 1000 <= Date.now()
-                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30 font-medium"
-                        : "font-medium"
-                    }
+                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                        : ""
+                    }`}
                   >
                     <div className="flex items-center space-x-1">
                       {actualStatus === MarketStatus.Active && (
@@ -354,21 +328,21 @@ export default function MarketDetailPage() {
 
                   {/* Hot indicator */}
                   {isHot && (
-                    <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-sm">
+                    <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-xs">
                       <Flame className="h-3 w-3" />
-                      <span className="text-xs font-medium">Hot</span>
+                      <span className="font-medium">Hot</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Enhanced Action buttons */}
+              {/* Action buttons - responsive sizing */}
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsBookmarked(!isBookmarked)}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all"
+                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Bookmark
                     className={`h-4 w-4 ${
@@ -380,43 +354,44 @@ export default function MarketDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleShare}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all"
+                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-red-500/50 transition-all"
+                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-red-500/50 transition-all p-2 sm:px-3"
                 >
                   <Flag className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-bold mb-4 text-white leading-tight">
+            {/* Title and description - responsive text */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white leading-tight">
               {market.title}
             </h1>
-            <p className="text-lg text-gray-300 leading-relaxed mb-6">
+            <p className="text-base sm:text-lg text-gray-300 leading-relaxed mb-6">
               {market.description}
             </p>
 
-            {/* Enhanced Market Meta */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-400">
+            {/* Market Meta - responsive grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-3 sm:gap-6 text-xs sm:text-sm text-gray-400">
               <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-[#9b87f5]" />
-                <span>Created by</span>
+                <Users className="h-4 w-4 text-[#9b87f5] flex-shrink-0" />
+                <span className="whitespace-nowrap">Created by</span>
                 <Link
                   href={`/dashboard/${market.creator}`}
-                  className="text-[#9b87f5] hover:text-[#8b5cf6] font-medium transition-colors"
+                  className="text-[#9b87f5] hover:text-[#8b5cf6] font-medium transition-colors truncate"
                 >
                   {market.creator.slice(0, 6)}...{market.creator.slice(-4)}
                 </Link>
               </div>
 
               <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-blue-400" />
-                <span>
+                <Calendar className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                <span className="whitespace-nowrap">
                   {new Date(
                     parseInt(market.createdAt) * 1000
                   ).toLocaleDateString()}
@@ -424,45 +399,44 @@ export default function MarketDetailPage() {
               </div>
 
               <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-yellow-400" />
+                <Clock className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                 <CountdownTimer endTime={parseInt(market.endTime) * 1000} />
               </div>
 
               <div className="flex items-center space-x-2">
-                <Volume2 className="h-4 w-4 text-green-400" />
-                <span>{formatCurrency(market.totalPool)} FLOW volume</span>
+                <Volume2 className="h-4 w-4 text-green-400 flex-shrink-0" />
+                <span className="whitespace-nowrap">{formatCurrency(market.totalPool)} FLOW volume</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Rest of the existing content remains the same... */}
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-8">
+        {/* Main Content - Mobile responsive grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Left Column - Trading & Details */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Enhanced Current Prices */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Enhanced Current Prices - Mobile optimized */}
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="text-white flex items-center space-x-2 text-lg sm:text-xl">
                   <TrendingUp className="h-5 w-5 text-[#9b87f5]" />
                   <span>Current Prices</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
                 {/* Enhanced Price Progress */}
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm font-medium">
-                    <span className="text-[#9b87f5]">
+                    <span className="text-[#9b87f5] truncate pr-2">
                       {market.optionA} {optionAPercentage.toFixed(1)}%
                     </span>
-                    <span className="text-gray-400">
+                    <span className="text-gray-400 truncate pl-2">
                       {market.optionB} {optionBPercentage.toFixed(1)}%
                     </span>
                   </div>
                   <Progress
                     value={optionAPercentage}
-                    className="h-4 bg-gray-800 rounded-full overflow-hidden"
+                    className="h-3 sm:h-4 bg-gray-800 rounded-full overflow-hidden"
                   >
                     <div
                       className="h-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] transition-all duration-500 rounded-full shadow-sm"
@@ -474,46 +448,46 @@ export default function MarketDetailPage() {
                 {/* Show resolved outcome if available */}
                 {actualStatus === MarketStatus.Resolved &&
                   market.outcome !== undefined && (
-                    <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20">
+                    <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl p-3 sm:p-4 border border-blue-500/20">
                       <div className="flex items-center space-x-2 mb-2">
-                        <CheckCircle className="h-5 w-5 text-blue-400" />
-                        <span className="font-semibold text-blue-400">
+                        <CheckCircle className="h-4 sm:h-5 w-4 sm:w-5 text-blue-400 flex-shrink-0" />
+                        <span className="font-semibold text-blue-400 text-sm sm:text-base">
                           Market Resolved
                         </span>
                       </div>
-                      <p className="text-white font-bold text-lg">
+                      <p className="text-white font-bold text-base sm:text-lg">
                         Winner:{" "}
                         {market.outcome === 0 ? market.optionA : market.optionB}
                       </p>
                     </div>
                   )}
 
-                {/* Enhanced User Position Display */}
+                {/* Enhanced User Position Display - Mobile optimized */}
                 {userPosition && (
-                  <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/30 rounded-xl p-4 border border-gray-800/50">
+                  <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/30 rounded-xl p-3 sm:p-4 border border-gray-800/50">
                     <h4 className="text-sm font-semibold text-gray-300 mb-3 flex items-center space-x-2">
                       <Zap className="h-4 w-4 text-[#9b87f5]" />
                       <span>Your Position</span>
                     </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
                       <div className="text-center">
-                        <div className="text-[#9b87f5] font-bold text-lg">
+                        <div className="text-[#9b87f5] font-bold text-sm sm:text-lg">
                           {formatCurrency(userPosition.optionAShares)}
                         </div>
-                        <div className="text-gray-500 text-xs">
+                        <div className="text-gray-500 text-xs truncate">
                           {market.optionA} shares
                         </div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gray-400 font-bold text-lg">
+                        <div className="text-gray-400 font-bold text-sm sm:text-lg">
                           {formatCurrency(userPosition.optionBShares)}
                         </div>
-                        <div className="text-gray-500 text-xs">
+                        <div className="text-gray-500 text-xs truncate">
                           {market.optionB} shares
                         </div>
                       </div>
                       <div className="text-center">
-                        <div className="text-white font-bold text-lg">
+                        <div className="text-white font-bold text-sm sm:text-lg">
                           {formatCurrency(userPosition.totalInvested)} FLOW
                         </div>
                         <div className="text-gray-500 text-xs">
@@ -526,9 +500,9 @@ export default function MarketDetailPage() {
 
                 {/* Show disabled message for non-active markets */}
                 {isBettingDisabled && (
-                  <div className="bg-gradient-to-r from-gray-700/10 to-gray-600/10 rounded-xl p-4 border border-gray-600/20">
+                  <div className="bg-gradient-to-r from-gray-700/10 to-gray-600/10 rounded-xl p-3 sm:p-4 border border-gray-600/20">
                     <div className="flex items-center space-x-2 text-gray-400">
-                      <Lock className="h-4 w-4" />
+                      <Lock className="h-4 w-4 flex-shrink-0" />
                       <span className="text-sm font-medium">
                         {getDisabledMessage()}
                       </span>
@@ -536,12 +510,12 @@ export default function MarketDetailPage() {
                   </div>
                 )}
 
-                {/* Enhanced Betting Buttons */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Enhanced Betting Buttons - Mobile optimized */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Button
                     size="lg"
                     onClick={() => handleBet("optionA")}
-                    className={`h-20 transform transition-all duration-200 ${
+                    className={`h-16 sm:h-20 transform transition-all duration-200 ${
                       isBettingDisabled
                         ? "bg-gray-700/50 text-gray-500 cursor-not-allowed hover:bg-gray-700/50 hover:scale-100 shadow-none"
                         : "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 hover:scale-105"
@@ -549,9 +523,9 @@ export default function MarketDetailPage() {
                     disabled={!!isBettingDisabled}
                   >
                     <div className="text-center">
-                      <div className="text-lg font-bold flex items-center justify-center space-x-2">
+                      <div className="text-base sm:text-lg font-bold flex items-center justify-center space-x-2">
                         {isBettingDisabled && <Lock className="h-4 w-4" />}
-                        <span>{market.optionA}</span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">{market.optionA}</span>
                       </div>
                       <div className="text-sm opacity-90">
                         {optionAPercentage.toFixed(0)}%
@@ -561,7 +535,7 @@ export default function MarketDetailPage() {
                   <Button
                     size="lg"
                     onClick={() => handleBet("optionB")}
-                    className={`h-20 transform transition-all duration-200 ${
+                    className={`h-16 sm:h-20 transform transition-all duration-200 ${
                       isBettingDisabled
                         ? "bg-gray-700/50 text-gray-500 cursor-not-allowed hover:bg-gray-700/50 hover:scale-100 shadow-none"
                         : "bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white shadow-lg hover:shadow-gray-700/40 hover:scale-105"
@@ -569,9 +543,9 @@ export default function MarketDetailPage() {
                     disabled={!!isBettingDisabled}
                   >
                     <div className="text-center">
-                      <div className="text-lg font-bold flex items-center justify-center space-x-2">
+                      <div className="text-base sm:text-lg font-bold flex items-center justify-center space-x-2">
                         {isBettingDisabled && <Lock className="h-4 w-4" />}
-                        <span>{market.optionB}</span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">{market.optionB}</span>
                       </div>
                       <div className="text-sm opacity-90">
                         {optionBPercentage.toFixed(0)}%
@@ -580,26 +554,26 @@ export default function MarketDetailPage() {
                   </Button>
                 </div>
 
-                {/* Enhanced Market Stats */}
-                <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-800/50">
-                  <div className="text-center p-3 rounded-lg bg-gray-800/20">
-                    <div className="text-xl font-bold text-white">
+                {/* Enhanced Market Stats - Mobile responsive */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-gray-800/50">
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-gray-800/20">
+                    <div className="text-base sm:text-xl font-bold text-white">
                       {formatCurrency(market.totalPool)}
                     </div>
                     <div className="text-xs text-gray-400 font-medium">
                       Volume
                     </div>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-gray-800/20">
-                    <div className="text-xl font-bold text-white">
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-gray-800/20">
+                    <div className="text-base sm:text-xl font-bold text-white">
                       {formatCurrency(totalShares)}
                     </div>
                     <div className="text-xs text-gray-400 font-medium">
                       Shares
                     </div>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-gray-800/20">
-                    <div className="text-xl font-bold text-white">
+                  <div className="text-center p-2 sm:p-3 rounded-lg bg-gray-800/20">
+                    <div className="text-base sm:text-xl font-bold text-white">
                       {trades.length}
                     </div>
                     <div className="text-xs text-gray-400 font-medium">
@@ -610,25 +584,25 @@ export default function MarketDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Enhanced Market Details Tabs */}
+            {/* Enhanced Market Details Tabs - Mobile optimized */}
             <div className="space-y-4">
               <Tabs defaultValue="activity" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-xl p-1 h-12">
+                <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-xl p-1 h-10 sm:h-12">
                   <TabsTrigger
                     value="activity"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-10 font-medium"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
                   >
                     Activity
                   </TabsTrigger>
                   <TabsTrigger
                     value="comments"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-10 font-medium"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
                   >
                     Comments
                   </TabsTrigger>
                   <TabsTrigger
                     value="chart"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-10 font-medium"
+                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
                   >
                     Chart
                   </TabsTrigger>
@@ -636,48 +610,48 @@ export default function MarketDetailPage() {
 
                 <TabsContent value="activity" className="mt-4">
                   <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-6">
-                      <div className="space-y-4">
+                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
+                      <div className="space-y-3 sm:space-y-4">
                         {trades.length === 0 ? (
-                          <div className="text-center py-12 text-gray-400">
-                            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg font-medium">No trades yet</p>
+                          <div className="text-center py-8 sm:py-12 text-gray-400">
+                            <BarChart3 className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-4 opacity-50" />
+                            <p className="text-base sm:text-lg font-medium">No trades yet</p>
                             <p className="text-sm">Be the first to trade!</p>
                           </div>
                         ) : (
                           trades.map((trade) => (
                             <div
                               key={trade.id}
-                              className="flex items-center justify-between p-4 rounded-xl hover:bg-gray-800/30 transition-colors border border-gray-800/30"
+                              className="flex items-center justify-between p-3 sm:p-4 rounded-xl hover:bg-gray-800/30 transition-colors border border-gray-800/30"
                             >
-                              <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                                 <Badge
                                   variant={
                                     trade.option === 0 ? "default" : "secondary"
                                   }
-                                  className={
+                                  className={`text-xs flex-shrink-0 ${
                                     trade.option === 0
                                       ? "bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium"
                                       : "bg-gray-700/50 text-gray-300 font-medium"
-                                  }
+                                  }`}
                                 >
                                   {trade.option === 0
                                     ? market.optionA
                                     : market.optionB}
                                 </Badge>
-                                <div>
-                                  <div className="font-semibold text-white">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-white text-sm sm:text-base">
                                     {formatCurrency(trade.amount)} FLOW
                                   </div>
-                                  <div className="text-sm text-gray-400">
+                                  <div className="text-xs sm:text-sm text-gray-400 truncate">
                                     by {trade.user.slice(0, 6)}...
                                     {trade.user.slice(-4)} •{" "}
                                     {formatRelativeTime(trade.timestamp)}
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="font-semibold text-white">
+                              <div className="text-right flex-shrink-0">
+                                <div className="font-semibold text-white text-sm sm:text-base">
                                   {formatCurrency(trade.price)} FLOW
                                 </div>
                               </div>
@@ -691,32 +665,32 @@ export default function MarketDetailPage() {
 
                 <TabsContent value="comments" className="mt-4">
                   <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-6 space-y-6">
+                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6 space-y-4 sm:space-y-6">
                       {comments.length === 0 ? (
-                        <div className="text-center py-12 text-gray-400">
-                          <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-medium">No comments yet</p>
+                        <div className="text-center py-8 sm:py-12 text-gray-400">
+                          <Users className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-base sm:text-lg font-medium">No comments yet</p>
                           <p className="text-sm">Start the discussion!</p>
                         </div>
                       ) : (
                         comments.map((comment) => (
                           <div key={comment.id} className="space-y-3">
-                            <div className="flex items-start space-x-3 p-4 rounded-xl bg-gray-800/20 border border-gray-800/30">
-                              <Avatar className="h-10 w-10">
+                            <div className="flex items-start space-x-3 p-3 sm:p-4 rounded-xl bg-gray-800/20 border border-gray-800/30">
+                              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
                                 <AvatarImage
                                   src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user}`}
                                 />
-                                <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5] font-bold">
+                                <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5] font-bold text-xs sm:text-sm">
                                   {comment.user.slice(2, 4).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center space-x-2 mb-2">
-                                  <span className="font-semibold text-white">
+                                  <span className="font-semibold text-white text-sm sm:text-base truncate">
                                     {comment.user.slice(0, 6)}...
                                     {comment.user.slice(-4)}
                                   </span>
-                                  <span className="text-xs text-gray-400">
+                                  <span className="text-xs text-gray-400 flex-shrink-0">
                                     {formatRelativeTime(comment.timestamp)}
                                   </span>
                                 </div>
@@ -739,11 +713,11 @@ export default function MarketDetailPage() {
 
                 <TabsContent value="chart" className="mt-4">
                   <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-6">
-                      <div className="h-64 flex items-center justify-center text-gray-400">
+                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
+                      <div className="h-48 sm:h-64 flex items-center justify-center text-gray-400">
                         <div className="text-center">
-                          <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-medium mb-2">
+                          <BarChart3 className="h-12 sm:h-16 w-12 sm:w-16 mx-auto mb-4 opacity-50" />
+                          <p className="text-base sm:text-lg font-medium mb-2">
                             Price chart data: {priceHistory.length} points
                             available
                           </p>
@@ -759,12 +733,12 @@ export default function MarketDetailPage() {
             </div>
           </div>
 
-          {/* Right Column - Enhanced Sidebar */}
-          <div className="space-y-6">
+          {/* Right Column - Enhanced Sidebar - Mobile optimized */}
+          <div className="space-y-4 sm:space-y-6">
             {/* Enhanced Market Status */}
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2 text-white">
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="flex items-center space-x-2 text-white text-lg sm:text-xl">
                   {actualStatus === MarketStatus.Active && (
                     <TrendingUp className="h-5 w-5 text-green-400" />
                   )}
@@ -777,7 +751,7 @@ export default function MarketDetailPage() {
                   <span>Market Status</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <Badge
                     variant={
@@ -785,7 +759,7 @@ export default function MarketDetailPage() {
                         ? "default"
                         : "secondary"
                     }
-                    className={`w-full justify-center py-3 text-sm font-semibold ${
+                    className={`w-full justify-center py-2 sm:py-3 text-sm font-semibold ${
                       actualStatus === MarketStatus.Active
                         ? "bg-green-500/20 text-green-400 border-green-500/30"
                         : actualStatus === MarketStatus.Resolved
@@ -799,7 +773,7 @@ export default function MarketDetailPage() {
                     {getStatusName(actualStatus)}
                   </Badge>
                   {actualStatus === MarketStatus.Active && (
-                    <div className="text-center bg-gray-800/30 rounded-lg p-4">
+                    <div className="text-center bg-gray-800/30 rounded-lg p-3 sm:p-4">
                       <CountdownTimer
                         endTime={parseInt(market.endTime) * 1000}
                         showIcon={false}
@@ -811,7 +785,7 @@ export default function MarketDetailPage() {
                   )}
                   {actualStatus === MarketStatus.Paused &&
                     parseInt(market.endTime) * 1000 <= Date.now() && (
-                      <div className="text-center bg-orange-500/10 rounded-xl p-4 border border-orange-500/20">
+                      <div className="text-center bg-orange-500/10 rounded-xl p-3 sm:p-4 border border-orange-500/20">
                         <p className="text-orange-400 font-semibold text-sm">
                           Market has ended and is awaiting admin resolution
                         </p>
@@ -820,8 +794,8 @@ export default function MarketDetailPage() {
                   {actualStatus === MarketStatus.Resolved &&
                     market.outcome !== undefined &&
                     market.outcome !== null && (
-                      <div className="text-center p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                        <p className="text-blue-400 font-semibold">
+                      <div className="text-center p-3 sm:p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                        <p className="text-blue-400 font-semibold text-sm sm:text-base">
                           Resolved:{" "}
                           {market.outcome === 0
                             ? market.optionA
@@ -835,12 +809,12 @@ export default function MarketDetailPage() {
 
             {/* Enhanced Creator Info */}
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-white">Market Creator</CardTitle>
+              <CardHeader className="pb-3 sm:pb-6">
+                <CardTitle className="text-white text-lg sm:text-xl">Market Creator</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-12 w-12">
+                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0">
                     <AvatarImage
                       src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${market.creator}`}
                     />
@@ -848,10 +822,10 @@ export default function MarketDetailPage() {
                       {market.creator.slice(2, 4).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <Link
                       href={"#"}
-                      className="font-semibold text-[#9b87f5] hover:text-[#8b5cf6] transition-colors"
+                      className="font-semibold text-[#9b87f5] hover:text-[#8b5cf6] transition-colors text-sm sm:text-base block truncate"
                     >
                       {market.creator.slice(0, 6)}...{market.creator.slice(-4)}
                     </Link>
@@ -866,7 +840,7 @@ export default function MarketDetailPage() {
               onClick={handleRefresh}
               variant="outline"
               disabled={isRefreshing}
-              className="w-full h-12 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all font-medium"
+              className="w-full h-10 sm:h-12 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all font-medium text-sm sm:text-base"
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}

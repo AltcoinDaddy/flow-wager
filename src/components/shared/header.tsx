@@ -20,7 +20,8 @@ export function Header() {
                   </div>
                   <div className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-br from-[#a78bfa] to-[#9b87f5] rounded-full animate-pulse"></div>
                 </div>
-                <div className="sm:text-3xl text-xl font-black tracking-tight">
+                {/* Text - Hidden on mobile, visible on sm and up */}
+                <div className="hidden sm:block sm:text-3xl text-xl font-black tracking-tight">
                   <span className="bg-gradient-to-r from-[#9b87f5] via-[#8b5cf6] to-[#a78bfa] bg-clip-text text-transparent">
                     Flow
                   </span>

@@ -546,12 +546,12 @@ export default function UserDashboardPage() {
   const reputation = data.profile.reputation;
 
   return (
-    <div className="min-h-screen bg-[#0A0C14]">
-      <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="min-h-screen bg-[#0A0C14] scrollbar-hide overflow-x-hidden">
+      <div className="container mx-auto px-4 py-8 space-y-8 scrollbar-hide">
         {/* User Profile Header */}
         <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-6 max-sm:flex-col max-sm:gap-6">
               <Avatar className="h-20 w-20 border-2 border-[#9b87f5]/20">
                 <AvatarImage
                   src={`https://api.dicebear.com/9.x/pixel-art/png?seed=${userAddress}&backgroundColor=ff5733,00d4ff,9b87f5&size=256&scale=80&radius=10`}
@@ -724,81 +724,83 @@ export default function UserDashboardPage() {
               <DollarSign className="h-5 w-5 text-green-400" />
               Claimable Winnings
             </h2>
-            <table className="min-w-full text-sm mb-4">
-              <thead>
-                <tr className="bg-[#151923]">
-                  <th className="px-2 py-2 text-white">Market</th>
-                  <th className="px-2 py-2 text-white">Amount</th>
-                  <th className="px-2 py-2 text-white">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.claimableWinnings.map((win: any) => {
-                  const market = allMarkets.find(
-                    (m) => m.id.toString() === win.marketId.toString()
-                  );
-                  return (
-                    <tr key={win.marketId} className="border-b border-gray-800">
-                      <td className="px-2 py-2 text-white">
-                        {market ? market.title : `Market #${win.marketId}`}
-                      </td>
-                      <td className="px-2 py-2 text-white">
-                        {parseFloat(win.amount).toFixed(2)} FLOW
-                      </td>
-                      <td className="px-2 py-2 text-white">
-                        <Button
-                          size="sm"
-                          className="text-white bg-black hover:bg-black"
-                          disabled={
-                            claimingMarketId === win.marketId.toString() ||
-                            parseFloat(win.amount) <= 0
-                          }
-                          onClick={async () => {
-                            // Check if already claimed before proceeding
-                            if (win.claimed === true) {
-                              setClaimError("Winnings already claimed");
-                              return;
+            <div className="overflow-x-auto scrollbar-hide">
+              <table className="min-w-full text-sm mb-4">
+                <thead>
+                  <tr className="bg-[#151923]">
+                    <th className="px-2 py-2 text-white">Market</th>
+                    <th className="px-2 py-2 text-white">Amount</th>
+                    <th className="px-2 py-2 text-white">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.claimableWinnings.map((win: any) => {
+                    const market = allMarkets.find(
+                      (m) => m.id.toString() === win.marketId.toString()
+                    );
+                    return (
+                      <tr key={win.marketId} className="border-b border-gray-800">
+                        <td className="px-2 py-2 text-white">
+                          {market ? market.title : `Market #${win.marketId}`}
+                        </td>
+                        <td className="px-2 py-2 text-white">
+                          {parseFloat(win.amount).toFixed(2)} FLOW
+                        </td>
+                        <td className="px-2 py-2 text-white">
+                          <Button
+                            size="sm"
+                            className="text-white bg-black hover:bg-black"
+                            disabled={
+                              claimingMarketId === win.marketId.toString() ||
+                              parseFloat(win.amount) <= 0
                             }
+                            onClick={async () => {
+                              // Check if already claimed before proceeding
+                              if (win.claimed === true) {
+                                setClaimError("Winnings already claimed");
+                                return;
+                              }
 
-                            setClaimingMarketId(win.marketId.toString());
-                            setClaimError(null);
-                            setClaimSuccess(null);
-                            try {
-                              const txScript = await claimWinningsTransaction();
-                              const authorization =
-                                fcl.currentUser.authorization;
-                              await fcl.mutate({
-                                cadence: txScript,
-                                args: (arg, t) => [arg(win.marketId, t.UInt64)],
-                                proposer: authorization,
-                                payer: authorization,
-                                authorizations: [authorization],
-                                limit: 1000,
-                              });
-                              setClaimSuccess("Winnings claimed successfully!");
-                              setTimeout(() => setClaimSuccess(null), 2000);
-                              await fetchUserData();
-                              await fetchUserTrades(userAddress);
-                              await fetchAllPositions(userAddress);
-                            } catch (err: any) {
-                              setClaimError(
-                                err.message || "Failed to claim winnings"
-                              );
-                            } finally {
-                              setClaimingMarketId(null);
-                            }
-                          }}
-                        >
-                          {claimingMarketId === win.marketId.toString()
-                            ? "Claiming..."
-                            : "Claim Winnings"}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                              setClaimingMarketId(win.marketId.toString());
+                              setClaimError(null);
+                              setClaimSuccess(null);
+                              try {
+                                const txScript = await claimWinningsTransaction();
+                                const authorization =
+                                  fcl.currentUser.authorization;
+                                await fcl.mutate({
+                                  cadence: txScript,
+                                  args: (arg, t) => [arg(win.marketId, t.UInt64)],
+                                  proposer: authorization,
+                                  payer: authorization,
+                                  authorizations: [authorization],
+                                  limit: 1000,
+                                });
+                                setClaimSuccess("Winnings claimed successfully!");
+                                setTimeout(() => setClaimSuccess(null), 2000);
+                                await fetchUserData();
+                                await fetchUserTrades(userAddress);
+                                await fetchAllPositions(userAddress);
+                              } catch (err: any) {
+                                setClaimError(
+                                  err.message || "Failed to claim winnings"
+                                );
+                              } finally {
+                                setClaimingMarketId(null);
+                              }
+                            }}
+                          >
+                            {claimingMarketId === win.marketId.toString()
+                              ? "Claiming..."
+                              : "Claim Winnings"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             {claimError && (
               <div className="text-red-400 mb-2">{claimError}</div>
             )}
@@ -851,7 +853,7 @@ export default function UserDashboardPage() {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="relative flex w-full bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto overflow-x-auto">
+          <TabsList className="relative flex w-full bg-[#1A1F2C] border border-gray-800/50 rounded-xl p-1 h-auto overflow-x-auto scrollbar-hide">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white text-gray-400 hover:text-white transition-all duration-200 rounded-lg py-3 font-medium whitespace-nowrap"
@@ -920,7 +922,7 @@ export default function UserDashboardPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-4 scrollbar-hide overflow-y-auto max-h-96">
                     {data.recentActivity.length === 0 ? (
                       <div className="text-center py-8 text-gray-400">
                         <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -966,9 +968,7 @@ export default function UserDashboardPage() {
                                 </>
                               )}
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {formatRelativeTime(activity.timestamp)}
-                            </p>
+                            <p className="text-xs text-gray-400 mt-1"></p>
                           </div>
                         </div>
                       ))
