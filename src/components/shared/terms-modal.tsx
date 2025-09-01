@@ -20,7 +20,6 @@ export function TermsModal() {
 
   const [isClient, setIsClient] = useState(false);
 
-  // Ensure component only renders on client side to avoid hydration issues
   useEffect(() => {
     setIsClient(true);
   }, []);

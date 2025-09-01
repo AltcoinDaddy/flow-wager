@@ -1,75 +1,66 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface TermsStore {
-  hasAcceptedTerms: boolean;
+interface TermsState {
+  // Existing terms state
   showTermsModal: boolean;
-  acceptedAt: string | null;
+  hasAcceptedTerms: boolean;
   acceptTerms: () => void;
   declineTerms: () => void;
-  showTermsDialog: () => void;
-  hideTermsDialog: () => void;
-  resetTermsAcceptance: () => void;
+
+  // New region state
+  isRegionRestricted: boolean;
+  countryCode?: string;
+  country?: string;
+  hasAcknowledgedRegion: boolean;
+  isLoadingRegion: boolean;
+  regionError?: string;
+  setRegionRestricted: (restricted: boolean, countryCode?: string, country?: string) => void;
+  acknowledgeRegion: () => void;
+  setLoadingRegion: (loading: boolean) => void;
+  setRegionError: (error?: string) => void;
+  resetRegion: () => void;
 }
 
-export const useTermsStore = create<TermsStore>()(
+export const useTermsStore = create<TermsState>()(
   persist(
     (set) => ({
+      // Existing terms state
+      showTermsModal: true,
       hasAcceptedTerms: false,
-      showTermsModal: true, // Show modal by default on first load
-      acceptedAt: null,
-
-      acceptTerms: () => {
-        set({
-          hasAcceptedTerms: true,
-          showTermsModal: false,
-          acceptedAt: new Date().toISOString(),
-        });
-      },
-
+      acceptTerms: () => set({ hasAcceptedTerms: true, showTermsModal: false }),
       declineTerms: () => {
+        // Redirect to alternative site or show info page
+        window.location.href = "https://www.google.com";
+      },
+
+      // New region state
+      isRegionRestricted: false,
+      hasAcknowledgedRegion: false,
+      isLoadingRegion: true,
+      setRegionRestricted: (restricted, countryCode, country) =>
+        set({ isRegionRestricted: restricted, countryCode, country }),
+      acknowledgeRegion: () => set({ hasAcknowledgedRegion: true }),
+      setLoadingRegion: (loading) => set({ isLoadingRegion: loading }),
+      setRegionError: (error) => set({ regionError: error, isLoadingRegion: false }),
+      resetRegion: () =>
         set({
-          hasAcceptedTerms: false,
-          showTermsModal: true,
-        });
-        // Optional: Close the tab/window or redirect
-        if (typeof window !== "undefined") {
-          window.close();
-          // If window.close() doesn't work (popup blockers), show a message
-          setTimeout(() => {
-            alert("Please close this tab to exit the site.");
-          }, 100);
-        }
-      },
-
-      showTermsDialog: () => {
-        set({ showTermsModal: true });
-      },
-
-      hideTermsDialog: () => {
-        set({ showTermsModal: false });
-      },
-
-      resetTermsAcceptance: () => {
-        set({
-          hasAcceptedTerms: false,
-          showTermsModal: true,
-          acceptedAt: null,
-        });
-      },
+          isRegionRestricted: false,
+          hasAcknowledgedRegion: false,
+          isLoadingRegion: true,
+          regionError: undefined,
+          countryCode: undefined,
+          country: undefined,
+        }),
     }),
     {
-      name: "flow-wager-terms-storage",
+      name: "flowwager-terms",
       partialize: (state) => ({
         hasAcceptedTerms: state.hasAcceptedTerms,
-        acceptedAt: state.acceptedAt,
-        // Don't persist showTermsModal - always check on load
+        hasAcknowledgedRegion: state.hasAcknowledgedRegion,
+        countryCode: state.countryCode,
+        isRegionRestricted: state.isRegionRestricted,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state && !state.hasAcceptedTerms) {
-          state.showTermsModal = true;
-        }
-      },
     },
   ),
 );

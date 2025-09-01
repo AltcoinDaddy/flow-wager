@@ -1,15 +1,23 @@
 "use client";
 
 import { useTermsStore } from "@/stores/terms-store";
+import { getUserLocation, isRegionRestricted } from "@/lib/geolocation";
 import { useEffect, useState } from "react";
 import { TermsModal } from "./terms-modal";
+import { RegionRestrictionModal } from "./region-restriction-modal";
 
 interface TermsGuardProps {
   children: React.ReactNode;
 }
 
 export function TermsGuard({ children }: TermsGuardProps) {
-  const { hasAcceptedTerms, showTermsModal } = useTermsStore();
+  const {
+    hasAcceptedTerms,
+    isLoadingRegion,
+    setRegionRestricted,
+    setLoadingRegion,
+    setRegionError,
+  } = useTermsStore();
   const [isClient, setIsClient] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -22,6 +30,52 @@ export function TermsGuard({ children }: TermsGuardProps) {
 
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const checkRegion = async () => {
+      try {
+        setLoadingRegion(true);
+        const location = await getUserLocation();
+
+        if (location.error) {
+          setRegionError(location.error);
+          // If we can't determine location, allow access but log the issue
+          setRegionRestricted(false);
+          return;
+        }
+
+        const restricted = isRegionRestricted(location.countryCode);
+        setRegionRestricted(restricted, location.countryCode, location.country);
+
+        if (restricted) {
+          console.warn(
+            `Access from restricted region: ${location.country} (${location.countryCode})`
+          );
+        }
+      } catch (error) {
+        console.error("Region check failed:", error);
+        setRegionError("Failed to verify region");
+        // On error, allow access but log the issue
+        setRegionRestricted(false);
+      } finally {
+        setLoadingRegion(false);
+      }
+    };
+
+    checkRegion();
+  }, [setRegionRestricted, setLoadingRegion, setRegionError]);
+
+  // Show loading state while checking region
+  if (isLoadingRegion) {
+    return (
+      <div className="min-h-screen bg-[#0A0C14] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-[#9b87f5] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Verifying location...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Don't render anything on server side or before hydration
   if (!isClient || !isHydrated) {
@@ -83,8 +137,8 @@ export function TermsGuard({ children }: TermsGuardProps) {
   return (
     <>
       {children}
-      {/* Still render the modal in case user wants to view terms again */}
-      {showTermsModal && <TermsModal />}
+      <RegionRestrictionModal />
+      <TermsModal />
     </>
   );
 }
