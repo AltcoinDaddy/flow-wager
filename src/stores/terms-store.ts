@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import Cookies from "js-cookie";
 
 interface TermsState {
   // Existing terms state
@@ -22,9 +23,26 @@ interface TermsState {
   resetRegion: () => void;
 }
 
+// Custom cookie storage implementation
+const cookieStorage = {
+  getItem: (name: string): string | null => {
+    return Cookies.get(name) || null;
+  },
+  setItem: (name: string, value: string): void => {
+    Cookies.set(name, value, {
+      expires: 30, // Cookie expires in 30 days
+      secure: true, // Only send over HTTPS
+      sameSite: "strict", // CSRF protection
+    });
+  },
+  removeItem: (name: string): void => {
+    Cookies.remove(name);
+  },
+};
+
 export const useTermsStore = create<TermsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Existing terms state
       showTermsModal: true,
       hasAcceptedTerms: false,
@@ -38,12 +56,31 @@ export const useTermsStore = create<TermsState>()(
       isRegionRestricted: false,
       hasAcknowledgedRegion: false,
       isLoadingRegion: true,
-      setRegionRestricted: (restricted, countryCode, country) =>
-        set({ isRegionRestricted: restricted, countryCode, country }),
-      acknowledgeRegion: () => set({ hasAcknowledgedRegion: true }),
+      setRegionRestricted: (restricted, countryCode, country) => {
+        set({
+          isRegionRestricted: restricted,
+          countryCode,
+          country,
+          hasAcknowledgedRegion: false,
+        });
+      },
+      acknowledgeRegion: () => {
+        set({ hasAcknowledgedRegion: true });
+        // Also set a separate cookie with longer expiration for region acknowledgment
+        Cookies.set("flowwager-region-acknowledged", "true", {
+          expires: 30, // 30 days
+          secure: true,
+          sameSite: "strict",
+        });
+        Cookies.set("flowwager-region-country", get().countryCode || "", {
+          expires: 365,
+          secure: true,
+          sameSite: "strict",
+        });
+      },
       setLoadingRegion: (loading) => set({ isLoadingRegion: loading }),
       setRegionError: (error) => set({ regionError: error, isLoadingRegion: false }),
-      resetRegion: () =>
+      resetRegion: () => {
         set({
           isRegionRestricted: false,
           hasAcknowledgedRegion: false,
@@ -51,10 +88,15 @@ export const useTermsStore = create<TermsState>()(
           regionError: undefined,
           countryCode: undefined,
           country: undefined,
-        }),
+        });
+        // Clear region cookies
+        Cookies.remove("flowwager-region-acknowledged");
+        Cookies.remove("flowwager-region-country");
+      },
     }),
     {
       name: "flowwager-terms",
+      storage: createJSONStorage(() => cookieStorage),
       partialize: (state) => ({
         hasAcceptedTerms: state.hasAcceptedTerms,
         hasAcknowledgedRegion: state.hasAcknowledgedRegion,
@@ -64,3 +106,11 @@ export const useTermsStore = create<TermsState>()(
     },
   ),
 );
+
+// Helper function to check if region was previously acknowledged
+export const checkPreviousRegionAcknowledgment = (): { acknowledged: boolean; countryCode?: string } => {
+  const acknowledged = Cookies.get("flowwager-region-acknowledged") === "true";
+  const countryCode = Cookies.get("flowwager-region-country");
+
+  return { acknowledged, countryCode };
+};

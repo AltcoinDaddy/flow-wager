@@ -29,8 +29,6 @@ export function RegionRestrictionModal() {
   const handleContinue = () => {
     if (hasAgreed) {
       acknowledgeRegion();
-      // Optionally redirect to a VPN service or information page
-      window.open('https://www.expressvpn.com', '_blank');
     }
   };
 
