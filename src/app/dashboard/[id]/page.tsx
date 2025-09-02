@@ -6,12 +6,14 @@
 import { MarketCard } from "@/components/market/market-card";
 import { MarketError } from "@/components/market/market-error";
 import { MarketLoading } from "@/components/market/market-loading";
+import { UserActivities } from "@/components/user/user-activities";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { usePoints } from "@/hooks/usePoints";
 import {
   claimWinningsTransaction,
   getAllUserTrades,
@@ -45,6 +47,9 @@ import {
   TrendingUp,
   Trophy,
   Wallet,
+  Award,
+  Crown,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -82,7 +87,7 @@ interface UserPosition {
   currentValue: string;
   pnl: string;
   pnlPercentage: number;
-  status: MarketStatus; // Ensure MarketStatus is a string type in @/types/market
+  status: MarketStatus;
   outcome?: number;
   claimableAmount?: string;
   claimed?: boolean;
@@ -187,6 +192,9 @@ export default function UserDashboardPage() {
   const userAddress = params.id as string;
   const { user: currentUser, isAuthenticated } = useAuth();
 
+  // Points system integration
+  const { userPoints, awardPoints, activities: pointsActivities } = usePoints();
+
   const [data, setData] = useState<UserDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -260,7 +268,7 @@ export default function UserDashboardPage() {
           args: (arg, t) => [arg(userAddress, t.Address)],
         });
 
-        console.log(createdMarkets, "This is the Created Markets")
+        console.log(createdMarkets, "This is the Created Markets");
       } catch (err) {
         console.warn("Could not fetch created markets:", err);
       }
@@ -356,7 +364,7 @@ export default function UserDashboardPage() {
         cadence: script,
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
-      console.log("tradesRaw:", tradesRaw); // Debug log
+      console.log("tradesRaw:", tradesRaw);
       const trades: UserTrades = {
         activeTrades: (tradesRaw.activeTrades || []).map((trade: any) => ({
           marketId: trade.marketId?.toString() ?? "",
@@ -374,14 +382,13 @@ export default function UserDashboardPage() {
         })),
         totalDeposited: tradesRaw.totalDeposited?.toString() ?? "0.0",
       };
-      console.log("Parsed trades:", trades); // Debug log
+      console.log("Parsed trades:", trades);
       setUserTrades(trades);
     } catch (err) {
       console.warn("Could not fetch user trades:", err);
       setUserTrades({ activeTrades: [], totalDeposited: "0.0" });
     }
   };
-
 
   const fetchAllPositions = async (userAddress: string) => {
     try {
@@ -391,8 +398,7 @@ export default function UserDashboardPage() {
         args: (arg, t) => [arg(userAddress, t.Address)],
       });
 
-
-      console.log(positionsRaw, "This is the Raw Positions")
+      console.log(positionsRaw, "This is the Raw Positions");
       const positions: UserPosition[] = (positionsRaw || []).map(
         (pos: any) => ({
           marketId: pos.marketId?.toString() ?? "",
@@ -441,6 +447,12 @@ export default function UserDashboardPage() {
         contractInfo: data.contractInfo,
         exportedAt: new Date().toISOString(),
         contractAddress: `${getFlowTokenAddress()}`,
+        // Include points data
+        pointsData: {
+          currentPoints: userPoints.points,
+          currentRank: userPoints.rank,
+          recentActivities: pointsActivities.slice(0, 20),
+        },
       };
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -562,8 +574,13 @@ export default function UserDashboardPage() {
               </Avatar>
 
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">
-                  {isOwnProfile ? `${generateShortNameFromWallet(userAddress)} Dashboard` : "User Profile"}
+                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                  {isOwnProfile
+                    ? `${generateShortNameFromWallet(userAddress)} Dashboard`
+                    : "User Profile"}
+                  {userPoints.rank <= 10 && userPoints.rank > 0 && (
+                    <Crown className="h-6 w-6 text-yellow-500" />
+                  )}
                 </h1>
                 <div className="flex items-center space-x-2 mb-3">
                   <code className="text-[#9b87f5] bg-gray-800/50 px-2 py-1 rounded text-sm font-mono">
@@ -589,10 +606,17 @@ export default function UserDashboardPage() {
                       ).toLocaleDateString()}
                     </span>
                   </div>
-                  {data.profile.rank > 0 && (
+                  {/* Points System Integration */}
+                  <div className="flex items-center space-x-1">
+                    <Award className="h-4 w-4 text-[#9b87f5]" />
+                    <span className="text-[#9b87f5] font-medium">
+                      {userPoints.points.toLocaleString()} FlowWager Points
+                    </span>
+                  </div>
+                  {userPoints.rank > 0 && (
                     <div className="flex items-center space-x-1">
                       <Trophy className="h-4 w-4 text-yellow-400" />
-                      <span>Rank #{data.profile.rank}</span>
+                      <span>Rank #{userPoints.rank}</span>
                     </div>
                   )}
                   <div className="flex items-center space-x-1">
@@ -660,8 +684,31 @@ export default function UserDashboardPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Summary Cards - Enhanced with Points */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* FlowWager Points Card */}
+          <Card className="bg-gradient-to-br from-[#9b87f5]/20 to-[#8b5cf6]/20 border-[#9b87f5]/30">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="p-2 bg-[#9b87f5]/20 rounded-lg">
+                  <Award className="h-5 w-5 text-[#9b87f5]" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">
+                  FlowWager Points
+                </span>
+                {userPoints.rank <= 10 && userPoints.rank > 0 && (
+                  <Crown className="h-4 w-4 text-yellow-500" />
+                )}
+              </div>
+              <p className="text-2xl font-bold text-[#9b87f5]">
+                {userPoints.points.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {userPoints.rank > 0 ? `Rank #${userPoints.rank}` : "Unranked"}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3 mb-3">
@@ -698,8 +745,6 @@ export default function UserDashboardPage() {
             </CardContent>
           </Card>
 
-  
-
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3 mb-3">
@@ -716,7 +761,84 @@ export default function UserDashboardPage() {
               <p className="text-xs text-gray-400 mt-1">Markets Created</p>
             </CardContent>
           </Card>
+
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="p-2 bg-orange-500/20 rounded-lg">
+                  <Zap className="h-5 w-5 text-orange-400" />
+                </div>
+                <span className="text-sm font-medium text-gray-400">
+                  Win Streak
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-white">
+                {winRate.toFixed(0)}%
+              </p>
+              <p className="text-xs text-gray-400 mt-1">Win Rate</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Points Quick Actions */}
+        {isOwnProfile && (
+          <Card className="bg-gradient-to-br from-[#9b87f5]/10 to-[#8b5cf6]/10 border-[#9b87f5]/20">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Award className="h-5 w-5 text-[#9b87f5]" />
+                Earn More Points
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4">
+                <Link href="/dashboard/create" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-[#9b87f5]/10 to-[#8b5cf6]/10 border-[#9b87f5]/30 hover:bg-gradient-to-br hover:from-[#9b87f5]/20 hover:to-[#8b5cf6]/20 hover:border-[#9b87f5]/50 text-white transition-all duration-300"
+                  >
+                    <Plus className="h-6 w-6 text-[#9b87f5]" />
+                    <span className="text-white font-medium">
+                      Create Market
+                    </span>
+                    <Badge className="bg-[#9b87f5]/30 text-[#9b87f5] border-[#9b87f5]/50 text-xs">
+                      +100 pts
+                    </Badge>
+                  </Button>
+                </Link>
+
+                <Link href="/markets" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border-purple-500/30 hover:bg-gradient-to-br hover:from-purple-500/20 hover:to-indigo-500/20 hover:border-purple-500/50 text-white transition-all duration-300"
+                  >
+                    <Target className="h-6 w-6 text-purple-400" />
+                    <span className="text-white font-medium">Place Bet</span>
+                    <Badge className="bg-purple-500/30 text-purple-400 border-purple-500/50 text-xs">
+                      +40 pts
+                    </Badge>
+                  </Button>
+                </Link>
+
+                <Link href="/leaderboard" className="w-full">
+                  <Button
+                    variant="outline"
+                    className="w-full h-24 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/30 hover:bg-gradient-to-br hover:from-yellow-500/20 hover:to-amber-500/20 hover:border-yellow-500/50 text-white transition-all duration-300"
+                  >
+                    <Trophy className="h-6 w-6 text-yellow-400" />
+                    <span className="text-white font-medium">
+                      View Leaderboard
+                    </span>
+                    <Badge className="bg-yellow-500/30 text-yellow-400 border-yellow-500/50 text-xs">
+                      {userPoints.rank > 0
+                        ? `Rank #${userPoints.rank}`
+                        : "Unranked"}
+                    </Badge>
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {data.claimableWinnings && data.claimableWinnings.length > 0 && (
           <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 my-6">
@@ -739,7 +861,10 @@ export default function UserDashboardPage() {
                       (m) => m.id.toString() === win.marketId.toString()
                     );
                     return (
-                      <tr key={win.marketId} className="border-b border-gray-800">
+                      <tr
+                        key={win.marketId}
+                        className="border-b border-gray-800"
+                      >
                         <td className="px-2 py-2 text-white">
                           {market ? market.title : `Market #${win.marketId}`}
                         </td>
@@ -755,7 +880,6 @@ export default function UserDashboardPage() {
                               parseFloat(win.amount) <= 0
                             }
                             onClick={async () => {
-                              // Check if already claimed before proceeding
                               if (win.claimed === true) {
                                 setClaimError("Winnings already claimed");
                                 return;
@@ -765,18 +889,41 @@ export default function UserDashboardPage() {
                               setClaimError(null);
                               setClaimSuccess(null);
                               try {
-                                const txScript = await claimWinningsTransaction();
+                                const txScript =
+                                  await claimWinningsTransaction();
                                 const authorization =
                                   fcl.currentUser.authorization;
                                 await fcl.mutate({
                                   cadence: txScript,
-                                  args: (arg, t) => [arg(win.marketId, t.UInt64)],
+                                  args: (arg, t) => [
+                                    arg(win.marketId, t.UInt64),
+                                  ],
                                   proposer: authorization,
                                   payer: authorization,
                                   authorizations: [authorization],
                                   limit: 1000,
                                 });
-                                setClaimSuccess("Winnings claimed successfully!");
+
+                                // Award points for winning
+                                const market = allMarkets.find(
+                                  (m) =>
+                                    m.id.toString() === win.marketId.toString()
+                                );
+                                await awardPoints(
+                                  "WIN_BET",
+                                  {
+                                    marketId: win.marketId,
+                                    marketTitle:
+                                      market?.title ||
+                                      `Market #${win.marketId}`,
+                                    winnings: parseFloat(win.amount),
+                                  },
+                                  win.marketId
+                                );
+
+                                setClaimSuccess(
+                                  "Winnings claimed successfully!"
+                                );
                                 setTimeout(() => setClaimSuccess(null), 2000);
                                 await fetchUserData();
                                 await fetchUserTrades(userAddress);
@@ -908,74 +1055,8 @@ export default function UserDashboardPage() {
             )}
 
             <div className="grid lg:grid-cols-2 gap-6">
-              <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
-                    <span>Recent Activity</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setActiveTab("activity")}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 scrollbar-hide overflow-y-auto max-h-96">
-                    {data.recentActivity.length === 0 ? (
-                      <div className="text-center py-8 text-gray-400">
-                        <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No recent activity</p>
-                        <p className="text-xs mt-2">
-                          Activity tracking coming soon
-                        </p>
-                      </div>
-                    ) : (
-                      data.recentActivity.slice(0, 5).map((activity) => (
-                        <div
-                          key={activity.id}
-                          className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-800/30 transition-colors"
-                        >
-                          <div className="flex-shrink-0 mt-0.5">
-                            {getActivityIcon(activity.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white line-clamp-1">
-                              {activity.marketTitle}
-                            </p>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span
-                                className={`text-sm ${getActivityColor(
-                                  activity.type
-                                )}`}
-                              >
-                                {activity.type === "BuyShares" &&
-                                  `Bought ${activity.side?.toUpperCase()} shares`}
-                                {activity.type === "SellShares" &&
-                                  `Sold ${activity.side?.toUpperCase()} shares`}
-                                {activity.type === "ClaimWinnings" &&
-                                  "Claimed winnings"}
-                                {activity.type === "CreateMarket" &&
-                                  "Created market"}
-                              </span>
-                              {activity.amount && (
-                                <>
-                                  <span className="text-gray-500">•</span>
-                                  <span className="text-sm font-medium text-white">
-                                    {formatCurrency(activity.amount)} FLOW
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1"></p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Replace Recent Activity with Points Activities */}
+              {isOwnProfile && <UserActivities />}
 
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
                 <CardHeader>
@@ -1008,6 +1089,24 @@ export default function UserDashboardPage() {
                       value={Math.min(reputation || 0, 100)}
                       className="h-2 bg-gray-800"
                     />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-400">
+                        FlowWager Points Progress
+                      </span>
+                      <span className="text-[#9b87f5] font-medium">
+                        {userPoints.points.toLocaleString()}
+                      </span>
+                    </div>
+                    <Progress
+                      value={Math.min((userPoints.points / 10000) * 100, 100)}
+                      className="h-2 bg-gray-800"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Progress to next milestone (10,000 points)
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-800/50">
@@ -1180,52 +1279,56 @@ export default function UserDashboardPage() {
           </TabsContent>
 
           <TabsContent value="activity">
-            <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-              <CardHeader>
-                <CardTitle className="text-white">Trading Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentActivity.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">
-                      <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No recent activity</p>
-                      <p className="text-xs mt-2">
-                        Activity tracking coming soon
-                      </p>
-                    </div>
-                  ) : (
-                    recentActivity.slice(0, 5).map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-800/30 transition-colors"
-                      >
-                        <div className="flex-shrink-0 mt-0.5">
-                          {getActivityIcon(activity.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white line-clamp-1">
-                            {activity.marketTitle}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span
-                              className={`text-sm ${getActivityColor(
-                                activity.type
-                              )}`}
-                            >
-                              Created market
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {formatRelativeTime(activity.timestamp)}
-                          </p>
-                        </div>
+            {isOwnProfile ? (
+              <UserActivities />
+            ) : (
+              <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+                <CardHeader>
+                  <CardTitle className="text-white">Trading Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentActivity.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No recent activity</p>
+                        <p className="text-xs mt-2">
+                          Activity tracking coming soon
+                        </p>
                       </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    ) : (
+                      recentActivity.slice(0, 5).map((activity) => (
+                        <div
+                          key={activity.id}
+                          className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-800/30 transition-colors"
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            {getActivityIcon(activity.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white line-clamp-1">
+                              {activity.marketTitle}
+                            </p>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span
+                                className={`text-sm ${getActivityColor(
+                                  activity.type
+                                )}`}
+                              >
+                                Created market
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {formatRelativeTime(activity.timestamp)}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="markets">
