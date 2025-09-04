@@ -35,6 +35,8 @@ import {
   getUserProfile,
 } from "@/lib/flow-wager-scripts";
 import Image from "next/image";
+import { PointsManager } from "@/lib/points-system";
+import { MarketCategory } from "@/types";
 
 // Market categories matching your FlowWager contract enum values
 const MARKET_CATEGORIES = [
@@ -487,6 +489,26 @@ export function CreateMarketForm({
             error: err.message || "Failed to create market",
           });
         return;
+      }
+      // Award points for market creation
+      try {
+        await PointsManager.awardPoints(
+          user.addr,
+          "CREATE_MARKET",
+          {
+            marketTitle: formData.question,
+            marketCategory: MarketCategory[formData.category],
+            marketId: Date.now(), // If you get the ID back
+            timestamp: new Date().toISOString(),
+          },
+          Date.now()
+        );
+
+        console.log("✅ Market creation activity logged");
+        toast.success("Market created successfully! +100 FlowWager Points!");
+      } catch (error) {
+        console.error("❌ Error logging market creation:", error);
+        toast.success("Market created successfully!");
       }
       toast.success("Market created successfully on Flow blockchain!");
       if (onSubmit) {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -6,25 +7,95 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { usePoints } from '@/hooks/usePoints';
-import { LeaderboardUser } from '@/lib/leaderboard-service';
+import { PointsManager } from '@/lib/points-system'; // 🎯 USE YOUR POINTS SYSTEM
 import { useAuth } from '@/providers/auth-provider';
-import { Award, BarChart3, Calendar, Crown, Medal, Target, Trophy, Users, Zap } from 'lucide-react';
+import { Award, BarChart3, Crown, Medal, Target, Trophy, Users, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+interface LeaderboardUser {
+  user_address: string;
+  total_points: number;
+  total_staked: number;
+  total_winnings: number;
+  total_losses: number;
+  markets_participated: number;
+  win_streak: number;
+  current_streak: number;
+  longest_win_streak: number;
+  rank: number;
+  username?: string;
+  display_name?: string;
+  profile_image_url?: string;
+}
 
 export default function LeaderboardPage() {
-  const { 
-    users, 
-    loading, 
-    error, 
-    timeframe, 
-    setTimeframe, 
-    category, 
-    setCategory 
-  } = useLeaderboard();
+  const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<'total-points' | 'market-creation' | 'betting' | 'resolution'>('total-points');
+  const [timeframe, setTimeframe] = useState<'all-time' | 'monthly' | 'weekly'>('all-time');
   
   const { user } = useAuth();
-  const { userPoints } = usePoints();
+  const [userRank, setUserRank] = useState<LeaderboardUser | null>(null);
+
+  const fetchLeaderboard = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('🏆 Fetching leaderboard data...');
+
+      // Get leaderboard data from your PointsManager
+      const leaderboardData = await PointsManager.getLeaderboard(100);
+      
+      console.log('📊 Raw leaderboard data:', leaderboardData);
+
+      // Format the data
+      const formattedUsers: LeaderboardUser[] = leaderboardData.map((entry, index) => ({
+        user_address: entry.user_address,
+        total_points: entry.total_points || 0,
+        total_staked: entry.total_staked || 0,
+        total_winnings: entry.total_winnings || 0,
+        total_losses: entry.total_losses || 0,
+        markets_participated: entry.markets_participated || 0,
+        win_streak: entry.win_streak || 0,
+        current_streak: entry.current_streak || 0,
+        longest_win_streak: entry.longest_win_streak || 0,
+        rank: index + 1,
+        username: `${entry.user_address.slice(0, 6)}...${entry.user_address.slice(-4)}`,
+        display_name: `User ${entry.user_address.slice(0, 6)}`,
+        profile_image_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${entry.user_address}`
+      }));
+
+      // Sort by total points (highest first) - this is crucial!
+      formattedUsers.sort((a, b) => b.total_points - a.total_points);
+      
+      // Re-assign ranks after sorting
+      formattedUsers.forEach((user, index) => {
+        user.rank = index + 1;
+      });
+
+      console.log('✅ Formatted users:', formattedUsers.slice(0, 3)); // Log top 3
+      setUsers(formattedUsers);
+
+      // Find current user's rank
+      if (user?.addr) {
+        const currentUserEntry = formattedUsers.find(u => u.user_address === user.addr);
+        setUserRank(currentUserEntry || null);
+        console.log('👤 Current user rank:', currentUserEntry);
+      }
+
+    } catch (err: any) {
+      console.error('❌ Error fetching leaderboard:', err);
+      setError(err.message || 'Failed to fetch leaderboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [user?.addr]);
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -42,30 +113,44 @@ export default function LeaderboardPage() {
   const getValueByCategory = (user: LeaderboardUser) => {
     switch (category) {
       case 'total-points':
-        if (timeframe === 'weekly') return `${user.weekly_points.toLocaleString()} pts`;
-        if (timeframe === 'monthly') return `${user.monthly_points.toLocaleString()} pts`;
-        return `${user.flowwager_points.toLocaleString()} pts`;
+        return `${user.total_points.toLocaleString()} pts`;
       case 'market-creation':
-        return `${user.markets_created} markets`;
+        return `${user.markets_participated} markets`; // Using markets_participated since we don't have markets_created
       case 'betting':
-        return `${user.bets_placed} bets`;
+        return `${user.total_staked.toFixed(2)} FLOW staked`;
       case 'resolution':
-        return `${user.markets_resolved} resolved`;
+        return `${user.total_winnings.toFixed(2)} FLOW won`;
       default:
-        return `${user.flowwager_points.toLocaleString()} pts`;
+        return `${user.total_points.toLocaleString()} pts`;
+    }
+  };
+
+  const getSortedUsers = () => {
+    const sortedUsers = [...users];
+    switch (category) {
+      case 'total-points':
+        return sortedUsers.sort((a, b) => b.total_points - a.total_points);
+      case 'market-creation':
+        return sortedUsers.sort((a, b) => b.markets_participated - a.markets_participated);
+      case 'betting':
+        return sortedUsers.sort((a, b) => b.total_staked - a.total_staked);
+      case 'resolution':
+        return sortedUsers.sort((a, b) => b.total_winnings - a.total_winnings);
+      default:
+        return sortedUsers;
     }
   };
 
   const getCategoryLabel = () => {
     switch (category) {
       case 'total-points':
-        return `FlowWager Points ${timeframe === 'all-time' ? '(All Time)' : timeframe === 'weekly' ? '(This Week)' : '(This Month)'}`;
+        return 'FlowWager Points (All Time)';
       case 'market-creation':
-        return 'Markets Created';
+        return 'Markets Participated';
       case 'betting':
-        return 'Bets Placed';
+        return 'Total Staked';
       case 'resolution':
-        return 'Markets Resolved';
+        return 'Total Winnings';
       default:
         return 'FlowWager Points';
     }
@@ -74,7 +159,10 @@ export default function LeaderboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0C14] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#9b87f5]"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#9b87f5] mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading leaderboard...</p>
+        </div>
       </div>
     );
   }
@@ -84,11 +172,13 @@ export default function LeaderboardPage() {
       <div className="min-h-screen bg-[#0A0C14] flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-400 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>Try Again</Button>
+          <Button onClick={fetchLeaderboard}>Try Again</Button>
         </div>
       </div>
     );
   }
+
+  const sortedUsers = getSortedUsers();
 
   return (
     <div className="min-h-screen bg-[#0A0C14]">
@@ -106,90 +196,86 @@ export default function LeaderboardPage() {
           </p>
           
           {/* Current User Rank */}
-          {user && userPoints.rank > 0 && (
+          {user && userRank && (
             <div className="flex items-center gap-4 p-4 bg-[#9b87f5]/10 border border-[#9b87f5]/20 rounded-lg">
               <div className="flex items-center gap-2">
                 <Award className="h-5 w-5 text-[#9b87f5]" />
                 <span className="text-white font-medium">Your Rank:</span>
               </div>
               <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
-                #{userPoints.rank}
+                #{userRank.rank}
               </Badge>
               <div className="text-gray-400">
-                {userPoints.points.toLocaleString()} FlowWager Points
+                {userRank.total_points.toLocaleString()} FlowWager Points
               </div>
             </div>
           )}
-        </div>
 
-        {/* Category and Timeframe Selection */}
-        <div className="mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Category Selection */}
-            <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-              <CardHeader>
-                <CardTitle className="text-white text-sm">Ranking Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={category} onValueChange={(value) => setCategory(value as any)}>
-                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-gray-800/50">
-                    <TabsTrigger value="total-points" className="flex items-center gap-1 text-xs">
-                      <Award className="h-3 w-3" />
-                      Points
-                    </TabsTrigger>
-                    <TabsTrigger value="market-creation" className="flex items-center gap-1 text-xs">
-                      <BarChart3 className="h-3 w-3" />
-                      Create
-                    </TabsTrigger>
-                    <TabsTrigger value="betting" className="flex items-center gap-1 text-xs">
-                      <Target className="h-3 w-3" />
-                      Bet
-                    </TabsTrigger>
-                    <TabsTrigger value="resolution" className="flex items-center gap-1 text-xs">
-                      <Zap className="h-3 w-3" />
-                      Resolve
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </CardContent>
-            </Card>
-
-            {/* Timeframe Selection */}
-            {category === 'total-points' && (
-              <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
-                <CardHeader>
-                  <CardTitle className="text-white text-sm">Time Period</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as any)}>
-                    <TabsList className="grid w-full grid-cols-3 bg-gray-800/50">
-                      <TabsTrigger value="all-time" className="flex items-center gap-1 text-xs">
-                        <Trophy className="h-3 w-3" />
-                        All Time
-                      </TabsTrigger>
-                      <TabsTrigger value="monthly" className="flex items-center gap-1 text-xs">
-                        <Calendar className="h-3 w-3" />
-                        Month
-                      </TabsTrigger>
-                      <TabsTrigger value="weekly" className="flex items-center gap-1 text-xs">
-                        <Calendar className="h-3 w-3" />
-                        Week
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            )}
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div className="bg-[#0A0C14]/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-white">{users.length}</p>
+              <p className="text-xs text-gray-400">Total Users</p>
+            </div>
+            <div className="bg-[#0A0C14]/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-[#9b87f5]">
+                {users.reduce((sum, u) => sum + u.total_points, 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-400">Total Points</p>
+            </div>
+            <div className="bg-[#0A0C14]/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-green-400">
+                {users.reduce((sum, u) => sum + u.total_staked, 0).toFixed(0)}
+              </p>
+              <p className="text-xs text-gray-400">Total Staked</p>
+            </div>
+            <div className="bg-[#0A0C14]/50 rounded-lg p-3 text-center">
+              <p className="text-2xl font-bold text-yellow-400">
+                {users.reduce((sum, u) => sum + u.markets_participated, 0)}
+              </p>
+              <p className="text-xs text-gray-400">Markets</p>
+            </div>
           </div>
         </div>
 
+        {/* Category Selection */}
+        <div className="mb-8">
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+            <CardHeader>
+              <CardTitle className="text-white text-sm">Ranking Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={category} onValueChange={(value) => setCategory(value as any)}>
+                <TabsList className="grid w-full grid-cols-4 bg-gray-800/50">
+                  <TabsTrigger value="total-points" className="flex items-center gap-1 text-xs">
+                    <Award className="h-3 w-3" />
+                    Points
+                  </TabsTrigger>
+                  <TabsTrigger value="market-creation" className="flex items-center gap-1 text-xs">
+                    <BarChart3 className="h-3 w-3" />
+                    Markets
+                  </TabsTrigger>
+                  <TabsTrigger value="betting" className="flex items-center gap-1 text-xs">
+                    <Target className="h-3 w-3" />
+                    Staked
+                  </TabsTrigger>
+                  <TabsTrigger value="resolution" className="flex items-center gap-1 text-xs">
+                    <Zap className="h-3 w-3" />
+                    Winnings
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Top 3 Podium */}
-        {users.length >= 3 && (
+        {sortedUsers.length >= 3 && (
           <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {users.slice(0, 3).map((user, index) => (
+              {sortedUsers.slice(0, 3).map((user, index) => (
                 <Card 
-                  key={user.id} 
+                  key={user.user_address} 
                   className={`bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 relative overflow-hidden ${
                     index === 0 ? 'ring-2 ring-yellow-500/50' : 
                     index === 1 ? 'ring-2 ring-gray-400/50' : 
@@ -203,11 +289,11 @@ export default function LeaderboardPage() {
                     <Avatar className="h-16 w-16 mx-auto mb-4">
                       <AvatarImage src={user.profile_image_url} alt={user.username} />
                       <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5]">
-                        {user.username.slice(0, 2).toUpperCase()}
+                        {user.user_address.slice(2, 4).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <CardTitle className="flex items-center justify-center gap-2 text-white">
-                      {user.display_name || user.username}
+                      {user.display_name}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="text-center">
@@ -215,32 +301,23 @@ export default function LeaderboardPage() {
                       <div>
                         <p className="text-sm text-gray-400">FlowWager Points</p>
                         <p className="text-xl font-bold text-[#9b87f5]">
-                          {user.flowwager_points.toLocaleString()}
+                          {user.total_points.toLocaleString()}
                         </p>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <p className="text-gray-400">Markets</p>
-                          <p className="font-medium text-white">{user.markets_created}</p>
+                          <p className="text-gray-400">Staked</p>
+                          <p className="font-medium text-white">{user.total_staked.toFixed(1)}</p>
                         </div>
                         <div>
-                          <p className="text-gray-400">Bets</p>
-                          <p className="font-medium text-white">{user.bets_placed}</p>
+                          <p className="text-gray-400">Winnings</p>
+                          <p className="font-medium text-white">{user.total_winnings.toFixed(1)}</p>
                         </div>
                       </div>
-                      {user.login_streak > 0 && (
-                        <div className="text-center">
-                          <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
-                            🔥 {user.login_streak} day streak
-                          </Badge>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1 justify-center">
-                        {user.badges.slice(0, 2).map((badge) => (
-                          <Badge key={badge} className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 text-xs">
-                            {badge}
-                          </Badge>
-                        ))}
+                      <div className="text-center">
+                        <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 text-xs">
+                          Rank #{index + 1}
+                        </Badge>
                       </div>
                     </div>
                   </CardContent>
@@ -257,59 +334,68 @@ export default function LeaderboardPage() {
               <span>{getCategoryLabel()}</span>
               <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                 <Users className="h-3 w-3 mr-1" />
-                {users.length} Traders
+                {sortedUsers.length} Users
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {users.map((user, index) => (
-                <div 
-                  key={user.id} 
-                  className="flex items-center justify-between p-4 rounded-lg bg-[#0A0C14]/50 border border-gray-800/30 hover:bg-gray-800/20 transition-colors cursor-pointer"
-                  onClick={() => window.location.href = `/dashboard/${user.address}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-8">
-                      {getRankIcon(index + 1)}
-                    </div>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.profile_image_url} alt={user.username} />
-                      <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5]">
-                        {user.username.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-white">
-                          {user.display_name || user.username}
-                        </h3>
-                        {user.login_streak > 7 && (
-                          <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
-                            🔥 {user.login_streak}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex gap-4 text-sm text-gray-400">
-                        <span>Activities: {user.total_activities}</span>
-                        <span>Markets: {user.markets_created}</span>
-                        <span>Bets: {user.bets_placed}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-[#9b87f5]">
-                      {getValueByCategory(user)}
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      {category === 'total-points' 
-                        ? `${user.total_activities} activities` 
-                        : `${user.flowwager_points.toLocaleString()} pts total`
-                      }
-                    </div>
-                  </div>
+              {sortedUsers.length === 0 ? (
+                <div className="text-center py-12 text-gray-400">
+                  <Trophy className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg mb-2">No users found</p>
+                  <p className="text-sm">Start betting to appear on the leaderboard!</p>
                 </div>
-              ))}
+              ) : (
+                sortedUsers.map((user, index) => (
+                  <div 
+                    key={user.user_address} 
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer ${
+                      user.user_address === `${user?.user_address}`
+                        ? 'bg-[#9b87f5]/10 border-[#9b87f5]/30 hover:bg-[#9b87f5]/20'
+                        : 'bg-[#0A0C14]/50 border-gray-800/30 hover:bg-gray-800/20'
+                    }`}
+                    onClick={() => window.location.href = `/dashboard/${user.user_address}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center w-8">
+                        {getRankIcon(index + 1)}
+                      </div>
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.profile_image_url} alt={user.username} />
+                        <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5]">
+                          {user.user_address.slice(2, 4).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-white">
+                            {user.display_name}
+                          </h3>
+                          {index < 10 && (
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
+                              Top 10
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex gap-4 text-sm text-gray-400">
+                          <span>{user.username}</span>
+                          <span>{user.total_points} pts</span>
+                          <span>{user.markets_participated} markets</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-[#9b87f5]">
+                        {getValueByCategory(user)}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        Rank #{index + 1}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

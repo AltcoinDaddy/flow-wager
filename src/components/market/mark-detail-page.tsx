@@ -6,6 +6,7 @@ import { BetDialog } from "@/components/market/bet-dialog";
 import { CountdownTimer } from "@/components/market/countdown-timer";
 import { MarketError } from "@/components/market/market-error";
 import { MarketLoading } from "@/components/market/market-loading";
+import { MarketActivity } from "@/components/market/market-activity"; // 🎯 ADD THIS IMPORT
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
   Users,
   Volume2,
   Zap,
+  Activity, // 🎯 ADD THIS IMPORT
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -272,7 +274,9 @@ export default function MarketDetailPage() {
             {getCategoryName(market.category)}
           </Link>
           <span>/</span>
-          <span className="text-white font-medium truncate">{market.title}</span>
+          <span className="text-white font-medium truncate">
+            {market.title}
+          </span>
         </div>
 
         {/* Enhanced Market Header - Mobile responsive */}
@@ -405,7 +409,9 @@ export default function MarketDetailPage() {
 
               <div className="flex items-center space-x-2">
                 <Volume2 className="h-4 w-4 text-green-400 flex-shrink-0" />
-                <span className="whitespace-nowrap">{formatCurrency(market.totalPool)} FLOW volume</span>
+                <span className="whitespace-nowrap">
+                  {formatCurrency(market.totalPool)} FLOW volume
+                </span>
               </div>
             </div>
           </div>
@@ -525,7 +531,9 @@ export default function MarketDetailPage() {
                     <div className="text-center">
                       <div className="text-base sm:text-lg font-bold flex items-center justify-center space-x-2">
                         {isBettingDisabled && <Lock className="h-4 w-4" />}
-                        <span className="truncate max-w-[120px] sm:max-w-none">{market.optionA}</span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">
+                          {market.optionA}
+                        </span>
                       </div>
                       <div className="text-sm opacity-90">
                         {optionAPercentage.toFixed(0)}%
@@ -545,7 +553,9 @@ export default function MarketDetailPage() {
                     <div className="text-center">
                       <div className="text-base sm:text-lg font-bold flex items-center justify-center space-x-2">
                         {isBettingDisabled && <Lock className="h-4 w-4" />}
-                        <span className="truncate max-w-[120px] sm:max-w-none">{market.optionB}</span>
+                        <span className="truncate max-w-[120px] sm:max-w-none">
+                          {market.optionB}
+                        </span>
                       </div>
                       <div className="text-sm opacity-90">
                         {optionBPercentage.toFixed(0)}%
@@ -584,92 +594,46 @@ export default function MarketDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Enhanced Market Details Tabs - Mobile optimized */}
+            {/* Enhanced Market Details Tabs - UPDATED TO ONLY SHOW BETS AND COMMENTS */}
             <div className="space-y-4">
-              <Tabs defaultValue="activity" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-xl p-1 h-10 sm:h-12">
+              <Tabs defaultValue="bets" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-xl p-1 h-10 sm:h-12">
                   <TabsTrigger
-                    value="activity"
+                    value="bets"
                     className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
                   >
-                    Activity
+                    <Activity className="h-3 w-3 mr-1" />
+                    Bets
                   </TabsTrigger>
                   <TabsTrigger
                     value="comments"
                     className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
                   >
+                    <Users className="h-3 w-3 mr-1" />
                     Comments
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="chart"
-                    className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#9b87f5] data-[state=active]:to-[#8b5cf6] data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=inactive]:text-gray-400 data-[state=inactive]:hover:text-white transition-all duration-200 rounded-lg h-8 sm:h-10 font-medium text-xs sm:text-sm"
-                  >
-                    Chart
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="activity" className="mt-4">
-                  <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
-                      <div className="space-y-3 sm:space-y-4">
-                        {trades.length === 0 ? (
-                          <div className="text-center py-8 sm:py-12 text-gray-400">
-                            <BarChart3 className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-4 opacity-50" />
-                            <p className="text-base sm:text-lg font-medium">No trades yet</p>
-                            <p className="text-sm">Be the first to trade!</p>
-                          </div>
-                        ) : (
-                          trades.map((trade) => (
-                            <div
-                              key={trade.id}
-                              className="flex items-center justify-between p-3 sm:p-4 rounded-xl hover:bg-gray-800/30 transition-colors border border-gray-800/30"
-                            >
-                              <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                                <Badge
-                                  variant={
-                                    trade.option === 0 ? "default" : "secondary"
-                                  }
-                                  className={`text-xs flex-shrink-0 ${
-                                    trade.option === 0
-                                      ? "bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium"
-                                      : "bg-gray-700/50 text-gray-300 font-medium"
-                                  }`}
-                                >
-                                  {trade.option === 0
-                                    ? market.optionA
-                                    : market.optionB}
-                                </Badge>
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-semibold text-white text-sm sm:text-base">
-                                    {formatCurrency(trade.amount)} FLOW
-                                  </div>
-                                  <div className="text-xs sm:text-sm text-gray-400 truncate">
-                                    by {trade.user.slice(0, 6)}...
-                                    {trade.user.slice(-4)} •{" "}
-                                    {formatRelativeTime(trade.timestamp)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="font-semibold text-white text-sm sm:text-base">
-                                  {formatCurrency(trade.price)} FLOW
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                {/* Bets Tab Content */}
+                <TabsContent value="bets" className="mt-4">
+                  <MarketActivity
+                    marketId={market.id}
+                    marketTitle={market.title}
+                    optionA={market.optionA}
+                    optionB={market.optionB}
+                  />
                 </TabsContent>
 
+                {/* Comments Tab Content */}
                 <TabsContent value="comments" className="mt-4">
                   <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
                     <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6 space-y-4 sm:space-y-6">
                       {comments.length === 0 ? (
                         <div className="text-center py-8 sm:py-12 text-gray-400">
                           <Users className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-base sm:text-lg font-medium">No comments yet</p>
+                          <p className="text-base sm:text-lg font-medium">
+                            No comments yet
+                          </p>
                           <p className="text-sm">Start the discussion!</p>
                         </div>
                       ) : (
@@ -707,25 +671,6 @@ export default function MarketDetailPage() {
                           </div>
                         ))
                       )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="chart" className="mt-4">
-                  <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
-                      <div className="h-48 sm:h-64 flex items-center justify-center text-gray-400">
-                        <div className="text-center">
-                          <BarChart3 className="h-12 sm:h-16 w-12 sm:w-16 mx-auto mb-4 opacity-50" />
-                          <p className="text-base sm:text-lg font-medium mb-2">
-                            Price chart data: {priceHistory.length} points
-                            available
-                          </p>
-                          <p className="text-sm">
-                            Chart visualization coming soon
-                          </p>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -810,7 +755,9 @@ export default function MarketDetailPage() {
             {/* Enhanced Creator Info */}
             <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
               <CardHeader className="pb-3 sm:pb-6">
-                <CardTitle className="text-white text-lg sm:text-xl">Market Creator</CardTitle>
+                <CardTitle className="text-white text-lg sm:text-xl">
+                  Market Creator
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center space-x-3">

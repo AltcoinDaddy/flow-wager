@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/utils/supabase/client";
-import { toast } from "sonner";
 
 export interface ActivityDetails {
   marketId?: number;
@@ -32,89 +31,112 @@ export class PointsManager {
   static async awardPoints(
     userAddress: string,
     activityType: ActivityType,
-    details?: ActivityDetails,
+    details: ActivityDetails,
     marketId?: number
   ): Promise<boolean> {
     try {
-      const points = ACTIVITY_POINTS[activityType];
-      const now = new Date().toISOString();
-
-      // Start a transaction-like operation
-      const { data: currentStats, error: fetchError } = await supabase
-        .from("user_stats")
-        .select("*")
-        .eq("address", userAddress)
-        .single();
-
-      if (fetchError) {
-        console.error("Error fetching user stats:", fetchError);
-        return false;
-      }
-
-      // Calculate new stats
-      const newPoints = (currentStats.flowwager_points || 0) + points;
-      
-      // Update user stats
-      const { error: updateError } = await supabase
-        .from("user_stats")
-        .update({
-          flowwager_points: newPoints,
-          last_updated: now,
-          // Update other relevant stats based on activity
-          ...(activityType === "PLACE_BET" && details?.betAmount && {
-            total_staked: (currentStats.total_staked || 0) + details.betAmount,
-            total_markets_participated: (currentStats.total_markets_participated || 0) + 1,
-            average_bet_size: ((currentStats.total_staked || 0) + details.betAmount) / 
-                            ((currentStats.total_markets_participated || 0) + 1)
-          }),
-          ...(activityType === "WIN_BET" && details?.winnings && {
-            total_winnings: (currentStats.total_winnings || 0) + details.winnings,
-            win_streak: (currentStats.win_streak || 0) + 1,
-            current_streak: (currentStats.current_streak || 0) + 1,
-            longest_win_streak: Math.max(
-              currentStats.longest_win_streak || 0, 
-              (currentStats.win_streak || 0) + 1
-            ),
-            roi: (((currentStats.total_winnings || 0) + details.winnings) / 
-                  Math.max(currentStats.total_staked || 1, 1)) * 100
-          })
-        })
-        .eq("address", userAddress);
-
-      if (updateError) {
-        console.error("Error updating user stats:", updateError);
-        return false;
-      }
-
-      // Log the activity
-      const { error: activityError } = await supabase
-        .from("activities")
-        .insert({
-          user_address: userAddress,
-          activity_type: activityType.toLowerCase(),
-          details: {
-            ...details,
-            points_awarded: points,
-            timestamp: now
-          },
-          points_earned: points,
-          market_id: marketId || null,
-          created_at: now
-        });
-
-      if (activityError) {
-        console.error("Error logging activity:", activityError);
-        return false;
-      }
-
-      // Show success notification
-      toast.success(`+${points} FlowWager Points earned!`, {
-        description: `Activity: ${activityType.replace(/_/g, ' ').toLowerCase()}`
+      console.log('📊 PointsManager.awardPoints called:', {
+        userAddress,
+        activityType,
+        details,
+        marketId
       });
 
+      const points = ACTIVITY_POINTS[activityType];
+
+      // First, ensure user exists in users table
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('address')
+        .eq('address', userAddress)
+        .single();
+
+      if (!existingUser) {
+        // Create user if doesn't exist
+        const { error: userError } = await supabase
+          .from('users')
+          .insert({
+            address: userAddress,
+            username: userAddress.slice(0, 8),
+            display_name: `User ${userAddress.slice(0, 6)}`,
+            created_at: new Date().toISOString()
+          });
+
+        if (userError && userError.code !== '23505') { // Ignore duplicate key error
+          console.error('Error creating user:', userError);
+        }
+      }
+
+      // Insert activity record
+      const activityData = {
+        user_address: userAddress,
+        activity_type: activityType.toLowerCase(), // Use lowercase for consistency
+        market_id: marketId || null,
+        details: details,
+        points_earned: points,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('📝 Inserting activity:', activityData);
+
+      const { data: activityResult, error: activityError } = await supabase
+        .from('activities')
+        .insert(activityData)
+        .select()
+        .single();
+
+      if (activityError) {
+        console.error('❌ Error inserting activity:', activityError);
+        return false;
+      }
+
+      console.log('✅ Activity inserted:', activityResult);
+
+      // Update or create user stats
+      const { data: existingStats } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('address', userAddress)
+        .single();
+
+      const currentStats = existingStats || {
+        address: userAddress,
+        flowwager_points: 0,
+        total_staked: 0,
+        total_winnings: 0,
+        total_losses: 0,
+        total_markets_participated: 0,
+        win_streak: 0,
+        current_streak: 0,
+        longest_win_streak: 0
+      };
+
+      const updatedStats = {
+        ...currentStats,
+        flowwager_points: (currentStats.flowwager_points || 0) + points,
+        last_updated: new Date().toISOString()
+      };
+
+      // Update bet-specific stats
+      if (activityType === 'PLACE_BET' && details.betAmount) {
+        updatedStats.total_staked = (currentStats.total_staked || 0) + details.betAmount;
+        updatedStats.total_markets_participated = (currentStats.total_markets_participated || 0) + 1;
+      }
+
+      const { error: statsError } = await supabase
+        .from('user_stats')
+        .upsert(updatedStats, { onConflict: 'address' });
+
+      if (statsError) {
+        console.error('❌ Error updating user stats:', statsError);
+        return false;
+      }
+
+      console.log('✅ User stats updated');
       return true;
+
     } catch (error) {
-      console.error("Error awarding points:", error);
+      console.error('❌ Error in awardPoints:', error);
       return false;
     }
   }
@@ -161,53 +183,54 @@ export class PointsManager {
   /**
    * Get leaderboard data
    */
-  static async getLeaderboard(limit: number = 50) {
+  static async getLeaderboard(limit: number = 100): Promise<any[]> {
     try {
-      const { data: leaderboard, error } = await supabase
-        .from("user_stats")
+      console.log('🏆 Fetching leaderboard with limit:', limit);
+
+      const { data: leaderboardData, error } = await supabase
+        .from('user_stats')
         .select(`
           address,
           flowwager_points,
           total_staked,
           total_winnings,
+          total_losses,
           total_markets_participated,
           win_streak,
-          roi,
-          users!inner (
-            username,
-            display_name,
-            profile_image_url
-          )
+          current_streak,
+          longest_win_streak,
+          last_updated
         `)
-        .order("flowwager_points", { ascending: false })
+        .order('flowwager_points', { ascending: false }) // 🎯 Sort by points DESC
         .limit(limit);
 
       if (error) {
-        console.error("Error fetching leaderboard:", error);
-        return [];
+        console.error('❌ Error fetching leaderboard:', error);
+        throw error;
       }
 
-      return leaderboard.map((entry, index) => {
-        // Handle the case where users might be an array (though it should be a single object with inner join)
-        const userInfo = Array.isArray(entry.users) ? entry.users[0] : entry.users;
-        
-        return {
-          rank: index + 1,
-          address: entry.address,
-          points: entry.flowwager_points || 0,
-          totalStaked: entry.total_staked || 0,
-          totalWinnings: entry.total_winnings || 0,
-          marketsParticipated: entry.total_markets_participated || 0,
-          winStreak: entry.win_streak || 0,
-          roi: entry.roi || 0,
-          username: userInfo?.username || "Anonymous",
-          displayName: userInfo?.display_name || "Unknown User",
-          profileImage: userInfo?.profile_image_url || null
-        };
-      });
+      console.log('✅ Leaderboard fetched:', leaderboardData?.length, 'entries');
+      console.log('🥇 Top entry:', leaderboardData?.[0]);
+
+      // Format the data with proper structure
+      const formattedData = leaderboardData?.map((entry, index) => ({
+        user_address: entry.address,
+        total_points: entry.flowwager_points || 0,
+        total_staked: entry.total_staked || 0,
+        total_winnings: entry.total_winnings || 0,
+        total_losses: entry.total_losses || 0,
+        markets_participated: entry.total_markets_participated || 0,
+        win_streak: entry.win_streak || 0,
+        current_streak: entry.current_streak || 0,
+        longest_win_streak: entry.longest_win_streak || 0,
+        rank: index + 1,
+        last_updated: entry.last_updated
+      })) || [];
+
+      return formattedData;
     } catch (error) {
-      console.error("Error getting leaderboard:", error);
-      return [];
+      console.error('❌ Error in getLeaderboard:', error);
+      throw error;
     }
   }
 

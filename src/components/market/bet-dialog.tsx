@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PointsManager } from '@/lib/points-system'; // 🎯 CHANGE THIS LINE
 
 interface BetDialogProps {
   open: boolean;
@@ -346,7 +347,28 @@ export function BetDialog({
         };
 
         addBetToHistory(user.addr ?? "", betInfo);
-        toast.success(`Successfully placed ${betAmount} FLOW bet on "${betInfo.optionName}"!`);
+
+        // 🎯 UPDATE THIS: Use your existing points system
+        try {
+          await PointsManager.awardPoints(
+            `${user?.addr}`,
+            'PLACE_BET',
+            {
+              marketId: parseInt(market.id),
+              betAmount: betAmount,
+              marketTitle: market.title,
+              marketCategory: market.category?.toString() || 'unknown',
+              outcome: side === "optionA" ? market.optionA : market.optionB,
+              transactionId
+            },
+            parseInt(market.id)
+          );
+          console.log('✅ Betting points awarded successfully');
+        } catch (pointsError) {
+          console.error('❌ Error awarding betting points:', pointsError);
+        }
+
+        toast.success(`Successfully placed ${betAmount} FLOW bet on "${betInfo.optionName}"! +40 FlowWager Points!`);
 
         await refreshBalance();
         onBetSuccess?.();

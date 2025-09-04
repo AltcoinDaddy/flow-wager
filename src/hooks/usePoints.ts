@@ -90,7 +90,7 @@ export const usePoints = () => {
   ) => {
     if (!user?.addr || !isAuthenticated) return false;
 
-    const success = await PointsManager.awardPoints(user.addr, activityType, details, marketId);
+    const success = await PointsManager.awardPoints(user.addr, activityType, details!, marketId);
     
     if (success) {
       // Refresh user points and activities
