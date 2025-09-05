@@ -1,3 +1,5 @@
+"use client"
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 type FooterLink = {
@@ -36,6 +38,10 @@ const socials: FooterLink[] = [
 ];
 
 export const Footer = () => {
+  const pathname = usePathname()
+
+  if(pathname !== "/") return null
+
   return (
     <footer className=" text-white w-full px-4 sm:px-8 lg:px-16 py-12 mt-8 flex flex-col gap-10">
       {/* Logo & Description */}

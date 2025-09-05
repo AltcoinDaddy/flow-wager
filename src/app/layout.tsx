@@ -8,10 +8,9 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Footer } from "@/components/shared/footer";
 
-// const inter = Inter({ subsets: ["latin"] });
 const bricolage = Bricolage_Grotesque({ subsets: ["latin"] });
 
-// ✅ Global Metadata
+// Global Metadata
 export const metadata = {
   title: {
     default: "FlowWager – Decentralized Prediction Markets",
@@ -19,7 +18,7 @@ export const metadata = {
   },
   description:
     "Trade, predict, and win on FlowWager. Fully on-chain, transparent, and community-driven prediction markets on Flow blockchain.",
-  metadataBase: new URL("https://www.flowwager.xyz"), // your production domain
+  metadataBase: new URL("https://www.flowwager.xyz"),
   openGraph: {
     title: "FlowWager – Decentralized Prediction Markets",
     description:
@@ -42,7 +41,7 @@ export const metadata = {
     title: "FlowWager – Decentralized Prediction Markets",
     description:
       "Trade, predict, and win on FlowWager. Fully on-chain, transparent, and community-driven.",
-    creator: "@flowwager", // update if you have a Twitter handle
+    creator: "@flowwager",
     images: ["https://www.flowwager.xyz/favicon.ico"],
   },
   icons: {
@@ -75,7 +74,6 @@ export default async function RootLayout({
       >
         <ErrorBoundary>
           <AuthProvider>
-            {/* Main app container - relative positioning for modal context */}
             <div className="min-h-screen flex flex-col bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14] text-white relative">
               <TermsGuard>
                 <Header />
