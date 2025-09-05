@@ -1,4 +1,5 @@
 import { ErrorBoundary } from "@/components/shared/error-bounday";
+import { headers } from "next/headers";
 import { Header } from "@/components/shared/header";
 import { TermsGuard } from "@/components/shared/terms-guard";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -59,11 +60,14 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const headersList = await headers();
+  const pathname = headersList.get("x-pathname") || "/";
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -76,7 +80,7 @@ export default function RootLayout({
               <TermsGuard>
                 <Header />
                 <main className="flex-1">{children}</main>
-                <Footer />
+                {pathname === "/" && <Footer />}
               </TermsGuard>
             </div>
             <Toaster theme="dark" position="top-right" />
