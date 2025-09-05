@@ -9,6 +9,7 @@ import { MarketLoading } from "@/components/market/market-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMarketManagement } from "@/hooks/use-market-management";
 import {
@@ -160,45 +161,47 @@ export default function MarketsPage() {
           </div>
 
           {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
-                placeholder="Search markets by title, description, or options..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 bg-[#1A1F2C] border-gray-700 text-white placeholder-gray-400 focus:border-[#9b87f5] focus:ring-[#9b87f5]/20 rounded-xl"
+              placeholder="Search markets by title, description, or options..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-12 h-12 bg-[#1A1F2C] border-gray-700 text-white placeholder-gray-400 focus:border-[#9b87f5] focus:ring-[#9b87f5]/20 rounded-sm"
               />
             </div>
             <div className="flex flex-col md:flex-row gap-3">
               <Button
-                variant={showFilters ? "default" : "outline"}
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 h-12 px-6 rounded-xl font-medium transition-all ${
-                  showFilters
-                    ? "bg-[#9b87f5] text-white hover:bg-[#8b5cf6] shadow-lg"
-                    : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
-                }`}
+              variant={showFilters ? "default" : "outline"}
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center h-12 gap-2 px-6 rounded-sm font-medium transition-all ${
+                showFilters
+                ? "bg-[#9b87f5] text-white hover:bg-[#8b5cf6] shadow-lg"
+                : "border-0 text-white hover:bg-[#1A1F2C] bg-[#1A1F2C] hover:text-white"
+              }`}
               >
-                <Filter className="h-4 w-4" />
-                Filters
+              <Filter className="h-4 w-4" />
+              Filters
               </Button>
-              <select
-                value={sortBy}
-                onChange={(e) =>
-                  setSortBy(
-                    e.target.value as "newest" | "ending" | "volume" | "popular"
-                  )
-                }
-                className="h-12 px-4 border border-gray-700 rounded-xl bg-[#1A1F2C] text-white text-sm focus:outline-none focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
+              <Select
+              value={sortBy}
+              onValueChange={(value) =>
+                setSortBy(
+                value as "newest" | "ending" | "volume" | "popular"
+                )
+              }
               >
-                <option value="newest">Newest First</option>
-                <option value="ending">Ending Soon</option>
-                <option value="volume">Highest Volume</option>
-                <option value="popular">Most Popular</option>
-              </select>
+              <SelectTrigger className="px-4 !h-[49px]  border border-gray-700 rounded-sm bg-[#1A1F2C] text-white text-sm focus:outline-none focus:border-[#9b87f5] focus:ring-[#9b87f5]/20">Newest First</SelectTrigger>
+              <SelectContent className="bg-[#1A1F2C] border border-gray-700 text-white rounded-md shadow-lg">
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="ending">Ending Soon</SelectItem>
+                <SelectItem value="volume">Highest Volume</SelectItem>
+                <SelectItem value="popular">Most Popular</SelectItem>
+              </SelectContent>
+              </Select>
             </div>
-          </div>
+            </div>
 
           {/* Enhanced Filters Panel */}
           {showFilters && (
@@ -281,7 +284,7 @@ export default function MarketsPage() {
                   <Button
                     onClick={handleResetFilters}
                     variant="outline"
-                    className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50"
+                    className="!bg-[#9b87f5] text-white hover:text-white hover:bg-[#9b87f5] border-0"
                   >
                     Clear all filters
                   </Button>

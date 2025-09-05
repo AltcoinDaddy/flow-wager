@@ -346,7 +346,7 @@ export default function MarketDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setIsBookmarked(!isBookmarked)}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
+                  className="border-0 text-white hover:bg-[#1A1F2C] hover:text-white bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Bookmark
                     className={`h-4 w-4 ${
@@ -358,14 +358,14 @@ export default function MarketDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleShare}
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
+                   className="border-0 text-white hover:bg-[#1A1F2C] hover:text-white bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-red-500/50 transition-all p-2 sm:px-3"
+                  className="border-0 text-white hover:bg-[#1A1F2C] hover:text-white bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Flag className="h-4 w-4" />
                 </Button>
@@ -787,7 +787,7 @@ export default function MarketDetailPage() {
               onClick={handleRefresh}
               variant="outline"
               disabled={isRefreshing}
-              className="w-full h-10 sm:h-12 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all font-medium text-sm sm:text-base"
+              className="w-full h-10 sm:h-12 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] bg-[#1A1F2C] hover:text-white hover:border-[#9b87f5]/50 transition-all font-medium text-sm sm:text-base"
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
