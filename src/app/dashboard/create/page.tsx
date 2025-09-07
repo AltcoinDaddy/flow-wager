@@ -89,6 +89,9 @@ export default function UserCreateMarketPage() {
           )}
         </CardContent>
       </Card>
+      <div className="absolute top-full z-50 mt-1 w-full rounded-md border bg-popover p-0 shadow-md">
+        {/* Dropdown content goes here */}
+      </div>
     </div>
   );
-} 
+}
