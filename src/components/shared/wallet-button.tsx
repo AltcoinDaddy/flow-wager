@@ -237,6 +237,23 @@ export function WalletButton() {
           </Link>
         </DropdownMenuItem>
 
+         <DropdownMenuItem asChild>
+          <Link 
+            href={`/leaderboard`} 
+            className="flex items-center cursor-pointer"
+            style={{ color: "white" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#8b5cf6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+            }}
+          >
+            <User className="h-4 w-4 mr-2" style={{ color: "white" }} />
+            <span>View Leaderboard</span>
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator style={{ backgroundColor: "#8b5cf6" }} />
 
         <DropdownMenuItem 

@@ -18,16 +18,25 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Check, Upload, Loader2, X, Image as ImageIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Upload,
+  Loader2,
+  X,
+  Image as ImageIcon,
+} from "lucide-react";
 import * as fcl from "@onflow/fcl";
 import { toast } from "sonner";
-import flowConfig from '@/lib/flow/config';
-import { 
+import flowConfig from "@/lib/flow/config";
+import {
   createMarketTransaction,
   getFlowWagerAddress,
   getUserProfile,
-} from '@/lib/flow-wager-scripts';
+} from "@/lib/flow-wager-scripts";
 import Image from "next/image";
+import { PointsManager } from "@/lib/points-system";
+import { MarketCategory } from "@/types";
 
 // Market categories matching your FlowWager contract enum values
 const MARKET_CATEGORIES = [
@@ -99,53 +108,51 @@ interface CreateMarketFormProps {
 
 // Cloudinary upload function
 const uploadToCloudinary = async (file: File): Promise<string> => {
-  // Validate environment variables
   const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
   if (!cloudName || !uploadPreset) {
-    console.error('Missing Cloudinary configuration:', {
+    console.error("Missing Cloudinary configuration:", {
       cloudName: !!cloudName,
-      uploadPreset: !!uploadPreset
+      uploadPreset: !!uploadPreset,
     });
-    throw new Error('Cloudinary not configured. Please check environment variables.');
+    throw new Error(
+      "Cloudinary not configured. Please check environment variables."
+    );
   }
 
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
+  formData.append("file", file);
+  formData.append("upload_preset", uploadPreset);
 
   try {
-    console.log('Uploading to Cloudinary:', {
+    console.log("Uploading to Cloudinary:", {
       cloudName,
       uploadPreset,
       fileSize: file.size,
-      fileType: file.type
+      fileType: file.type,
     });
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      {
-        method: 'POST',
-        body: formData,
-      }
+      { method: "POST", body: formData }
     );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Cloudinary API error:', data);
-      throw new Error(data.error?.message || `Upload failed with status ${response.status}`);
+      console.error("Cloudinary API error:", data);
+      throw new Error(
+        data.error?.message || `Upload failed with status ${response.status}`
+      );
     }
 
-    console.log('Upload successful:', data.secure_url);
+    console.log("Upload successful:", data.secure_url);
     return data.secure_url;
   } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('Failed to upload image');
+    console.error("Cloudinary upload error:", error);
+    if (error instanceof Error) throw error;
+    throw new Error("Failed to upload image");
   }
 };
 
@@ -155,7 +162,7 @@ export function CreateMarketForm({
 }: CreateMarketFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [formData, setFormData] = useState({
     question: "",
     optionA: "",
@@ -181,88 +188,82 @@ export function CreateMarketForm({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>("");
 
-  // Check user authentication on component mount
   useEffect(() => {
     const checkAuth = async () => {
       const currentUser = await fcl.currentUser.snapshot();
       setUser(currentUser);
     };
-    
     checkAuth();
-
-    // Subscribe to auth changes
     const unsubscribe = fcl.currentUser.subscribe(setUser);
-    
-    // Return cleanup function
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // Initialize Flow configuration
   useEffect(() => {
     const initFlow = async () => {
       try {
         flowConfig();
-        console.log('Flow configuration initialized for market creation');
+        console.log("Flow configuration initialized for market creation");
       } catch (error) {
-        console.error('Failed to initialize Flow configuration:', error);
+        console.error("Failed to initialize Flow configuration:", error);
       }
     };
-
     initFlow();
   }, []);
 
-  // Handle file selection and upload
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+    // Validate file type: only PNG or JPEG
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      toast.error("Please select a PNG or JPEG image file only.");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB');
+      toast.error("Image size must be less than 5MB");
       return;
     }
 
-    // Check Cloudinary configuration
-    if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) {
-      toast.error('Cloudinary not configured. Please check environment variables.');
-      console.error('Missing Cloudinary environment variables:', {
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: !!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: !!process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+    if (
+      !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
+      !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+    ) {
+      toast.error(
+        "Cloudinary not configured. Please check environment variables."
+      );
+      console.error("Missing Cloudinary environment variables:", {
+        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:
+          !!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET:
+          !!process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
       });
       return;
     }
 
     try {
       setIsUploadingImage(true);
-      
-      // Create preview
+
       const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result as string);
-      };
+      reader.onload = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
 
-      // Upload to Cloudinary
       const imageUrl = await uploadToCloudinary(file);
-      
-      setFormData(prev => ({ ...prev, imageURI: imageUrl }));
-      toast.success('Image uploaded successfully!');
+      setFormData((prev) => ({ ...prev, imageURI: imageUrl }));
+      toast.success("Image uploaded successfully!");
     } catch (error) {
-      console.error('Upload error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to upload image. Please try again.';
+      console.error("Upload error:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to upload image. Please try again.";
       toast.error(errorMessage);
       setImagePreview("");
-      
-      // If it's a configuration error, provide helpful guidance
-      if (errorMessage.includes('not configured')) {
+
+      if (errorMessage.includes("not configured")) {
         console.log(`
 📋 Cloudinary Setup Instructions:
 1. Sign up at https://cloudinary.com
@@ -282,93 +283,64 @@ export function CreateMarketForm({
     }
   };
 
-  // Trigger file input
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Remove uploaded image
+  const handleUploadClick = () => fileInputRef.current?.click();
   const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, imageURI: "" }));
+    setFormData((prev) => ({ ...prev, imageURI: "" }));
     setImagePreview("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.question.trim()) newErrors.question = "Question is required";
     if (formData.question.length < 10)
       newErrors.question = "Question must be at least 10 characters";
     if (formData.question.length > 500)
       newErrors.question = "Question must be less than 500 characters";
-
     if (!formData.optionA.trim()) newErrors.optionA = "Option A is required";
     if (!formData.optionB.trim()) newErrors.optionB = "Option B is required";
     if (formData.optionA === formData.optionB)
       newErrors.optionB = "Options must be different";
-
     if (formData.category === -1) newErrors.category = "Category is required";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.endDate) newErrors.endDate = "End date is required";
     if (!formData.endTime) newErrors.endTime = "End time is required";
-
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
     const now = new Date();
-    const minEndTime = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
-
-    if (endDateTime <= minEndTime) {
+    const minEndTime = new Date(now.getTime() + 60 * 60 * 1000);
+    if (endDateTime <= minEndTime)
       newErrors.endDate = "Market must end at least 1 hour from now";
-    }
-
-    // Calculate duration in hours
     const durationHours =
       (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (durationHours > 720) {
-      // 30 days = 720 hours
+    if (durationHours > 720)
       newErrors.endDate = "Market duration cannot exceed 30 days";
-    }
-
-    if (!formData.resolutionSource.trim()) {
+    if (!formData.resolutionSource.trim())
       newErrors.resolutionSource = "Resolution source is required";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
-
     const minBet = parseFloat(formData.minBet);
     const maxBet = parseFloat(formData.maxBet);
-
-    if (isNaN(minBet) || minBet < 0.01) {
+    if (isNaN(minBet) || minBet < 0.01)
       newErrors.minBet = "Minimum bet must be at least 0.01 FLOW";
-    }
-    if (isNaN(maxBet) || maxBet < minBet) {
+    if (isNaN(maxBet) || maxBet < minBet)
       newErrors.maxBet = "Maximum bet must be greater than minimum bet";
-    }
-    if (maxBet > 100000) {
+    if (maxBet > 100000)
       newErrors.maxBet = "Maximum bet cannot exceed 100,000 FLOW";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleNext = () => {
     let isValid = false;
-
     switch (step) {
       case 1:
         isValid = validateStep1();
@@ -380,206 +352,167 @@ export function CreateMarketForm({
         isValid = validateStep3();
         break;
     }
-
-    if (isValid) {
-      setStep(step + 1);
-    }
+    if (isValid) setStep(step + 1);
   };
 
-  const handleBack = () => {
-    setStep(step - 1);
-  };
+  const handleBack = () => setStep(step - 1);
 
-  // 🚨 UPDATED: Use your Flow Wager scripts instead of hardcoded Cadence 🚨
   const createMarketOnBlockchain = async (marketData: any): Promise<string> => {
-    if (!user?.addr) {
-      throw new Error("User not authenticated");
-    }
-
+    if (!user?.addr) throw new Error("User not authenticated");
     try {
       console.log("Creating market on blockchain with data:", marketData);
-
-      // Get the create market transaction script from your flow-wager-scripts
       const transactionScript = await createMarketTransaction();
-      
       console.log("Using transaction script from flow-wager-scripts");
-
       const authorization = fcl.currentUser().authorization;
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
-          arg(marketData.question, t.String),           // title
-          arg(marketData.description, t.String),        // description (includes rules + image)
-          arg(marketData.category.toString(), t.UInt8), // category
-          arg(marketData.optionA, t.String),           // optionA
-          arg(marketData.optionB, t.String),           // optionB
-          arg(marketData.endTime.toFixed(1), t.UFix64), // endTime (Unix timestamp)
-          arg(marketData.minBet.toFixed(8), t.UFix64),  // minBet
-          arg(marketData.maxBet.toFixed(8), t.UFix64),  // maxBet
-          arg(marketData.imageURI || "", t.String),     // imageUrl
+          arg(marketData.question, t.String),
+          arg(marketData.description, t.String),
+          arg(marketData.category.toString(), t.UInt8),
+          arg(marketData.optionA, t.String),
+          arg(marketData.optionB, t.String),
+          arg(marketData.endTime.toFixed(1), t.UFix64),
+          arg(marketData.minBet.toFixed(8), t.UFix64),
+          arg(marketData.maxBet.toFixed(8), t.UFix64),
+          arg(marketData.imageURI || "", t.String),
         ],
         proposer: authorization,
         payer: authorization,
         authorizations: [authorization],
-        limit: 1000
+        limit: 1000,
       });
-
       console.log("Transaction submitted:", transactionId);
-
-      // Wait for transaction to be sealed
       const transaction = await fcl.tx(transactionId).onceSealed();
-      
-      console.log("Transaction result:", transaction);
-      console.log("Transaction status:", transaction.status);
-      console.log("Transaction events:", transaction.events);
-
-      // Check transaction status
-      if (transaction.status === 5) {
-        // Status 5 = EXPIRED/FAILED
-        const errorMsg = transaction.errorMessage || "Transaction expired/failed";
-        console.error("Transaction failed with error:", errorMsg);
-        throw new Error(`Transaction failed: ${errorMsg}`);
-      }
-
-      if (transaction.status === 4) {
-        // Status 4 = SEALED (success!)
-        console.log("Transaction sealed successfully!");
-        
-        // Try to extract market ID from events
-        const marketCreatedEvent = transaction.events?.find(
-          (event: any) => event.type.includes('MarketCreated')
+      if (transaction.status === 5)
+        throw new Error(
+          transaction.errorMessage || "Transaction expired/failed"
         );
-        
-        if (marketCreatedEvent) {
+      if (transaction.status === 4) {
+        console.log("Transaction sealed successfully!");
+        const marketCreatedEvent = transaction.events?.find((event: any) =>
+          event.type.includes("MarketCreated")
+        );
+        if (marketCreatedEvent)
           console.log("Market created event:", marketCreatedEvent);
-          // Extract market ID from event data if available
-          const marketId = marketCreatedEvent.data?.marketId;
-          if (marketId) {
-            console.log("Extracted market ID:", marketId);
-          }
-        }
-        
         return transactionId;
       }
-
-      // If we get here, something unexpected happened
       console.warn("Unexpected transaction status:", transaction.status);
       return transactionId;
-
     } catch (error: any) {
       console.error("Market creation failed:", error);
-      
-      // Better error message extraction
       let errorMessage = "Unknown error occurred";
-      
-      if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      // If it's a Cadence runtime error, try to extract the panic message
-      if (error.message && error.message.includes('panic:')) {
+      if (error.message) errorMessage = error.message;
+      if (error.message.includes("panic:")) {
         const panicMatch = error.message.match(/panic: (.+?)(?:\n|$)/);
-        if (panicMatch) {
-          errorMessage = panicMatch[1];
-        }
+        if (panicMatch) errorMessage = panicMatch[1];
       }
-      
-      // Handle specific error cases
-      if (errorMessage.includes('Could not borrow Admin reference')) {
-        errorMessage = "You do not have the required permissions to create a market. Please ensure your account is set up correctly or contact support if this issue persists.";
-      } else if (errorMessage.includes('Could not borrow FlowToken vault')) {
-        errorMessage = "Unable to access your Flow token vault. Please ensure you have sufficient FLOW tokens and proper vault setup.";
-      } else if (errorMessage.includes('location')) {
-        errorMessage = "Contract deployment error. Please check the contract address configuration.";
-      }
-      
+      if (errorMessage.includes("Could not borrow Admin reference"))
+        errorMessage =
+          "You do not have the required permissions to create a market. Please ensure your account is set up correctly or contact support if this issue persists.";
+      if (errorMessage.includes("Could not borrow FlowToken vault"))
+        errorMessage =
+          "Unable to access your Flow token vault. Please ensure you have sufficient FLOW tokens and proper vault setup.";
+      if (errorMessage.includes("location"))
+        errorMessage =
+          "Contract deployment error. Please check the contract address configuration.";
       console.error("Processed error message:", errorMessage);
       throw new Error(errorMessage);
     }
   };
 
-  // Helper to ensure user account exists before market creation
   const ensureUserAccount = async () => {
     if (!user?.addr) {
       toast.error("Wallet not connected. Please connect your wallet.");
       throw new Error("Wallet not connected");
     }
-    // Only check if user profile exists, do not prompt for onboarding here
     const script = await getUserProfile();
     const profile = await fcl.query({
       cadence: script,
       args: (arg, t) => [arg(user.addr, t.Address)],
     });
     if (!profile) {
-      toast.error("You must create a FlowWager account before creating a market.");
+      toast.error(
+        "You must create a FlowWager account before creating a market."
+      );
       throw new Error("User account not found");
     }
   };
 
   const handleSubmit = async () => {
     if (!validateStep3()) return;
-
     if (!user?.loggedIn) {
       toast.error("Please connect your wallet first");
-      if (onSubmit) {
-        onSubmit({ success: false, error: "Wallet not connected" });
-      }
+      if (onSubmit) onSubmit({ success: false, error: "Wallet not connected" });
       return;
     }
-
     setIsSubmitting(true);
-
     try {
-      // Ensure user account exists before proceeding
       await ensureUserAccount();
-
-      // Calculate end time as Unix timestamp
       const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
       const endTimeUnix = endDateTime.getTime() / 1000;
-
-  
       const marketCreationData = {
         question: formData.question.trim(),
         description: formData.rules.trim(),
         optionA: formData.optionA.trim(),
         optionB: formData.optionB.trim(),
         category: formData.category,
-        endTime: endTimeUnix, // Unix timestamp
+        endTime: endTimeUnix,
         minBet: parseFloat(formData.minBet),
         maxBet: parseFloat(formData.maxBet),
         imageURI: formData.imageURI.trim(),
       };
-
       console.log("Submitting market creation:", marketCreationData);
-
-      // 🚨 CALLING YOUR FLOW WAGER SCRIPT HERE 🚨
       let transactionId;
       try {
         transactionId = await createMarketOnBlockchain(marketCreationData);
       } catch (err: any) {
-        if (err && err.message && err.message.toLowerCase().includes("user rejected")) {
+        if (err.message.toLowerCase().includes("user rejected")) {
           toast.error("Transaction cancelled by user.");
-          if (onSubmit) onSubmit({ success: false, error: "User rejected the transaction" });
+          if (onSubmit)
+            onSubmit({
+              success: false,
+              error: "User rejected the transaction",
+            });
           return;
         }
-        if (err && err.message && err.message.toLowerCase().includes("wallet not connected")) {
+        if (err.message.toLowerCase().includes("wallet not connected")) {
           toast.error("Wallet not connected. Please connect your wallet.");
-          if (onSubmit) onSubmit({ success: false, error: "Wallet not connected" });
+          if (onSubmit)
+            onSubmit({ success: false, error: "Wallet not connected" });
           return;
         }
         toast.error("Failed to create market: " + (err.message || err));
-        if (onSubmit) onSubmit({ success: false, error: err.message || "Failed to create market" });
+        if (onSubmit)
+          onSubmit({
+            success: false,
+            error: err.message || "Failed to create market",
+          });
         return;
       }
+      // Award points for market creation
+      try {
+        await PointsManager.awardPoints(
+          user.addr,
+          "CREATE_MARKET",
+          {
+            marketTitle: formData.question,
+            marketCategory: MarketCategory[formData.category],
+            marketId: Date.now(), // If you get the ID back
+            timestamp: new Date().toISOString(),
+          },
+          Date.now()
+        );
 
+        console.log("✅ Market creation activity logged");
+        toast.success("Market created successfully! +100 FlowWager Points!");
+      } catch (error) {
+        console.error("❌ Error logging market creation:", error);
+        toast.success("Market created successfully!");
+      }
       toast.success("Market created successfully on Flow blockchain!");
-
       if (onSubmit) {
-        onSubmit({
-          success: true,
-          transactionId,
-          marketId: Date.now(), // Temporary ID - you could extract real ID from events
-        });
+        onSubmit({ success: true, transactionId, marketId: Date.now() });
       } else {
         router.push("/admin");
       }
@@ -587,10 +520,7 @@ export function CreateMarketForm({
       console.error("Failed to create market:", error);
       const errorMessage = error.message || "Failed to create market";
       toast.error(errorMessage);
-
-      if (onSubmit) {
-        onSubmit({ success: false, error: errorMessage });
-      }
+      if (onSubmit) onSubmit({ success: false, error: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
@@ -600,16 +530,13 @@ export function CreateMarketForm({
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 p-6 border-2 border-gray-700/50 rounded-xl bg-gradient-to-br from-[#0A0C14]/50 to-[#151923]/30 backdrop-blur-sm">
-      {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileSelect}
-        accept="image/*"
+        accept="image/png,image/jpeg"
         className="hidden"
       />
-
-      {/* Wallet Connection Check */}
       {!user?.loggedIn && (
         <Alert className="bg-yellow-500/10 border-yellow-500/30">
           <AlertTriangle className="h-4 w-4" />
@@ -618,9 +545,8 @@ export function CreateMarketForm({
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Cloudinary Configuration Check */}
-      {(!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) && (
+      {(!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
+        !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) && (
         <Alert className="bg-orange-500/10 border-orange-500/30">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-orange-400">
@@ -634,8 +560,6 @@ export function CreateMarketForm({
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Progress Indicator */}
       <div className="flex items-center justify-between mb-8">
         {[1, 2, 3, 4].map((stepNumber) => (
           <div key={stepNumber} className="flex items-center">
@@ -660,8 +584,6 @@ export function CreateMarketForm({
           </div>
         ))}
       </div>
-
-      {/* Step 1: Basic Information */}
       {step === 1 && (
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
@@ -690,7 +612,6 @@ export function CreateMarketForm({
                 {formData.question.length}/500 characters
               </p>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="optionA" className="text-gray-300">
@@ -714,7 +635,6 @@ export function CreateMarketForm({
                   <p className="text-sm text-red-400">{errors.optionA}</p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="optionB" className="text-gray-300">
                   Option B *
@@ -738,7 +658,6 @@ export function CreateMarketForm({
                 )}
               </div>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="category" className="text-gray-300">
                 Category *
@@ -780,14 +699,10 @@ export function CreateMarketForm({
                 <p className="text-sm text-red-400">{errors.category}</p>
               )}
             </div>
-
-            {/* Enhanced Image Upload Section */}
             <div className="space-y-2">
               <Label htmlFor="imageURI" className="text-gray-300">
                 Market Image (Optional)
               </Label>
-              
-              {/* Image Preview */}
               {(imagePreview || formData.imageURI) && (
                 <div className="relative">
                   <div className="relative w-full h-48 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
@@ -810,8 +725,6 @@ export function CreateMarketForm({
                   </div>
                 </div>
               )}
-
-              {/* Upload Controls */}
               <div className="flex space-x-2">
                 <Input
                   id="imageURI"
@@ -845,13 +758,14 @@ export function CreateMarketForm({
                   )}
                 </Button>
               </div>
-              
               <div className="flex items-center space-x-2 text-xs text-gray-400">
                 <ImageIcon className="h-3 w-3" />
-                <span>Supports JPG, PNG, GIF up to 5MB. Images will be hosted on Cloudinary.</span>
+                <span>
+                  Supports PNG or JPEG up to 5MB. Images will be hosted on
+                  Cloudinary.
+                </span>
               </div>
             </div>
-
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="isBreakingNews" className="text-gray-300">
@@ -872,8 +786,6 @@ export function CreateMarketForm({
           </CardContent>
         </Card>
       )}
-
-      {/* Step 2: Timeline & Resolution */}
       {step === 2 && (
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
@@ -901,7 +813,6 @@ export function CreateMarketForm({
                   }`}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="endTime" className="text-gray-300">
                   End Time *
@@ -927,7 +838,6 @@ export function CreateMarketForm({
                 {errors.endDate || errors.endTime}
               </p>
             )}
-
             <div className="space-y-2">
               <Label htmlFor="resolutionSource" className="text-gray-300">
                 Resolution Source *
@@ -956,10 +866,9 @@ export function CreateMarketForm({
                 resolution
               </p>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="rules" className="text-gray-300">
-                Resolution Rules
+                Resolution Rules*
               </Label>
               <Textarea
                 id="rules"
@@ -977,8 +886,6 @@ export function CreateMarketForm({
           </CardContent>
         </Card>
       )}
-
-      {/* Step 3: Market Settings */}
       {step === 3 && (
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
@@ -1008,7 +915,6 @@ export function CreateMarketForm({
                   <p className="text-sm text-red-400">{errors.minBet}</p>
                 )}
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="maxBet" className="text-gray-300">
                   Maximum Bet (FLOW) *
@@ -1032,7 +938,6 @@ export function CreateMarketForm({
                 )}
               </div>
             </div>
-
             <div className="bg-[#0A0C14] p-4 rounded-lg border border-gray-800/50">
               <h4 className="font-medium mb-2 text-white">
                 Contract Information
@@ -1040,7 +945,8 @@ export function CreateMarketForm({
               <div className="text-sm text-gray-400 space-y-1">
                 <p>
                   • <strong className="text-gray-300">Contract:</strong>{" "}
-                  {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT || "0xfb16e84ea1882f67"}
+                  {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT ||
+                    "0xfb16e84ea1882f67"}
                 </p>
                 <p>
                   • <strong className="text-gray-300">Network:</strong> Flow{" "}
@@ -1051,19 +957,20 @@ export function CreateMarketForm({
                   {user?.addr}
                 </p>
                 <p>
-                  • <strong className="text-gray-300">Creation Fee:</strong> 10.0 FLOW
-                  (waived for contract deployer)
+                  • <strong className="text-gray-300">Creation Fee:</strong>{" "}
+                  10.0 FLOW (waived for contract deployer)
                 </p>
                 <p>
-                  • <strong className="text-gray-300">Platform Fee:</strong> {`${getFlowWagerAddress() === user.addr ? "3% of  market winnings goes to the market creator": "2% of the winnings goes to you, 1% for platform maintenance"}`}
+                  • <strong className="text-gray-300">Platform Fee:</strong>{" "}
+                  {getFlowWagerAddress() === user.addr
+                    ? "3% of market winnings goes to the market creator"
+                    : "2% of the winnings goes to you, 1% for platform maintenance"}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Step 4: Review & Confirm - Updated to not show hidden image URL in rules */}
       {step === 4 && (
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
@@ -1075,7 +982,6 @@ export function CreateMarketForm({
                 <h4 className="font-semibold text-white">Market Question</h4>
                 <p className="text-sm text-gray-400">{formData.question}</p>
               </div>
-
               <div>
                 <h4 className="font-semibold text-white">Options</h4>
                 <div className="flex space-x-2">
@@ -1093,7 +999,6 @@ export function CreateMarketForm({
                   </Badge>
                 </div>
               </div>
-
               <div>
                 <h4 className="font-semibold text-white">Category</h4>
                 <Badge
@@ -1107,7 +1012,6 @@ export function CreateMarketForm({
                   }
                 </Badge>
               </div>
-
               {formData.imageURI && (
                 <div>
                   <h4 className="font-semibold text-white">Market Image</h4>
@@ -1122,7 +1026,6 @@ export function CreateMarketForm({
                   </div>
                 </div>
               )}
-
               <div>
                 <h4 className="font-semibold text-white">Trading Period</h4>
                 <p className="text-sm text-gray-400">
@@ -1132,15 +1035,12 @@ export function CreateMarketForm({
                   ).toLocaleString()}
                 </p>
               </div>
-
-              {/* ✅ Show clean resolution rules (without hidden image URL) */}
               {formData.rules && (
                 <div>
                   <h4 className="font-semibold text-white">Resolution Rules</h4>
                   <p className="text-sm text-gray-400">{formData.rules}</p>
                 </div>
               )}
-
               <div>
                 <h4 className="font-semibold text-white">Betting Limits</h4>
                 <p className="text-sm text-gray-400">
@@ -1148,7 +1048,6 @@ export function CreateMarketForm({
                 </p>
               </div>
             </div>
-
             <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-lg">
               <div className="flex items-start space-x-2">
                 <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5" />
@@ -1167,8 +1066,6 @@ export function CreateMarketForm({
           </CardContent>
         </Card>
       )}
-
-      {/* Action Buttons */}
       <div className="flex justify-between">
         <Button
           variant="outline"
@@ -1178,7 +1075,6 @@ export function CreateMarketForm({
         >
           Back
         </Button>
-
         <div className="space-x-2">
           {step < 4 ? (
             <Button

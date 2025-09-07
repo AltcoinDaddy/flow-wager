@@ -101,6 +101,10 @@ export default function HomePage() {
     allMarketsCount: allMarkets.length,
   });
 
+
+
+   console.log("This is the Featured Markets", featuredMarkets)
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
       {/* Hero Section - Banner Style */}
@@ -156,7 +160,7 @@ export default function HomePage() {
               </Button>
 
               <button
-                className="border border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200"
+                className="border border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-3 rounded-lg font-semibold transition-all duration-200 max-sm:w-[60%]"
                 onClick={() =>
                   window.scrollTo({
                     top: window.innerHeight,
@@ -283,8 +287,8 @@ export default function HomePage() {
       {/* Featured Markets Section */}
       <section className="py-16 px-4 bg-[#0A0C14]">
         <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
+          <div className="flex items-center md:justify-between mb-8 max-sm:flex-col max-sm:gap-4">
+            <div className="max-sm:text-center">
               <h2 className="text-3xl font-bold text-white mb-2">
                 Featured Markets
               </h2>
@@ -372,7 +376,13 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredMarkets.map((market) => (
-                <MarketCard key={market.id} market={market} />
+                <MarketCard
+                  key={market.id}
+                  market={{
+                    ...market,
+                    imageUrl: market.imageURI,
+                  }}
+                />
               ))}
             </div>
           )}
