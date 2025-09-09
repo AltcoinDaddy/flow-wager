@@ -42,7 +42,7 @@ export default function HomePage() {
     } catch (err) {
       console.error("❌ Error fetching markets:", err);
       setMarketsError(
-        err instanceof Error ? err.message : "Failed to fetch markets"
+        err instanceof Error ? err.message : "Failed to fetch markets",
       );
     } finally {
       setMarketsLoading(false);
@@ -90,7 +90,7 @@ export default function HomePage() {
   // Calculate platform stats using market-data functions
   const platformStats = React.useMemo(
     () => calculatePlatformStats(allMarkets, activeMarkets),
-    [allMarkets, activeMarkets]
+    [allMarkets, activeMarkets],
   );
 
   console.log("🎯 HomePage state (using market-api):", {
@@ -101,9 +101,7 @@ export default function HomePage() {
     allMarketsCount: allMarkets.length,
   });
 
-
-
-   console.log("This is the Featured Markets", featuredMarkets)
+  console.log("This is the Featured Markets", featuredMarkets);
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
@@ -168,7 +166,7 @@ export default function HomePage() {
                   })
                 }
               >
-                Learn More
+                <Link href={"/learn"}>Learn More</Link>
               </button>
             </div>
           </div>
