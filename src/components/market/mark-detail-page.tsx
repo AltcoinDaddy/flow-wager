@@ -3,6 +3,7 @@
 "use client";
 
 import { BetDialog } from "@/components/market/bet-dialog";
+import { CommentsSection } from "@/components/comments/comments-section";
 import { CountdownTimer } from "@/components/market/countdown-timer";
 import { MarketError } from "@/components/market/market-error";
 import { MarketLoading } from "@/components/market/market-loading";
@@ -62,7 +63,7 @@ export default function MarketDetailPage() {
 
   const [betDialogOpen, setBetDialogOpen] = useState(false);
   const [selectedSide, setSelectedSide] = useState<"optionA" | "optionB">(
-    "optionA"
+    "optionA",
   );
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -309,11 +310,11 @@ export default function MarketDetailPage() {
                       actualStatus === MarketStatus.Active
                         ? "bg-green-500/20 text-green-400 border-green-500/30"
                         : actualStatus === MarketStatus.Resolved
-                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                        : actualStatus === MarketStatus.Paused &&
-                          parseInt(market.endTime) * 1000 <= Date.now()
-                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
-                        : ""
+                          ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                          : actualStatus === MarketStatus.Paused &&
+                              parseInt(market.endTime) * 1000 <= Date.now()
+                            ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                            : ""
                     }`}
                   >
                     <div className="flex items-center space-x-1">
@@ -358,7 +359,7 @@ export default function MarketDetailPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleShare}
-                   className="border-0 text-white hover:bg-[#1A1F2C] hover:text-white bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
+                  className="border-0 text-white hover:bg-[#1A1F2C] hover:text-white bg-[#1A1F2C] hover:border-[#9b87f5]/50 transition-all p-2 sm:px-3"
                 >
                   <Share2 className="h-4 w-4" />
                 </Button>
@@ -397,7 +398,7 @@ export default function MarketDetailPage() {
                 <Calendar className="h-4 w-4 text-blue-400 flex-shrink-0" />
                 <span className="whitespace-nowrap">
                   {new Date(
-                    parseInt(market.createdAt) * 1000
+                    parseInt(market.createdAt) * 1000,
                   ).toLocaleDateString()}
                 </span>
               </div>
@@ -626,53 +627,11 @@ export default function MarketDetailPage() {
 
                 {/* Comments Tab Content */}
                 <TabsContent value="comments" className="mt-4">
-                  <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50 shadow-xl">
-                    <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6 space-y-4 sm:space-y-6">
-                      {comments.length === 0 ? (
-                        <div className="text-center py-8 sm:py-12 text-gray-400">
-                          <Users className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-base sm:text-lg font-medium">
-                            No comments yet
-                          </p>
-                          <p className="text-sm">Start the discussion!</p>
-                        </div>
-                      ) : (
-                        comments.map((comment) => (
-                          <div key={comment.id} className="space-y-3">
-                            <div className="flex items-start space-x-3 p-3 sm:p-4 rounded-xl bg-gray-800/20 border border-gray-800/30">
-                              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
-                                <AvatarImage
-                                  src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user}`}
-                                />
-                                <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5] font-bold text-xs sm:text-sm">
-                                  {comment.user.slice(2, 4).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="font-semibold text-white text-sm sm:text-base truncate">
-                                    {comment.user.slice(0, 6)}...
-                                    {comment.user.slice(-4)}
-                                  </span>
-                                  <span className="text-xs text-gray-400 flex-shrink-0">
-                                    {formatRelativeTime(comment.timestamp)}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300 leading-relaxed">
-                                  {comment.content}
-                                </p>
-                                <div className="flex items-center space-x-4 mt-3">
-                                  <button className="text-xs text-gray-400 hover:text-[#9b87f5] transition-colors font-medium">
-                                    {comment.likes} likes
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
+                  <CommentsSection
+                    marketId={parseInt(market.id)}
+                    marketTitle={market.title}
+                    currentUserAddress={`${user?.addr}`}
+                  />
                 </TabsContent>
               </Tabs>
             </div>
@@ -708,11 +667,11 @@ export default function MarketDetailPage() {
                       actualStatus === MarketStatus.Active
                         ? "bg-green-500/20 text-green-400 border-green-500/30"
                         : actualStatus === MarketStatus.Resolved
-                        ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                        : actualStatus === MarketStatus.Paused &&
-                          parseInt(market.endTime) * 1000 <= Date.now()
-                        ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
-                        : "bg-gray-700/50 text-gray-300"
+                          ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                          : actualStatus === MarketStatus.Paused &&
+                              parseInt(market.endTime) * 1000 <= Date.now()
+                            ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                            : "bg-gray-700/50 text-gray-300"
                     }`}
                   >
                     {getStatusName(actualStatus)}
