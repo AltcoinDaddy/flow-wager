@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { usePoints } from "@/hooks/usePoints";
+import { useUserData } from "@/hooks/use-user-data"; // Add this import
 import {
   claimWinningsTransaction,
   getAllUserTrades,
@@ -191,6 +192,15 @@ export default function UserDashboardPage() {
   const params = useParams();
   const userAddress = params.id as string;
   const { user: currentUser, isAuthenticated } = useAuth();
+
+  // Fetch user data from Supabase
+  const {
+    user: supabaseUser,
+    loading: userLoading,
+    displayName,
+    shortName,
+    hasProfile,
+  } = useUserData(userAddress);
 
   // Points system integration
   const { userPoints, awardPoints, activities: pointsActivities } = usePoints();
@@ -566,22 +576,64 @@ export default function UserDashboardPage() {
             <div className="flex items-center space-x-6 max-sm:flex-col max-sm:gap-6">
               <Avatar className="h-20 w-20 border-2 border-[#9b87f5]/20">
                 <AvatarImage
-                  src={`https://api.dicebear.com/9.x/pixel-art/png?seed=${userAddress}&backgroundColor=ff5733,00d4ff,9b87f5&size=256&scale=80&radius=10`}
+                  src={
+                    supabaseUser?.profile_image_url ||
+                    `https://api.dicebear.com/9.x/pixel-art/png?seed=${userAddress}&backgroundColor=ff5733,00d4ff,9b87f5&size=256&scale=80&radius=10`
+                  }
                 />
                 <AvatarFallback className="bg-[#9b87f5]/20 text-[#9b87f5] text-xl font-bold">
-                  {userAddress.slice(2, 4).toUpperCase()}
+                  {displayName.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
 
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                  {isOwnProfile
-                    ? `${generateShortNameFromWallet(userAddress)} Dashboard`
-                    : "User Profile"}
+                  {isOwnProfile ? (
+                    <>
+                      {userLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-pulse bg-gray-700 h-8 w-48 rounded"></div>
+                          <span className="text-lg"></span>
+                        </div>
+                      ) : (
+                        <>
+                          {displayName}
+                          {!hasProfile && (
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">
+                              Guest
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {userLoading ? (
+                        <div className="animate-pulse bg-gray-700 h-8 w-32 rounded"></div>
+                      ) : (
+                        <>
+                          {displayName}
+                          {!hasProfile && (
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs">
+                              Guest User
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
                   {userPoints.rank <= 10 && userPoints.rank > 0 && (
                     <Crown className="h-6 w-6 text-yellow-500" />
                   )}
                 </h1>
+
+                {/* User bio if available */}
+                {supabaseUser?.bio && (
+                  <p className="text-gray-300 mb-3 max-w-md">
+                    {supabaseUser.bio}
+                  </p>
+                )}
+
                 <div className="flex items-center space-x-2 mb-3">
                   <code className="text-[#9b87f5] bg-gray-800/50 px-2 py-1 rounded text-sm font-mono">
                     {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
@@ -594,6 +646,11 @@ export default function UserDashboardPage() {
                   >
                     <ExternalLink className="h-3 w-3" />
                   </Button>
+                  {supabaseUser?.username && (
+                    <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
+                      @{supabaseUser.username}
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
@@ -601,9 +658,11 @@ export default function UserDashboardPage() {
                     <Calendar className="h-4 w-4" />
                     <span>
                       Joined{" "}
-                      {new Date(
-                        parseInt(data.profile.joinDate) * 1000,
-                      ).toLocaleDateString()}
+                      {supabaseUser?.joined_at
+                        ? new Date(supabaseUser.joined_at).toLocaleDateString()
+                        : new Date(
+                            parseInt(data?.profile.joinDate || "0") * 1000,
+                          ).toLocaleDateString()}
                     </span>
                   </div>
                   {/* Points System Integration */}
@@ -621,7 +680,9 @@ export default function UserDashboardPage() {
                   )}
                   <div className="flex items-center space-x-1">
                     <Star className="h-4 w-4 text-[#9b87f5]" />
-                    <span>{data.profile.reputation.toFixed(1)} reputation</span>
+                    <span>
+                      {data?.profile.reputation.toFixed(1) || "0.0"} reputation
+                    </span>
                   </div>
                   {userAddress === `${getFlowTokenAddress}` && (
                     <div className="flex items-center space-x-1">
@@ -631,7 +692,7 @@ export default function UserDashboardPage() {
                       </span>
                     </div>
                   )}
-                  {data.platformStats && (
+                  {data?.platformStats && (
                     <div className="flex items-center space-x-1">
                       <Activity className="h-4 w-4 text-blue-400" />
                       <span className="text-blue-400">
