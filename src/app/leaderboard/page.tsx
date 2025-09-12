@@ -43,7 +43,7 @@ interface LeaderboardUser {
   username?: string;
   display_name?: string;
   profile_image_url?: string;
-  supabaseUser?: User; // Add this to store the actual Supabase user data
+  supabaseUser?: User | null; // Add this to store the actual Supabase user data
   hasProfile?: boolean; // Add this to track if user has a profile
 }
 
@@ -96,7 +96,7 @@ export default function LeaderboardPage() {
         (entry, index) => {
           const supabaseUser = supabaseUsersMap.get(entry.user_address);
           const displayInfo = getUserDisplayInfo(
-            supabaseUser,
+            supabaseUser!,
             entry.user_address,
           );
 
@@ -307,7 +307,7 @@ export default function LeaderboardPage() {
                 value={category}
                 onValueChange={(value) => setCategory(value as any)}
               >
-                <TabsList className="grid w-full grid-cols-4 bg-gray-800/50">
+                <TabsList className="grid w-full grid-cols-4 bg-gray-800/50 text-white">
                   <TabsTrigger
                     value="total-points"
                     className="flex items-center gap-1 text-xs"
@@ -492,12 +492,12 @@ export default function LeaderboardPage() {
         </Card>
 
         {/* Join Competition Banner */}
-        <Card className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white mt-8">
+        <Card className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8  mt-8 text-white">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-                  <Trophy className="h-6 w-6" />
+                  <Trophy className="h-6 w-6 text-yellow-600" />
                   Climb the Leaderboard!
                 </h3>
                 <p className="opacity-90">
@@ -507,7 +507,7 @@ export default function LeaderboardPage() {
               </div>
               <Button
                 variant="secondary"
-                className="bg-white text-[#9b87f5] hover:bg-gray-100"
+                className="bg-[#9b87f5] text-white hover:!bg-inherit"
                 onClick={() => (window.location.href = "/markets")}
               >
                 Start Earning Points
