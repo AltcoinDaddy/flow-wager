@@ -9,6 +9,7 @@ import { Comment, CommentsService } from "@/lib/comments-service";
 import { CommentItem } from "./comment-item";
 import { CommentForm } from "./comment-form";
 import { toast } from "sonner";
+import { useAuth } from "@/providers/auth-provider";
 
 interface CommentsSectionProps {
   marketId: number;
@@ -21,6 +22,7 @@ export function CommentsSection({
   marketTitle,
   currentUserAddress,
 }: CommentsSectionProps) {
+  const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCommentForm, setShowCommentForm] = useState(false);
@@ -79,7 +81,7 @@ export function CommentsSection({
             Discussion ({commentCount})
           </CardTitle>
 
-          {currentUserAddress && !showCommentForm && (
+          {currentUserAddress && !user && !showCommentForm && (
             <Button
               size="sm"
               onClick={() => setShowCommentForm(true)}
@@ -111,7 +113,7 @@ export function CommentsSection({
             <MessageCircle className="h-16 w-16 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium mb-2">No comments yet</p>
             <p className="text-sm">Be the first to share your thoughts!</p>
-            {!currentUserAddress && (
+            {!user && (
               <p className="text-xs mt-4 text-gray-500">
                 Connect your wallet to join the discussion
               </p>
