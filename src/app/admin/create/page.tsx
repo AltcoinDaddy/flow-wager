@@ -10,13 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreateMarketForm } from "@/components/admin/create/create-market-form";
 import { useAuth } from "@/providers/auth-provider";
-import { 
-  getPlatformStats,
-  getAllMarkets,
-} from '@/lib/flow-wager-scripts';
-import * as fcl from '@onflow/fcl';
-import flowConfig from '@/lib/flow/config';
-import { 
+import { getPlatformStats, getAllMarkets } from "@/lib/flow-wager-scripts";
+import * as fcl from "@onflow/fcl";
+import flowConfig from "@/lib/flow/config";
+import {
   ArrowLeft,
   CheckCircle,
   AlertTriangle,
@@ -28,7 +25,7 @@ import {
   Zap,
   Target,
   Activity,
-  Loader2
+  Loader2,
 } from "lucide-react";
 
 export default function AdminCreatePage() {
@@ -48,7 +45,7 @@ export default function AdminCreatePage() {
     activeMarkets: 0,
     totalUsers: 0,
     totalVolume: "0",
-    totalFees: "0"
+    totalFees: "0",
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
@@ -56,9 +53,8 @@ export default function AdminCreatePage() {
   const initConfig = async () => {
     try {
       flowConfig();
-      console.log('Flow configuration initialized for admin panel');
     } catch (error) {
-      console.error('Failed to initialize Flow configuration:', error);
+      console.error("Failed to initialize Flow configuration:", error);
       throw error;
     }
   };
@@ -67,7 +63,7 @@ export default function AdminCreatePage() {
   useEffect(() => {
     const fetchStats = async () => {
       if (!user?.addr) return;
-      
+
       try {
         setIsLoadingStats(true);
         await initConfig();
@@ -78,32 +74,31 @@ export default function AdminCreatePage() {
           cadence: platformStatsScript,
         });
 
-        console.log('Platform stats from contract:', stats);
-
         // Fetch all markets to calculate daily/weekly stats
         const allMarketsScript = await getAllMarkets();
         const markets = await fcl.query({
           cadence: allMarketsScript,
         });
 
-        console.log('All markets from contract:', markets);
-
         // Calculate daily/weekly creation stats
         const now = Date.now() / 1000;
-        const oneDayAgo = now - (24 * 60 * 60);
-        const oneWeekAgo = now - (7 * 24 * 60 * 60);
+        const oneDayAgo = now - 24 * 60 * 60;
+        const oneWeekAgo = now - 7 * 24 * 60 * 60;
 
-        const marketsCreatedToday = markets?.filter((market: any) => 
-          parseFloat(market.createdAt) >= oneDayAgo
-        ).length || 0;
+        const marketsCreatedToday =
+          markets?.filter(
+            (market: any) => parseFloat(market.createdAt) >= oneDayAgo,
+          ).length || 0;
 
-        const marketsCreatedThisWeek = markets?.filter((market: any) => 
-          parseFloat(market.createdAt) >= oneWeekAgo
-        ).length || 0;
+        const marketsCreatedThisWeek =
+          markets?.filter(
+            (market: any) => parseFloat(market.createdAt) >= oneWeekAgo,
+          ).length || 0;
 
         // Calculate average volume
         const totalVolume = parseFloat(stats.totalVolume || "0");
-        const averageVolume = markets?.length > 0 ? totalVolume / markets.length : 0;
+        const averageVolume =
+          markets?.length > 0 ? totalVolume / markets.length : 0;
 
         setCreationStats({
           marketsCreatedToday,
@@ -115,9 +110,8 @@ export default function AdminCreatePage() {
           activeMarkets: parseInt(stats.activeMarkets?.toString() || "0"),
           totalUsers: parseInt(stats.totalUsers?.toString() || "0"),
           totalVolume: stats.totalVolume?.toString() || "0",
-          totalFees: stats.totalFees?.toString() || "0"
+          totalFees: stats.totalFees?.toString() || "0",
         });
-
       } catch (error) {
         console.error("Failed to fetch admin stats:", error);
         setError("Failed to load admin statistics from contract");
@@ -134,16 +128,16 @@ export default function AdminCreatePage() {
   const handleMarketSubmission = async (marketData: any) => {
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
-      console.log("Creating market with data:", marketData);
-      
       // The CreateMarketForm handles the actual contract interaction using your scripts
       // This will be called after successful transaction
       if (marketData.success && marketData.transactionId) {
-        setCreatedMarketId(marketData.marketId || Math.floor(Math.random() * 1000) + 100);
+        setCreatedMarketId(
+          marketData.marketId || Math.floor(Math.random() * 1000) + 100,
+        );
         setCreationSuccess(true);
-        
+
         // Refresh stats after successful creation
         const fetchUpdatedStats = async () => {
           try {
@@ -152,14 +146,18 @@ export default function AdminCreatePage() {
             const updatedStats = await fcl.query({
               cadence: platformStatsScript,
             });
-            
-            setCreationStats(prev => ({
+
+            setCreationStats((prev) => ({
               ...prev,
-              totalMarkets: parseInt(updatedStats.totalMarkets?.toString() || "0"),
-              activeMarkets: parseInt(updatedStats.activeMarkets?.toString() || "0"),
+              totalMarkets: parseInt(
+                updatedStats.totalMarkets?.toString() || "0",
+              ),
+              activeMarkets: parseInt(
+                updatedStats.activeMarkets?.toString() || "0",
+              ),
               totalVolume: updatedStats.totalVolume?.toString() || "0",
               marketsCreatedToday: prev.marketsCreatedToday + 1,
-              marketsCreatedThisWeek: prev.marketsCreatedThisWeek + 1
+              marketsCreatedThisWeek: prev.marketsCreatedThisWeek + 1,
             }));
           } catch (error) {
             console.error("Failed to refresh stats:", error);
@@ -167,7 +165,7 @@ export default function AdminCreatePage() {
         };
 
         fetchUpdatedStats();
-        
+
         // Redirect after a delay
         setTimeout(() => {
           router.push(`/markets`);
@@ -175,7 +173,6 @@ export default function AdminCreatePage() {
       } else if (!marketData.success) {
         setError(marketData.error || "Failed to create market");
       }
-      
     } catch (error: any) {
       console.error("Failed to create market:", error);
       setError(`Failed to create market: ${error.message || "Unknown error"}`);
@@ -191,11 +188,13 @@ export default function AdminCreatePage() {
         <Card className="w-full max-w-md bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardContent className="pt-6 text-center">
             <Shield className="h-12 w-12 text-[#9b87f5] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Connect Your Wallet</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Connect Your Wallet
+            </h2>
             <p className="text-gray-400 mb-4">
               You need to connect your Flow wallet to access admin features.
             </p>
-            <Button 
+            <Button
               onClick={() => router.push("/markets")}
               className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
             >
@@ -214,47 +213,46 @@ export default function AdminCreatePage() {
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-8 text-center">
               <CheckCircle className="h-16 w-16 text-green-400 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold text-white mb-2">Market Created Successfully!</h1>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Market Created Successfully!
+              </h1>
               <p className="text-gray-400 mb-6">
-                Your market has been deployed to the Flow blockchain and is now live on the platform.
+                Your market has been deployed to the Flow blockchain and is now
+                live on the platform.
               </p>
-              
+
               <div className="bg-[#0A0C14] p-4 rounded-lg border border-gray-800/50 mb-6">
-                <p className="text-sm font-medium text-[#9b87f5]">Market ID: #{createdMarketId}</p>
+                <p className="text-sm font-medium text-[#9b87f5]">
+                  Market ID: #{createdMarketId}
+                </p>
                 <p className="text-xs text-gray-400 mt-1">
                   Contract: {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
                 </p>
                 <p className="text-xs text-gray-400">
-                  Network: {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'}
+                  Network: {process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet"}
                 </p>
               </div>
-              
+
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button 
+                <Button
                   asChild
                   className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
                 >
-                  <Link href="/markets">
-                    View Markets
-                  </Link>
+                  <Link href="/markets">View Markets</Link>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   asChild
                   className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white"
                 >
-                  <Link href="/admin">
-                    Back to Admin
-                  </Link>
+                  <Link href="/admin">Back to Admin</Link>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   asChild
                   className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white"
                 >
-                  <Link href="/admin/create">
-                    Create Another
-                  </Link>
+                  <Link href="/admin/create">Create Another</Link>
                 </Button>
               </div>
             </CardContent>
@@ -270,9 +268,9 @@ export default function AdminCreatePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center space-x-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               asChild
               className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white"
             >
@@ -284,7 +282,9 @@ export default function AdminCreatePage() {
             <div>
               <div className="flex items-center space-x-3 mb-2">
                 <Zap className="h-8 w-8 text-[#9b87f5]" />
-                <h1 className="text-4xl font-bold text-white">Create New Market</h1>
+                <h1 className="text-4xl font-bold text-white">
+                  Create New Market
+                </h1>
               </div>
               <p className="text-gray-400">
                 Deploy a new prediction market to the Flow blockchain
@@ -298,7 +298,7 @@ export default function AdminCreatePage() {
                 </Badge>
                 <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
                   <Activity className="h-3 w-3 mr-1" />
-                  {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'} Network
+                  {process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet"} Network
                 </Badge>
               </div>
             </div>
@@ -323,7 +323,9 @@ export default function AdminCreatePage() {
                   {isLoadingStats ? (
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">{creationStats.marketsCreatedToday}</p>
+                    <p className="text-2xl font-bold text-white">
+                      {creationStats.marketsCreatedToday}
+                    </p>
                   )}
                   <p className="text-xs text-blue-400">Markets</p>
                 </div>
@@ -331,7 +333,7 @@ export default function AdminCreatePage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -340,7 +342,9 @@ export default function AdminCreatePage() {
                   {isLoadingStats ? (
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">{creationStats.marketsCreatedThisWeek}</p>
+                    <p className="text-2xl font-bold text-white">
+                      {creationStats.marketsCreatedThisWeek}
+                    </p>
                   )}
                   <p className="text-xs text-green-400">Markets</p>
                 </div>
@@ -348,7 +352,7 @@ export default function AdminCreatePage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -358,7 +362,10 @@ export default function AdminCreatePage() {
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
                     <p className="text-2xl font-bold text-white">
-                      {(parseFloat(creationStats.totalVolume) / 1000).toFixed(1)}K
+                      {(parseFloat(creationStats.totalVolume) / 1000).toFixed(
+                        1,
+                      )}
+                      K
                     </p>
                   )}
                   <p className="text-xs text-yellow-400">FLOW</p>
@@ -367,7 +374,7 @@ export default function AdminCreatePage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -376,7 +383,9 @@ export default function AdminCreatePage() {
                   {isLoadingStats ? (
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">{creationStats.activeMarkets}</p>
+                    <p className="text-2xl font-bold text-white">
+                      {creationStats.activeMarkets}
+                    </p>
                   )}
                   <p className="text-xs text-green-400">Live</p>
                 </div>
@@ -384,7 +393,7 @@ export default function AdminCreatePage() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -393,7 +402,9 @@ export default function AdminCreatePage() {
                   {isLoadingStats ? (
                     <div className="h-8 w-8 bg-gray-700 animate-pulse rounded"></div>
                   ) : (
-                    <p className="text-2xl font-bold text-white">{creationStats.totalUsers}</p>
+                    <p className="text-2xl font-bold text-white">
+                      {creationStats.totalUsers}
+                    </p>
                   )}
                   <p className="text-xs text-[#9b87f5]">Registered</p>
                 </div>
@@ -429,7 +440,10 @@ export default function AdminCreatePage() {
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Choose appropriate betting limits (Min: 0.1 FLOW, Max: 1000 FLOW)</span>
+                    <span>
+                      Choose appropriate betting limits (Min: 0.1 FLOW, Max:
+                      1000 FLOW)
+                    </span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
@@ -441,7 +455,9 @@ export default function AdminCreatePage() {
                   </li>
                   <li className="flex items-start space-x-2">
                     <Target className="h-3 w-3 mt-1 text-green-400 flex-shrink-0" />
-                    <span>Consider transaction fees (Creation fee: 10 FLOW)</span>
+                    <span>
+                      Consider transaction fees (Creation fee: 10 FLOW)
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -500,7 +516,9 @@ export default function AdminCreatePage() {
                 </div>
                 <div>
                   <span className="text-gray-400">Network:</span>
-                  <p className="text-green-400">Flow {process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet'}</p>
+                  <p className="text-green-400">
+                    Flow {process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet"}
+                  </p>
                 </div>
                 <div>
                   <span className="text-gray-400">Admin Address:</span>
@@ -524,7 +542,7 @@ export default function AdminCreatePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateMarketForm 
+            <CreateMarketForm
               onSubmit={handleMarketSubmission}
               isLoading={isSubmitting}
             />
@@ -540,14 +558,19 @@ export default function AdminCreatePage() {
                   <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-700 border-t-[#9b87f5] mx-auto"></div>
                   <Loader2 className="absolute inset-0 h-16 w-16 mx-auto text-[#9b87f5] animate-pulse" />
                 </div>
-                <h3 className="text-xl font-bold mb-2 text-white">Creating Market...</h3>
+                <h3 className="text-xl font-bold mb-2 text-white">
+                  Creating Market...
+                </h3>
                 <p className="text-gray-400 mb-4">
                   Deploying smart contract transaction to Flow blockchain
                 </p>
                 <div className="bg-[#0A0C14] p-3 rounded-lg border border-gray-800/50">
                   <div className="flex items-center justify-center space-x-2 text-xs text-gray-400">
                     <div className="animate-pulse">⚡</div>
-                    <span>Using contract: {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}</span>
+                    <span>
+                      Using contract:{" "}
+                      {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
+                    </span>
                     <div className="animate-pulse">⚡</div>
                   </div>
                 </div>

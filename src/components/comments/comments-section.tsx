@@ -1,7 +1,8 @@
 // src/components/comments/comments-section.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
 import { MessageCircle, Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +29,7 @@ export function CommentsSection({
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [commentCount, setCommentCount] = useState(0);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       setIsLoading(true);
       const [commentsData, count] = await Promise.all([
@@ -38,17 +39,17 @@ export function CommentsSection({
 
       setComments(commentsData);
       setCommentCount(count);
-    } catch (error) {
-      console.error("Error fetching comments:", error);
+    } catch (error: unknown) {
       toast.error("Failed to load comments");
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [marketId, currentUserAddress]);
 
   useEffect(() => {
     fetchComments();
-  }, [marketId, currentUserAddress]);
+  }, [fetchComments]);
 
   const handleAddComment = async (content: string) => {
     if (!currentUserAddress) {
