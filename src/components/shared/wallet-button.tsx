@@ -533,7 +533,7 @@ export function WalletButton() {
                     <Badge
                       variant="secondary"
                       className="text-xs"
-                      style={{ backgroundColor: "#a78bfa", color: "white" }}
+                      style={{ backgroundColor: "#f59e0b", color: "white" }}
                     >
                       {isLoadingBalance ? "Loading..." : `${balance} FLOW`}
                     </Badge>

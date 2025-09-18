@@ -128,8 +128,7 @@ export default function HomePage() {
 
             {/* Subheading */}
             <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Join the ultimate prediction platform where your prediction
-              knowledge pays off. Trade shares on real events and win big.
+              Join the top prediction platform where your foresight earns rewards. Trade shares on real-world events and score big wins.
             </p>
 
             {/* CTA Buttons */}
