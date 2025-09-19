@@ -125,8 +125,7 @@ const learnSections = [
           <span className="font-semibold text-gray-100">
             On-Chain Transparency:
           </span>{" "}
-          All activity is public, immutable, and auditable on the Flow
-          blockchain.
+          All activity is transparent, permanent, and verifiable on the Flow blockchain.
         </li>
       </ul>
     ),

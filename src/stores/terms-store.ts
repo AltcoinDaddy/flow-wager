@@ -3,13 +3,13 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import Cookies from "js-cookie";
 
 interface TermsState {
-  // Existing terms state
+  
   showTermsModal: boolean;
   hasAcceptedTerms: boolean;
   acceptTerms: () => void;
   declineTerms: () => void;
 
-  // New region state
+  
   isRegionRestricted: boolean;
   countryCode?: string;
   country?: string;
@@ -23,7 +23,7 @@ interface TermsState {
   resetRegion: () => void;
 }
 
-// Custom cookie storage implementation
+
 const cookieStorage = {
   getItem: (name: string): string | null => {
     return Cookies.get(name) || null;
