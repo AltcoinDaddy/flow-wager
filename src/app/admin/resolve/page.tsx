@@ -144,7 +144,7 @@ function AdminResolveContent(): JSX.Element {
     }
   }, [marketIdParam, markets]);
 
-  // Redirect non-admin users
+  
   useEffect(() => {
     if (!authLoading && loggedIn && !isAdmin) {
       toast.error("You don't have admin privileges");
@@ -152,13 +152,12 @@ function AdminResolveContent(): JSX.Element {
     }
   }, [loggedIn, isAdmin, authLoading, router]);
 
-  // Filter markets with proper typing
+
   const filteredMarkets: Market[] = markets.filter((market: Market) =>
     market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (market.category in MarketCategoryLabels && MarketCategoryLabels[market.category as keyof typeof MarketCategoryLabels]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // Event handlers with proper typing
   const handleMarketSelect = (market: Market): void => {
     setSelectedMarket(market);
     setResolutionData({
@@ -183,7 +182,6 @@ function AdminResolveContent(): JSX.Element {
     setSearchQuery(e.target.value);
   };
 
-  // 🚨 UPDATED: Use your Flow Wager resolve script
   const handleResolve = async (): Promise<void> => {
     if (!selectedMarket || !resolutionData.outcome) {
       toast.error("Please select an outcome");
@@ -204,7 +202,6 @@ function AdminResolveContent(): JSX.Element {
     setResolutionError(null);
 
     try {
-      // Validate inputs
       const marketId = parseInt(selectedMarket.id);
       const outcomeValue = parseInt(resolutionData.outcome);
       const justification = resolutionData.evidence.trim();
@@ -221,7 +218,6 @@ function AdminResolveContent(): JSX.Element {
 
       toast.loading("Submitting resolution transaction...");
 
-      // 🚨 USE YOUR FLOW WAGER RESOLVE SCRIPT 🚨
       const transactionScript = await resolveMarketTransaction();
       
       console.log("Using resolution script from flow-wager-scripts");
@@ -230,9 +226,9 @@ function AdminResolveContent(): JSX.Element {
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
-          arg(marketId, t.UInt64),      // marketId
-          arg(outcomeValue, t.UInt8),   // outcome (MarketOutcome enum value)
-          arg(justification, t.String), // justification
+          arg(marketId, t.UInt64),      
+          arg(outcomeValue, t.UInt8),   
+          arg(justification, t.String), 
         ],
         proposer: authorization,
         payer: authorization,
