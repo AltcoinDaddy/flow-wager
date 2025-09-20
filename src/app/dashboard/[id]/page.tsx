@@ -1,8 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
 import { MarketCard } from "@/components/market/market-card";
 import { MarketError } from "@/components/market/market-error";
 import { MarketLoading } from "@/components/market/market-loading";
@@ -14,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { usePoints } from "@/hooks/usePoints";
-import { useUserData } from "@/hooks/use-user-data"; // Add this import
+import { useUserData } from "@/hooks/use-user-data";
 import {
   claimWinningsTransaction,
   getAllUserTrades,
@@ -56,7 +52,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-// Types for user dashboard data
 interface UserDashboardData {
   profile: {
     address: string;
@@ -140,7 +135,7 @@ function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
   let totalPnL = 0;
   positions.forEach((pos) => {
     const market = allMarkets.find(
-      (m) => m.id.toString() === pos.marketId.toString(),
+      (m) => m.id.toString() === pos.marketId.toString()
     );
     if (market && market.resolved) {
       let payout = 0;
@@ -167,13 +162,13 @@ function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
 
 function calculateWinRate(
   positions: UserPosition[],
-  allMarkets: Market[],
+  allMarkets: Market[]
 ): number {
   let wins = 0;
   let resolved = 0;
   positions.forEach((pos) => {
     const market = allMarkets.find(
-      (m) => m.id.toString() === pos.marketId.toString(),
+      (m) => m.id.toString() === pos.marketId.toString()
     );
     if (market && market.resolved) {
       resolved++;
@@ -193,7 +188,6 @@ export default function UserDashboardPage() {
   const userAddress = params.id as string;
   const { user: currentUser, isAuthenticated } = useAuth();
 
-  // Fetch user data from Supabase
   const {
     user: supabaseUser,
     loading: userLoading,
@@ -202,7 +196,6 @@ export default function UserDashboardPage() {
     hasProfile,
   } = useUserData(userAddress);
 
-  // Points system integration
   const { userPoints, awardPoints, activities: pointsActivities } = usePoints();
 
   const [data, setData] = useState<UserDashboardData | null>(null);
@@ -234,7 +227,6 @@ export default function UserDashboardPage() {
       setError(null);
       await initConfig();
 
-      // Fetch user dashboard data
       let dashboardDataRaw = null;
       try {
         const userDashboardScript = await getUserDashboardData();
@@ -246,7 +238,6 @@ export default function UserDashboardPage() {
         console.warn("Could not fetch user dashboard data:", err);
       }
 
-      // Fetch platform stats
       let platformStats = null;
       try {
         const platformStatsScript = await getPlatformStats();
@@ -257,7 +248,6 @@ export default function UserDashboardPage() {
         console.warn("Could not fetch platform stats:", statsError);
       }
 
-      // Fetch all markets
       let allMarkets: Market[] = [];
       try {
         const allMarketsScript = await getAllMarkets();
@@ -269,7 +259,6 @@ export default function UserDashboardPage() {
       }
       setAllMarkets(allMarkets);
 
-      // Fetch user's created markets
       let createdMarkets: Market[] = [];
       try {
         const createdMarketsScript = await getMarketCreator();
@@ -283,7 +272,6 @@ export default function UserDashboardPage() {
         console.warn("Could not fetch created markets:", err);
       }
 
-      // Transform data
       let dashboardData: UserDashboardData;
       if (dashboardDataRaw) {
         dashboardData = {
@@ -359,7 +347,7 @@ export default function UserDashboardPage() {
       };
       setData(fallbackData);
       setError(
-        "Unable to fetch all user data. Some features may not be available yet.",
+        "Unable to fetch all user data. Some features may not be available yet."
       );
     } finally {
       setLoading(false);
@@ -426,7 +414,7 @@ export default function UserDashboardPage() {
           status: pos.status?.rawValue ?? "Unknown",
           claimableAmount: pos.claimableAmount?.toString() ?? "0",
           claimed: pos.claimed ?? false,
-        }),
+        })
       );
       setAllPositions(positions);
     } catch (err) {
@@ -457,7 +445,7 @@ export default function UserDashboardPage() {
         contractInfo: data.contractInfo,
         exportedAt: new Date().toISOString(),
         contractAddress: `${getFlowTokenAddress()}`,
-        // Include points data
+
         pointsData: {
           currentPoints: userPoints.points,
           currentRank: userPoints.rank,
@@ -482,14 +470,12 @@ export default function UserDashboardPage() {
     }
   };
 
-  // Polling for constant data fetching
   useEffect(() => {
     if (userAddress) {
       fetchUserData();
       fetchUserTrades(userAddress);
       fetchAllPositions(userAddress);
 
-      // Poll every 30 seconds
       pollingIntervalRef.current = setInterval(() => {
         fetchUserData();
         fetchUserTrades(userAddress);
@@ -570,7 +556,6 @@ export default function UserDashboardPage() {
   return (
     <div className="min-h-screen bg-[#0A0C14] scrollbar-hide overflow-x-hidden">
       <div className="container mx-auto px-4 py-8 space-y-8 scrollbar-hide">
-        {/* User Profile Header */}
         <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex items-center space-x-6 max-sm:flex-col max-sm:gap-6">
@@ -627,7 +612,6 @@ export default function UserDashboardPage() {
                   )}
                 </h1>
 
-                {/* User bio if available */}
                 {supabaseUser?.bio && (
                   <p className="text-gray-300 mb-3 max-w-md">
                     {supabaseUser.bio}
@@ -661,11 +645,11 @@ export default function UserDashboardPage() {
                       {supabaseUser?.joined_at
                         ? new Date(supabaseUser.joined_at).toLocaleDateString()
                         : new Date(
-                            parseInt(data?.profile.joinDate || "0") * 1000,
+                            parseInt(data?.profile.joinDate || "0") * 1000
                           ).toLocaleDateString()}
                     </span>
                   </div>
-                  {/* Points System Integration */}
+
                   <div className="flex items-center space-x-1">
                     <Award className="h-4 w-4 text-[#9b87f5]" />
                     <span className="text-[#9b87f5] font-medium">
@@ -745,9 +729,7 @@ export default function UserDashboardPage() {
           </div>
         </div>
 
-        {/* Summary Cards - Enhanced with Points */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* FlowWager Points Card */}
           <Card className="bg-gradient-to-br from-[#9b87f5]/20 to-[#8b5cf6]/20 border-[#9b87f5]/30">
             <CardContent className="p-6">
               <div className="flex items-center space-x-3 mb-3">
@@ -841,7 +823,6 @@ export default function UserDashboardPage() {
           </Card>
         </div>
 
-        {/* Points Quick Actions */}
         {isOwnProfile && (
           <Card className="bg-gradient-to-br from-[#9b87f5]/10 to-[#8b5cf6]/10 border-[#9b87f5]/20">
             <CardHeader>
@@ -919,7 +900,7 @@ export default function UserDashboardPage() {
                 <tbody>
                   {data.claimableWinnings.map((win: any) => {
                     const market = allMarkets.find(
-                      (m) => m.id.toString() === win.marketId.toString(),
+                      (m) => m.id.toString() === win.marketId.toString()
                     );
                     return (
                       <tr
@@ -965,10 +946,9 @@ export default function UserDashboardPage() {
                                   limit: 1000,
                                 });
 
-                                // Award points for winning
                                 const market = allMarkets.find(
                                   (m) =>
-                                    m.id.toString() === win.marketId.toString(),
+                                    m.id.toString() === win.marketId.toString()
                                 );
                                 await awardPoints(
                                   "WIN_BET",
@@ -979,11 +959,11 @@ export default function UserDashboardPage() {
                                       `Market #${win.marketId}`,
                                     winnings: parseFloat(win.amount),
                                   },
-                                  win.marketId,
+                                  win.marketId
                                 );
 
                                 setClaimSuccess(
-                                  "Winnings claimed successfully!",
+                                  "Winnings claimed successfully!"
                                 );
                                 setTimeout(() => setClaimSuccess(null), 2000);
                                 await fetchUserData();
@@ -991,7 +971,7 @@ export default function UserDashboardPage() {
                                 await fetchAllPositions(userAddress);
                               } catch (err: any) {
                                 setClaimError(
-                                  err.message || "Failed to claim winnings",
+                                  err.message || "Failed to claim winnings"
                                 );
                               } finally {
                                 setClaimingMarketId(null);
@@ -1116,7 +1096,6 @@ export default function UserDashboardPage() {
             )}
 
             <div className="grid lg:grid-cols-2 gap-6">
-              {/* Replace Recent Activity with Points Activities */}
               {isOwnProfile && <UserActivities />}
 
               <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
@@ -1373,7 +1352,7 @@ export default function UserDashboardPage() {
                             <div className="flex items-center space-x-2 mt-1">
                               <span
                                 className={`text-sm ${getActivityColor(
-                                  activity.type,
+                                  activity.type
                                 )}`}
                               >
                                 Created market
@@ -1535,7 +1514,7 @@ export default function UserDashboardPage() {
                             <p className="text-gray-400">Ends</p>
                             <p className="text-white font-medium">
                               {new Date(
-                                parseFloat(trade.endTime) * 1000,
+                                parseFloat(trade.endTime) * 1000
                               ).toLocaleString()}
                             </p>
                           </div>
