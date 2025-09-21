@@ -1,4 +1,3 @@
- 
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -34,20 +33,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, JSX, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// Import your Flow Wager scripts
 import {
-  getAllPendingMarketsWithEvidence, getFlowWagerAddress, // New script
+  getAllPendingMarketsWithEvidence,
+  getFlowWagerAddress,
   resolveMarketTransaction,
 } from "@/lib/flow-wager-scripts";
 
-// Import your existing types
 import type { PendingMarketDetails } from "@/types";
 import { MarketCategoryLabels, MarketOutcome } from "@/types";
 
-// Your existing auth hook
 import { useAuth } from "@/providers/auth-provider";
 
-// Resolution form data interface
 interface ResolutionData {
   outcome: string;
   evidence: string;
@@ -60,18 +56,16 @@ function AdminResolveContent(): JSX.Element {
   const router = useRouter();
   const marketIdParam = searchParams.get("id");
 
-  // Use your existing auth hook
   const { user, isAuthenticated: loggedIn, isLoading: authLoading } = useAuth();
 
-  // State management
   const [markets, setMarkets] = useState<PendingMarketDetails[]>([]);
   const [marketsLoading, setMarketsLoading] = useState(true);
   const [marketsError, setMarketsError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<boolean>(false);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
 
-  // Component state
-  const [selectedMarket, setSelectedMarket] = useState<PendingMarketDetails | null>(null);
+  const [selectedMarket, setSelectedMarket] =
+    useState<PendingMarketDetails | null>(null);
   const [resolutionData, setResolutionData] = useState<ResolutionData>({
     outcome: "",
     evidence: "",
@@ -80,10 +74,8 @@ function AdminResolveContent(): JSX.Element {
   });
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Simple admin check (update to match your admin address)
-  const isAdmin = loggedIn && user?.addr === `${getFlowWagerAddress()}`
+  const isAdmin = loggedIn && user?.addr === `${getFlowWagerAddress()}`;
 
-  // Initialize Flow configuration
   useEffect(() => {
     const initFlow = async () => {
       try {
@@ -96,7 +88,6 @@ function AdminResolveContent(): JSX.Element {
     initFlow();
   }, []);
 
-  // Fetch pending markets with evidence
   useEffect(() => {
     const fetchMarkets = async () => {
       if (!loggedIn || !isAdmin) return;
@@ -108,7 +99,9 @@ function AdminResolveContent(): JSX.Element {
         setMarkets(pendingMarkets || []);
       } catch (error) {
         console.error("Failed to fetch markets:", error);
-        setMarketsError("Failed to load pending markets with evidence from contract");
+        setMarketsError(
+          "Failed to load pending markets with evidence from contract"
+        );
       } finally {
         setMarketsLoading(false);
       }
@@ -116,13 +109,12 @@ function AdminResolveContent(): JSX.Element {
     fetchMarkets();
   }, [loggedIn, isAdmin]);
 
-  // Load specific market if ID provided
   useEffect(() => {
     if (marketIdParam && markets.length > 0) {
       const market = markets.find((m) => m.market.id === marketIdParam);
       if (market) {
         setSelectedMarket(market);
-        // Pre-populate outcome with requestedOutcome from evidence
+
         setResolutionData((prev) => ({
           ...prev,
           outcome: market.evidence.requestedOutcome,
@@ -134,7 +126,6 @@ function AdminResolveContent(): JSX.Element {
     }
   }, [marketIdParam, markets]);
 
-  // Redirect non-admin users
   useEffect(() => {
     if (!authLoading && loggedIn && !isAdmin) {
       toast.error("You don't have admin privileges");
@@ -142,31 +133,34 @@ function AdminResolveContent(): JSX.Element {
     }
   }, [loggedIn, isAdmin, authLoading, router]);
 
-  // Filter markets
-  const filteredMarkets: PendingMarketDetails[] = markets.filter((market) =>
-    market.market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (market.market.category in MarketCategoryLabels &&
-      MarketCategoryLabels[market.market.category as keyof typeof MarketCategoryLabels]
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()))
+  const filteredMarkets: PendingMarketDetails[] = markets.filter(
+    (market) =>
+      market.market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (market.market.category in MarketCategoryLabels &&
+        MarketCategoryLabels[
+          market.market.category as keyof typeof MarketCategoryLabels
+        ]
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()))
   );
 
-  // Event handlers
   const handleMarketSelect = (market: PendingMarketDetails): void => {
     setSelectedMarket(market);
     setResolutionData({
       outcome: market.evidence.requestedOutcome,
       evidence: "",
-      sourceUrl: market.evidence.evidence.startsWith("http") ? market.evidence.evidence : "",
+      sourceUrl: market.evidence.evidence.startsWith("http")
+        ? market.evidence.evidence
+        : "",
       adminNotes: "",
     });
   };
 
-  const handleInputChange = (field: keyof ResolutionData) => (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ): void => {
-    setResolutionData((prev) => ({ ...prev, [field]: e.target.value }));
-  };
+  const handleInputChange =
+    (field: keyof ResolutionData) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
+      setResolutionData((prev) => ({ ...prev, [field]: e.target.value }));
+    };
 
   const handleOutcomeChange = (value: string): void => {
     setResolutionData((prev) => ({ ...prev, outcome: value }));
@@ -204,7 +198,11 @@ function AdminResolveContent(): JSX.Element {
         throw new Error("Invalid market ID or outcome");
       }
 
-      console.log("Resolving market:", { marketId, outcomeValue, justification });
+      console.log("Resolving market:", {
+        marketId,
+        outcomeValue,
+        justification,
+      });
 
       toast.loading("Submitting resolution transaction...");
 
@@ -237,7 +235,6 @@ function AdminResolveContent(): JSX.Element {
           duration: 5000,
         });
 
-        // Refresh markets
         const script = await getAllPendingMarketsWithEvidence();
         const updatedMarkets = await fcl.query({ cadence: script });
         setMarkets(updatedMarkets || []);
@@ -277,7 +274,6 @@ function AdminResolveContent(): JSX.Element {
     }
   };
 
-  // Utility functions
   const formatCurrency = (value: string | number): string => {
     const numValue = typeof value === "string" ? parseFloat(value) : value;
     if (isNaN(numValue)) return "0";
@@ -310,10 +306,16 @@ function AdminResolveContent(): JSX.Element {
   };
 
   const getTotalShares = (market: PendingMarketDetails): number => {
-    return parseFloat(market.market.totalOptionAShares) + parseFloat(market.market.totalOptionBShares);
+    return (
+      parseFloat(market.market.totalOptionAShares) +
+      parseFloat(market.market.totalOptionBShares)
+    );
   };
 
-  const getWinningAmount = (market: PendingMarketDetails, outcome: MarketOutcome): number => {
+  const getWinningAmount = (
+    market: PendingMarketDetails,
+    outcome: MarketOutcome
+  ): number => {
     const totalPool = parseFloat(market.market.totalPool);
     const totalShares = getTotalShares(market);
     if (outcome === MarketOutcome.Cancelled) return totalPool;
@@ -329,7 +331,10 @@ function AdminResolveContent(): JSX.Element {
   };
 
   const getEstimatedParticipants = (market: PendingMarketDetails): number => {
-    return parseInt(market.participantCount) || Math.max(1, Math.floor(getTotalShares(market) / 100));
+    return (
+      parseInt(market.participantCount) ||
+      Math.max(1, Math.floor(getTotalShares(market) / 100))
+    );
   };
 
   const getSharePercentage = (shares: string, totalShares: number): number => {
@@ -353,7 +358,6 @@ function AdminResolveContent(): JSX.Element {
     }
   };
 
-  // Show loading while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-[#0A0C14] text-white">
@@ -367,7 +371,6 @@ function AdminResolveContent(): JSX.Element {
     );
   }
 
-  // Show authentication prompt if not logged in
   if (!loggedIn) {
     return (
       <div className="min-h-screen flex flex-col bg-[#0A0C14] text-white">
@@ -396,7 +399,6 @@ function AdminResolveContent(): JSX.Element {
     );
   }
 
-  // Show unauthorized message if not admin
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex flex-col bg-[#0A0C14] text-white">
@@ -415,10 +417,7 @@ function AdminResolveContent(): JSX.Element {
               <div className="text-xs text-gray-500 mb-4">
                 Connected as: {user?.addr}
               </div>
-              <Button
-                asChild
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
+              <Button asChild className="w-full bg-blue-600 hover:bg-blue-700">
                 <Link href="/">Go to Home</Link>
               </Button>
             </CardContent>
@@ -445,7 +444,9 @@ function AdminResolveContent(): JSX.Element {
               </Link>
             </Button>
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold">Resolve Markets</h1>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                Resolve Markets
+              </h1>
               <p className="text-gray-400">
                 Determine outcomes for markets with submitted evidence
               </p>
@@ -488,7 +489,6 @@ function AdminResolveContent(): JSX.Element {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-          {/* Market Selection */}
           <div className="space-y-6 w-full">
             <Card className="bg-gray-900/50 border-gray-700 backdrop-blur w-full">
               <CardHeader>
@@ -521,7 +521,9 @@ function AdminResolveContent(): JSX.Element {
                       <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p>No markets with evidence found.</p>
                       {markets.length === 0 && (
-                        <p className="text-sm mt-2">No markets are pending resolution with evidence.</p>
+                        <p className="text-sm mt-2">
+                          No markets are pending resolution with evidence.
+                        </p>
                       )}
                     </div>
                   ) : (
@@ -539,11 +541,20 @@ function AdminResolveContent(): JSX.Element {
                         >
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center space-x-2">
-                              <Badge variant="outline" className="text-orange-400 border-orange-500 bg-orange-900/20">
+                              <Badge
+                                variant="outline"
+                                className="text-orange-400 border-orange-500 bg-orange-900/20"
+                              >
                                 Pending
                               </Badge>
-                              <Badge variant="secondary" className="bg-gray-700 text-gray-200">
-                                {MarketCategoryLabels[market.market.category as keyof typeof MarketCategoryLabels] || "Unknown"}
+                              <Badge
+                                variant="secondary"
+                                className="bg-gray-700 text-gray-200"
+                              >
+                                {MarketCategoryLabels[
+                                  market.market
+                                    .category as keyof typeof MarketCategoryLabels
+                                ] || "Unknown"}
                               </Badge>
                             </div>
                             <span className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded">
@@ -557,46 +568,67 @@ function AdminResolveContent(): JSX.Element {
                             <div className="flex items-center gap-1">
                               <TrendingUp className="h-3 w-3 text-gray-400" />
                               <span className="text-gray-400">Volume:</span>
-                              <span className="font-medium text-white">{formatCurrency(market.totalVolume)} FLOW</span>
+                              <span className="font-medium text-white">
+                                {formatCurrency(market.totalVolume)} FLOW
+                              </span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3 text-gray-400" />
                               <span className="text-gray-400">Ended:</span>
-                              <span className="font-medium text-white">{getTimeSinceEnd(market.market.endTime)}</span>
+                              <span className="font-medium text-white">
+                                {getTimeSinceEnd(market.market.endTime)}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Users className="h-3 w-3 text-gray-400" />
                               <span className="text-gray-400">Traders:</span>
-                              <span className="font-medium text-white">{getEstimatedParticipants(market)}</span>
+                              <span className="font-medium text-white">
+                                {getEstimatedParticipants(market)}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3 text-gray-400" />
                               <span className="text-gray-400">Shares:</span>
-                              <span className="font-medium text-white">{totalShares.toLocaleString()}</span>
+                              <span className="font-medium text-white">
+                                {totalShares.toLocaleString()}
+                              </span>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs">
                               <span className="text-green-400">
                                 {market.market.optionA}:{" "}
-                                {getSharePercentage(market.market.totalOptionAShares, totalShares).toFixed(1)}%
+                                {getSharePercentage(
+                                  market.market.totalOptionAShares,
+                                  totalShares
+                                ).toFixed(1)}
+                                %
                               </span>
                               <span className="text-blue-400">
                                 {market.market.optionB}:{" "}
-                                {getSharePercentage(market.market.totalOptionBShares, totalShares).toFixed(1)}%
+                                {getSharePercentage(
+                                  market.market.totalOptionBShares,
+                                  totalShares
+                                ).toFixed(1)}
+                                %
                               </span>
                             </div>
                             <div className="w-full bg-gray-700 rounded-full h-2">
                               <div
                                 className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all"
                                 style={{
-                                  width: `${getSharePercentage(market.market.totalOptionAShares, totalShares)}%`,
+                                  width: `${getSharePercentage(
+                                    market.market.totalOptionAShares,
+                                    totalShares
+                                  )}%`,
                                 }}
                               />
                             </div>
                           </div>
                           <div className="mt-2 text-xs text-gray-400">
-                            <span className="font-medium">Evidence Submitted:</span>{" "}
+                            <span className="font-medium">
+                              Evidence Submitted:
+                            </span>{" "}
                             {formatDate(market.evidence.submittedAt)}
                           </div>
                         </div>
@@ -608,7 +640,6 @@ function AdminResolveContent(): JSX.Element {
             </Card>
           </div>
 
-          {/* Resolution Form */}
           <div className="space-y-6 w-full">
             {selectedMarket ? (
               <>
@@ -622,7 +653,10 @@ function AdminResolveContent(): JSX.Element {
                         asChild
                         className="border-gray-600 hover:bg-gray-800 text-white"
                       >
-                        <Link href={`/markets/${selectedMarket.market.id}`} target="_blank">
+                        <Link
+                          href={`/markets/${selectedMarket.market.id}`}
+                          target="_blank"
+                        >
                           <ExternalLink className="h-4 w-4 mr-2" />
                           View Market
                         </Link>
@@ -631,19 +665,24 @@ function AdminResolveContent(): JSX.Element {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <h4 className="font-medium mb-3 text-white">{selectedMarket.market.title}</h4>
+                      <h4 className="font-medium mb-3 text-white">
+                        {selectedMarket.market.title}
+                      </h4>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-400">Category:</span>
                           <div className="font-medium text-white">
-                            {MarketCategoryLabels[selectedMarket.market.category as keyof typeof MarketCategoryLabels] ||
-                              "Unknown"}
+                            {MarketCategoryLabels[
+                              selectedMarket.market
+                                .category as keyof typeof MarketCategoryLabels
+                            ] || "Unknown"}
                           </div>
                         </div>
                         <div>
                           <span className="text-gray-400">Creator:</span>
                           <div className="font-mono text-xs bg-gray-800 text-gray-200 px-2 py-1 rounded">
-                            {selectedMarket.market.creator.slice(0, 6)}...{selectedMarket.market.creator.slice(-4)}
+                            {selectedMarket.market.creator.slice(0, 6)}...
+                            {selectedMarket.market.creator.slice(-4)}
                           </div>
                         </div>
                         <div>
@@ -655,33 +694,51 @@ function AdminResolveContent(): JSX.Element {
                         <div>
                           <span className="text-gray-400">Participants:</span>
                           <div className="font-medium text-white">
-                            {getEstimatedParticipants(selectedMarket).toLocaleString()}
+                            {getEstimatedParticipants(
+                              selectedMarket
+                            ).toLocaleString()}
                           </div>
                         </div>
                         <div>
                           <span className="text-gray-400">Total Shares:</span>
-                          <div className="text-xs text-white">{getTotalShares(selectedMarket).toLocaleString()}</div>
+                          <div className="text-xs text-white">
+                            {getTotalShares(selectedMarket).toLocaleString()}
+                          </div>
                         </div>
                         <div>
                           <span className="text-gray-400">Ended:</span>
-                          <div className="text-xs text-white">{formatDate(selectedMarket.market.endTime)}</div>
+                          <div className="text-xs text-white">
+                            {formatDate(selectedMarket.market.endTime)}
+                          </div>
                         </div>
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <h5 className="font-medium text-white">Submitted Evidence</h5>
+                      <h5 className="font-medium text-white">
+                        Submitted Evidence
+                      </h5>
                       <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
                         <div className="space-y-2 text-sm">
                           <div>
-                            <span className="text-gray-400">Requested Outcome:</span>{" "}
+                            <span className="text-gray-400">
+                              Requested Outcome:
+                            </span>{" "}
                             <span className="text-white">
-                              {getOutcomeLabel(parseInt(selectedMarket.evidence.requestedOutcome) as MarketOutcome)}
+                              {getOutcomeLabel(
+                                parseInt(
+                                  selectedMarket.evidence.requestedOutcome
+                                ) as MarketOutcome
+                              )}
                             </span>
                           </div>
                           <div>
                             <span className="text-gray-400">Evidence:</span>{" "}
-                            <span className="text-white">{selectedMarket.evidence.evidence}</span>
-                            {selectedMarket.evidence.evidence.startsWith("http") && (
+                            <span className="text-white">
+                              {selectedMarket.evidence.evidence}
+                            </span>
+                            {selectedMarket.evidence.evidence.startsWith(
+                              "http"
+                            ) && (
                               <a
                                 href={selectedMarket.evidence.evidence}
                                 target="_blank"
@@ -694,45 +751,65 @@ function AdminResolveContent(): JSX.Element {
                           </div>
                           <div>
                             <span className="text-gray-400">Submitted At:</span>{" "}
-                            <span className="text-white">{formatDate(selectedMarket.evidence.submittedAt)}</span>
+                            <span className="text-white">
+                              {formatDate(selectedMarket.evidence.submittedAt)}
+                            </span>
                           </div>
                         </div>
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <h5 className="font-medium text-white">Current Distribution</h5>
+                      <h5 className="font-medium text-white">
+                        Current Distribution
+                      </h5>
                       <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
                           <div>
-                            <span className="text-sm font-medium text-green-300">{selectedMarket.market.optionA}</span>
-                            <div className="text-xs text-green-400">Option A</div>
+                            <span className="text-sm font-medium text-green-300">
+                              {selectedMarket.market.optionA}
+                            </span>
+                            <div className="text-xs text-green-400">
+                              Option A
+                            </div>
                           </div>
                           <div className="text-right">
                             <div className="font-medium text-white">
-                              {parseFloat(selectedMarket.market.totalOptionAShares).toLocaleString()} shares
+                              {parseFloat(
+                                selectedMarket.market.totalOptionAShares
+                              ).toLocaleString()}{" "}
+                              shares
                             </div>
                             <div className="text-sm text-green-400">
                               {getSharePercentage(
                                 selectedMarket.market.totalOptionAShares,
                                 getTotalShares(selectedMarket)
-                              ).toFixed(1)}%
+                              ).toFixed(1)}
+                              %
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
                           <div>
-                            <span className="text-sm font-medium text-blue-300">{selectedMarket.market.optionB}</span>
-                            <div className="text-xs text-blue-400">Option B</div>
+                            <span className="text-sm font-medium text-blue-300">
+                              {selectedMarket.market.optionB}
+                            </span>
+                            <div className="text-xs text-blue-400">
+                              Option B
+                            </div>
                           </div>
                           <div className="text-right">
                             <div className="font-medium text-white">
-                              {parseFloat(selectedMarket.market.totalOptionBShares).toLocaleString()} shares
+                              {parseFloat(
+                                selectedMarket.market.totalOptionBShares
+                              ).toLocaleString()}{" "}
+                              shares
                             </div>
                             <div className="text-sm text-blue-400">
                               {getSharePercentage(
                                 selectedMarket.market.totalOptionBShares,
                                 getTotalShares(selectedMarket)
-                              ).toFixed(1)}%
+                              ).toFixed(1)}
+                              %
                             </div>
                           </div>
                         </div>
@@ -750,35 +827,67 @@ function AdminResolveContent(): JSX.Element {
                   </CardHeader>
                   <CardContent className="space-y-6 w-full">
                     <div className="space-y-3 w-full">
-                      <Label className="text-sm font-medium text-white">Outcome *</Label>
-                      <Select value={resolutionData.outcome} onValueChange={handleOutcomeChange}>
+                      <Label className="text-sm font-medium text-white">
+                        Outcome *
+                      </Label>
+                      <Select
+                        value={resolutionData.outcome}
+                        onValueChange={handleOutcomeChange}
+                      >
                         <SelectTrigger className="h-12 bg-gray-800 border-gray-600 text-white text-base w-full">
                           <SelectValue placeholder="Select the winning outcome" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-600">
-                          <SelectItem value={MarketOutcome.OptionA.toString()} className="text-white hover:bg-gray-700">
+                          <SelectItem
+                            value={MarketOutcome.OptionA.toString()}
+                            className="text-white hover:bg-gray-700"
+                          >
                             <div className="flex items-center space-x-3 py-1">
                               <CheckCircle className="h-4 w-4 text-green-400" />
                               <div>
-                                <div className="font-medium">{selectedMarket.market.optionA}</div>
+                                <div className="font-medium">
+                                  {selectedMarket.market.optionA}
+                                </div>
                                 <div className="text-xs text-gray-400">
-                                  Winners receive: {formatCurrency(getWinningAmount(selectedMarket, MarketOutcome.OptionA))} FLOW
+                                  Winners receive:{" "}
+                                  {formatCurrency(
+                                    getWinningAmount(
+                                      selectedMarket,
+                                      MarketOutcome.OptionA
+                                    )
+                                  )}{" "}
+                                  FLOW
                                 </div>
                               </div>
                             </div>
                           </SelectItem>
-                          <SelectItem value={MarketOutcome.OptionB.toString()} className="text-white hover:bg-gray-700">
+                          <SelectItem
+                            value={MarketOutcome.OptionB.toString()}
+                            className="text-white hover:bg-gray-700"
+                          >
                             <div className="flex items-center space-x-3 py-1">
                               <CheckCircle className="h-4 w-4 text-blue-400" />
                               <div>
-                                <div className="font-medium">{selectedMarket.market.optionB}</div>
+                                <div className="font-medium">
+                                  {selectedMarket.market.optionB}
+                                </div>
                                 <div className="text-xs text-gray-400">
-                                  Winners receive: {formatCurrency(getWinningAmount(selectedMarket, MarketOutcome.OptionB))} FLOW
+                                  Winners receive:{" "}
+                                  {formatCurrency(
+                                    getWinningAmount(
+                                      selectedMarket,
+                                      MarketOutcome.OptionB
+                                    )
+                                  )}{" "}
+                                  FLOW
                                 </div>
                               </div>
                             </div>
                           </SelectItem>
-                          <SelectItem value={MarketOutcome.Cancelled.toString()} className="text-white hover:bg-gray-700">
+                          <SelectItem
+                            value={MarketOutcome.Cancelled.toString()}
+                            className="text-white hover:bg-gray-700"
+                          >
                             <div className="flex items-center space-x-3 py-1">
                               <XCircle className="h-4 w-4 text-red-400" />
                               <div>
@@ -793,7 +902,10 @@ function AdminResolveContent(): JSX.Element {
                       </Select>
                     </div>
                     <div className="space-y-2 w-full">
-                      <Label htmlFor="evidence" className="text-sm font-medium text-white">
+                      <Label
+                        htmlFor="evidence"
+                        className="text-sm font-medium text-white"
+                      >
                         Evidence/Reasoning *
                       </Label>
                       <Textarea
@@ -809,7 +921,10 @@ function AdminResolveContent(): JSX.Element {
                       </div>
                     </div>
                     <div className="space-y-2 w-full">
-                      <Label htmlFor="sourceUrl" className="text-sm font-medium text-white">
+                      <Label
+                        htmlFor="sourceUrl"
+                        className="text-sm font-medium text-white"
+                      >
                         Source URL
                       </Label>
                       <Input
@@ -825,7 +940,10 @@ function AdminResolveContent(): JSX.Element {
                       </div>
                     </div>
                     <div className="space-y-2 w-full">
-                      <Label htmlFor="adminNotes" className="text-sm font-medium text-white">
+                      <Label
+                        htmlFor="adminNotes"
+                        className="text-sm font-medium text-white"
+                      >
                         Admin Notes (Internal)
                       </Label>
                       <Textarea
@@ -839,22 +957,35 @@ function AdminResolveContent(): JSX.Element {
                     </div>
                     {resolutionData.outcome && (
                       <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg space-y-2">
-                        <h6 className="font-medium text-sm text-white">Resolution Preview</h6>
+                        <h6 className="font-medium text-sm text-white">
+                          Resolution Preview
+                        </h6>
                         <div className="text-sm space-y-1">
                           <div>
                             <span className="text-gray-400">Outcome:</span>{" "}
                             <span className="text-white">
-                              {getOutcomeLabel(parseInt(resolutionData.outcome) as MarketOutcome)}
+                              {getOutcomeLabel(
+                                parseInt(
+                                  resolutionData.outcome
+                                ) as MarketOutcome
+                              )}
                             </span>
                           </div>
                           <div>
-                            <span className="text-gray-400">Total Distribution:</span>{" "}
-                            <span className="text-white">{formatCurrency(selectedMarket.totalVolume)} FLOW</span>
+                            <span className="text-gray-400">
+                              Total Distribution:
+                            </span>{" "}
+                            <span className="text-white">
+                              {formatCurrency(selectedMarket.totalVolume)} FLOW
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-400">Contract:</span>{" "}
                             <span className="text-blue-400 font-mono">
-                              {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
+                              {
+                                process.env
+                                  .NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT
+                              }
                             </span>
                           </div>
                         </div>
@@ -863,15 +994,24 @@ function AdminResolveContent(): JSX.Element {
                     <div className="flex items-start space-x-3 p-4 rounded-lg bg-yellow-900/20 border border-yellow-600/50">
                       <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" />
                       <div className="text-sm text-yellow-200">
-                        <p className="font-medium mb-1">Resolution is permanent and irreversible</p>
+                        <p className="font-medium mb-1">
+                          Resolution is permanent and irreversible
+                        </p>
                         <p>
-                          Once resolved, this action cannot be undone. Funds will be distributed immediately using your Flow Wager contract. Please verify all information is accurate before proceeding.
+                          Once resolved, this action cannot be undone. Funds
+                          will be distributed immediately using your Flow Wager
+                          contract. Please verify all information is accurate
+                          before proceeding.
                         </p>
                       </div>
                     </div>
                     <Button
                       onClick={handleResolve}
-                      disabled={resolving || !resolutionData.outcome || !resolutionData.evidence.trim()}
+                      disabled={
+                        resolving ||
+                        !resolutionData.outcome ||
+                        !resolutionData.evidence.trim()
+                      }
                       className="w-full h-14 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-400 text-base"
                       size="lg"
                     >
@@ -883,7 +1023,11 @@ function AdminResolveContent(): JSX.Element {
                       ) : (
                         `Resolve Market: ${
                           resolutionData.outcome
-                            ? getOutcomeLabel(parseInt(resolutionData.outcome) as MarketOutcome)
+                            ? getOutcomeLabel(
+                                parseInt(
+                                  resolutionData.outcome
+                                ) as MarketOutcome
+                              )
                             : "Select Outcome"
                         }`
                       )}
@@ -895,9 +1039,13 @@ function AdminResolveContent(): JSX.Element {
               <Card className="bg-gray-900/50 border-gray-700 backdrop-blur">
                 <CardContent className="p-12 text-center">
                   <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-xl font-medium mb-2 text-white">Select a Market to Resolve</h3>
+                  <h3 className="text-xl font-medium mb-2 text-white">
+                    Select a Market to Resolve
+                  </h3>
                   <p className="text-gray-400 max-w-md mx-auto">
-                    Choose a market from the list on the left to begin the resolution process. Markets are loaded from your Flow Wager contract at{" "}
+                    Choose a market from the list on the left to begin the
+                    resolution process. Markets are loaded from your Flow Wager
+                    contract at{" "}
                     {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}.
                   </p>
                 </CardContent>
@@ -911,7 +1059,9 @@ function AdminResolveContent(): JSX.Element {
             <Card className="w-full max-w-md mx-4 bg-gray-900 border-gray-700">
               <CardContent className="p-8 text-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-b-transparent mx-auto mb-6"></div>
-                <h3 className="text-lg font-medium mb-2 text-white">Resolving Market...</h3>
+                <h3 className="text-lg font-medium mb-2 text-white">
+                  Resolving Market...
+                </h3>
                 <p className="text-gray-400 mb-4">
                   Processing resolution using Flow Wager contract
                 </p>
@@ -944,7 +1094,9 @@ function AdminResolveLoading(): JSX.Element {
             Back to Admin
           </Button>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white">Resolve Markets</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-white">
+              Resolve Markets
+            </h1>
             <p className="text-gray-400">Loading...</p>
           </div>
         </div>
@@ -964,7 +1116,9 @@ function AdminResolveLoading(): JSX.Element {
           <Card className="bg-gray-900/50 border-gray-700">
             <CardContent className="p-12 text-center">
               <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4 opacity-50" />
-              <h3 className="text-xl font-medium mb-2 text-white">Loading...</h3>
+              <h3 className="text-xl font-medium mb-2 text-white">
+                Loading...
+              </h3>
             </CardContent>
           </Card>
         </div>

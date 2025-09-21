@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -49,7 +48,6 @@ export default function AdminCreatePage() {
   });
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
-  // Initialize Flow configuration
   const initConfig = async () => {
     try {
       flowConfig();
@@ -59,7 +57,6 @@ export default function AdminCreatePage() {
     }
   };
 
-  // Fetch real admin stats using your Flow scripts
   useEffect(() => {
     const fetchStats = async () => {
       if (!user?.addr) return;
@@ -68,34 +65,30 @@ export default function AdminCreatePage() {
         setIsLoadingStats(true);
         await initConfig();
 
-        // Fetch platform stats using your script
         const platformStatsScript = await getPlatformStats();
         const stats = await fcl.query({
           cadence: platformStatsScript,
         });
 
-        // Fetch all markets to calculate daily/weekly stats
         const allMarketsScript = await getAllMarkets();
         const markets = await fcl.query({
           cadence: allMarketsScript,
         });
 
-        // Calculate daily/weekly creation stats
         const now = Date.now() / 1000;
         const oneDayAgo = now - 24 * 60 * 60;
         const oneWeekAgo = now - 7 * 24 * 60 * 60;
 
         const marketsCreatedToday =
           markets?.filter(
-            (market: any) => parseFloat(market.createdAt) >= oneDayAgo,
+            (market: any) => parseFloat(market.createdAt) >= oneDayAgo
           ).length || 0;
 
         const marketsCreatedThisWeek =
           markets?.filter(
-            (market: any) => parseFloat(market.createdAt) >= oneWeekAgo,
+            (market: any) => parseFloat(market.createdAt) >= oneWeekAgo
           ).length || 0;
 
-        // Calculate average volume
         const totalVolume = parseFloat(stats.totalVolume || "0");
         const averageVolume =
           markets?.length > 0 ? totalVolume / markets.length : 0;
@@ -104,7 +97,7 @@ export default function AdminCreatePage() {
           marketsCreatedToday,
           marketsCreatedThisWeek,
           averageVolume,
-          successRate: 100, // You can calculate this based on resolved markets
+          successRate: 100,
           totalCreators: parseInt(stats.totalUsers?.toString() || "0"),
           totalMarkets: parseInt(stats.totalMarkets?.toString() || "0"),
           activeMarkets: parseInt(stats.activeMarkets?.toString() || "0"),
@@ -130,15 +123,12 @@ export default function AdminCreatePage() {
     setError(null);
 
     try {
-      // The CreateMarketForm handles the actual contract interaction using your scripts
-      // This will be called after successful transaction
       if (marketData.success && marketData.transactionId) {
         setCreatedMarketId(
-          marketData.marketId || Math.floor(Math.random() * 1000) + 100,
+          marketData.marketId || Math.floor(Math.random() * 1000) + 100
         );
         setCreationSuccess(true);
 
-        // Refresh stats after successful creation
         const fetchUpdatedStats = async () => {
           try {
             await initConfig();
@@ -150,10 +140,10 @@ export default function AdminCreatePage() {
             setCreationStats((prev) => ({
               ...prev,
               totalMarkets: parseInt(
-                updatedStats.totalMarkets?.toString() || "0",
+                updatedStats.totalMarkets?.toString() || "0"
               ),
               activeMarkets: parseInt(
-                updatedStats.activeMarkets?.toString() || "0",
+                updatedStats.activeMarkets?.toString() || "0"
               ),
               totalVolume: updatedStats.totalVolume?.toString() || "0",
               marketsCreatedToday: prev.marketsCreatedToday + 1,
@@ -166,7 +156,6 @@ export default function AdminCreatePage() {
 
         fetchUpdatedStats();
 
-        // Redirect after a delay
         setTimeout(() => {
           router.push(`/markets`);
         }, 3000);
@@ -181,7 +170,6 @@ export default function AdminCreatePage() {
     }
   };
 
-  // Show login prompt if not connected
   if (!loggedIn) {
     return (
       <div className="min-h-screen bg-[#0A0C14] flex items-center justify-center p-4">
@@ -265,7 +253,6 @@ export default function AdminCreatePage() {
   return (
     <div className="min-h-screen bg-[#0A0C14]">
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center space-x-4">
             <Button
@@ -305,7 +292,6 @@ export default function AdminCreatePage() {
           </div>
         </div>
 
-        {/* Error Alert */}
         {error && (
           <Alert className="bg-red-500/10 border-red-500/30 text-red-400">
             <AlertTriangle className="h-4 w-4" />
@@ -313,7 +299,6 @@ export default function AdminCreatePage() {
           </Alert>
         )}
 
-        {/* Creation Stats - Now using real data from your Flow scripts */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardContent className="p-4">
@@ -363,7 +348,7 @@ export default function AdminCreatePage() {
                   ) : (
                     <p className="text-2xl font-bold text-white">
                       {(parseFloat(creationStats.totalVolume) / 1000).toFixed(
-                        1,
+                        1
                       )}
                       K
                     </p>
@@ -414,7 +399,6 @@ export default function AdminCreatePage() {
           </Card>
         </div>
 
-        {/* Guidelines */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -497,7 +481,6 @@ export default function AdminCreatePage() {
           </CardContent>
         </Card>
 
-        {/* Contract Information - Now shows real contract info */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white">
@@ -533,7 +516,6 @@ export default function AdminCreatePage() {
           </CardContent>
         </Card>
 
-        {/* Market Creation Form */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="text-white flex items-center space-x-2">
@@ -549,7 +531,6 @@ export default function AdminCreatePage() {
           </CardContent>
         </Card>
 
-        {/* Loading Overlay */}
         {isSubmitting && (
           <div className="fixed inset-0 bg-[#0A0C14]/90 backdrop-blur-sm z-50 flex items-center justify-center">
             <Card className="w-full max-w-md bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">

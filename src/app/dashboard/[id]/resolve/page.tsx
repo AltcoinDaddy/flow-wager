@@ -1,6 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { MarketError } from "@/components/market/market-error";
@@ -33,15 +30,15 @@ import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
 import { usePoints } from "@/hooks/usePoints";
 import * as fcl from "@onflow/fcl";
-import { 
-  CheckCircle, 
-  Loader2, 
-  RefreshCw, 
-  Award, 
-  FileText, 
+import {
+  CheckCircle,
+  Loader2,
+  RefreshCw,
+  Award,
+  FileText,
   Calendar,
   Trophy,
-  Crown
+  Crown,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -68,8 +65,7 @@ export default function UserResolvePage() {
   const params = useParams();
   const userAddress = params.id as string;
   const { user: currentUser, isAuthenticated } = useAuth();
-  
-  // Points system integration
+
   const { userPoints, awardPoints } = usePoints();
 
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -172,7 +168,7 @@ export default function UserResolvePage() {
       setSubmitError(null);
       setSubmitSuccess(null);
       setIsSubmitting(true);
-      
+
       const transaction = await submitResolutionEvidenceTransaction();
       const txResult = await fcl.mutate({
         cadence: transaction,
@@ -188,24 +184,30 @@ export default function UserResolvePage() {
       });
 
       await fcl.tx(txResult).onceSealed();
-      
-      // Award points for submitting evidence
-      const market = markets.find(m => m.id === marketId);
+
+      const market = markets.find((m) => m.id === marketId);
       if (market) {
-        await awardPoints("MARKET_RESOLVED", {
-          marketId: parseInt(marketId),
-          marketTitle: market.title,
-          outcomeSubmitted: requestedOutcome === "0" ? market.optionA : market.optionB,
-          evidenceLength: evidence.length
-        }, parseInt(marketId));
+        await awardPoints(
+          "MARKET_RESOLVED",
+          {
+            marketId: parseInt(marketId),
+            marketTitle: market.title,
+            outcomeSubmitted:
+              requestedOutcome === "0" ? market.optionA : market.optionB,
+            evidenceLength: evidence.length,
+          },
+          parseInt(marketId)
+        );
       }
-      
+
       setMarkets(markets.filter((market) => market.id !== marketId));
       setSelectedMarket(null);
       setEvidence("");
       setRequestedOutcome("");
       setExistingEvidence(null);
-      setSubmitSuccess("Evidence submitted successfully! You earned 75 FlowWager Points!");
+      setSubmitSuccess(
+        "Evidence submitted successfully! You earned 75 FlowWager Points!"
+      );
       setTimeout(() => setSubmitSuccess(null), 3000);
     } catch (err: any) {
       const errorMessage = err.message || "Failed to submit evidence.";
@@ -283,7 +285,6 @@ export default function UserResolvePage() {
   return (
     <div className="min-h-screen bg-[#0A0C14]">
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {/* Header with Points Display */}
         <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -294,10 +295,10 @@ export default function UserResolvePage() {
                 )}
               </h1>
               <p className="text-gray-400 mb-4">
-                Submit evidence for markets you created that are pending resolution.
+                Submit evidence for markets you created that are pending
+                resolution.
               </p>
-              
-              {/* Points display */}
+
               <div className="flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center space-x-2">
                   <Award className="h-4 w-4 text-[#9b87f5]" />
@@ -308,7 +309,9 @@ export default function UserResolvePage() {
                 {userPoints.rank > 0 && (
                   <div className="flex items-center space-x-2">
                     <Trophy className="h-4 w-4 text-yellow-400" />
-                    <span className="text-gray-400">Rank #{userPoints.rank}</span>
+                    <span className="text-gray-400">
+                      Rank #{userPoints.rank}
+                    </span>
                   </div>
                 )}
                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
@@ -316,7 +319,7 @@ export default function UserResolvePage() {
                 </Badge>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
@@ -325,7 +328,9 @@ export default function UserResolvePage() {
                 className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50 w-full sm:w-auto"
               >
                 <RefreshCw
-                  className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
+                  className={`h-4 w-4 mr-2 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
                 />
                 Refresh
               </Button>
@@ -333,7 +338,6 @@ export default function UserResolvePage() {
           </div>
         </div>
 
-        {/* Points Quick Info */}
         <Card className="bg-gradient-to-br from-[#9b87f5]/10 to-[#8b5cf6]/10 border-[#9b87f5]/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -344,7 +348,8 @@ export default function UserResolvePage() {
                     Evidence Submission Rewards
                   </h3>
                   <p className="text-gray-400 text-sm">
-                    Earn points by providing evidence for your market resolutions
+                    Earn points by providing evidence for your market
+                    resolutions
                   </p>
                 </div>
               </div>
@@ -356,14 +361,14 @@ export default function UserResolvePage() {
           </CardContent>
         </Card>
 
-        {/* Markets List */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="text-white flex items-center justify-between">
               <span>Markets Pending Resolution</span>
               {markets.length > 0 && (
                 <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                  {markets.length} market{markets.length !== 1 ? 's' : ''} pending
+                  {markets.length} market{markets.length !== 1 ? "s" : ""}{" "}
+                  pending
                 </Badge>
               )}
             </CardTitle>
@@ -448,7 +453,6 @@ export default function UserResolvePage() {
           </CardContent>
         </Card>
 
-        {/* Evidence Submission Modal */}
         <Dialog
           open={!!selectedMarket}
           onOpenChange={(open) => !open && setSelectedMarket(null)}
@@ -463,7 +467,9 @@ export default function UserResolvePage() {
                 <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
                   +75 FlowWager Points
                 </Badge>
-                <span className="text-gray-400 text-sm">on successful submission</span>
+                <span className="text-gray-400 text-sm">
+                  on successful submission
+                </span>
               </div>
             </DialogHeader>
             <div className="space-y-4">
@@ -511,7 +517,9 @@ export default function UserResolvePage() {
                   <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
                     <div className="flex items-center gap-2 text-green-400">
                       <CheckCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Evidence already submitted</span>
+                      <span className="text-sm font-medium">
+                        Evidence already submitted
+                      </span>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
                       You&lsquo;ve already earned points for this submission.
@@ -536,7 +544,8 @@ export default function UserResolvePage() {
                       id="evidence-description"
                       className="text-sm text-gray-500 mt-1"
                     >
-                      Provide a URL or detailed description of the evidence. Quality evidence helps resolve markets fairly.
+                      Provide a URL or detailed description of the evidence.
+                      Quality evidence helps resolve markets fairly.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2">
@@ -562,8 +571,7 @@ export default function UserResolvePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  {/* Points Preview */}
+
                   <div className="bg-[#9b87f5]/10 border border-[#9b87f5]/20 rounded-lg p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -572,10 +580,13 @@ export default function UserResolvePage() {
                           Evidence Submission Reward
                         </span>
                       </div>
-                      <span className="text-[#9b87f5] font-bold">+75 points</span>
+                      <span className="text-[#9b87f5] font-bold">
+                        +75 points
+                      </span>
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
-                      You&#39;ll earn these points once your evidence is successfully submitted.
+                      You&#39;ll earn these points once your evidence is
+                      successfully submitted.
                     </p>
                   </div>
                 </div>
