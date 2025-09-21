@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-declare module '*.ts' {
+declare module "*.ts" {
   const content: any;
   export default content;
 }

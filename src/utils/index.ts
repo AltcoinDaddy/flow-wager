@@ -1,10 +1,10 @@
 export const getStatusColor = (status: number) => {
   switch (status) {
-    case 0: // Active
+    case 0:
       return "text-green-400 bg-green-500/20 border-green-500/30";
-    case 1: // Paused
+    case 1:
       return "text-yellow-400 bg-yellow-500/20 border-yellow-500/30";
-    case 2: // Resolved
+    case 2:
       return "text-blue-400 bg-blue-500/20 border-blue-500/30";
     default:
       return "text-gray-400 bg-gray-500/20 border-gray-500/30";
@@ -55,24 +55,18 @@ const namePool = [
   "witty",
 ];
 
-/**
- * Simple hash function to convert wallet into a number
- */
 function simpleHash(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) >>> 0; // keep unsigned 32-bit
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
   }
   return hash;
 }
 
-/**
- * Generates a name like "hunter-6" from a wallet address
- */
 export function generateShortNameFromWallet(wallet: string): string {
   const hash = simpleHash(wallet);
   const name = namePool[hash % namePool.length];
-  const number = hash % 100; // 0–99
+  const number = hash % 100;
 
   return `${name}-${number}`;
 }
