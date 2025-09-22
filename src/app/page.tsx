@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { OwnerOnly } from "@/components/auth/owner-only";
@@ -28,7 +27,6 @@ export default function HomePage() {
   const [marketsLoading, setMarketsLoading] = useState(true);
   const [marketsError, setMarketsError] = useState<string | null>(null);
 
-  // Handle markets data fetching using market-api
   const handleFetchMarkets = async () => {
     try {
       setMarketsLoading(true);
@@ -42,14 +40,13 @@ export default function HomePage() {
     } catch (err) {
       console.error("❌ Error fetching markets:", err);
       setMarketsError(
-        err instanceof Error ? err.message : "Failed to fetch markets",
+        err instanceof Error ? err.message : "Failed to fetch markets"
       );
     } finally {
       setMarketsLoading(false);
     }
   };
 
-  // Handle user stats fetching using user-stats
   const handleFetchUserStats = async () => {
     if (!user?.addr || !user.loggedIn) return;
 
@@ -67,12 +64,10 @@ export default function HomePage() {
     }
   };
 
-  // Fetch markets when component mounts
   useEffect(() => {
     handleFetchMarkets();
   }, []);
 
-  // Fetch user stats when user logs in
   useEffect(() => {
     if (user?.loggedIn && user?.addr) {
       handleFetchUserStats();
@@ -81,16 +76,14 @@ export default function HomePage() {
     }
   }, [user?.loggedIn, user?.addr]);
 
-  // Process featured markets when active markets change
   useEffect(() => {
     const featured = processFeaturedMarkets(activeMarkets, 6);
     setFeaturedMarkets(featured);
   }, [activeMarkets]);
 
-  // Calculate platform stats using market-data functions
   const platformStats = React.useMemo(
     () => calculatePlatformStats(allMarkets, activeMarkets),
-    [allMarkets, activeMarkets],
+    [allMarkets, activeMarkets]
   );
 
   console.log("🎯 HomePage state (using market-api):", {
@@ -105,9 +98,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
-      {/* Hero Section - Banner Style */}
       <section className="w-full h-[500px] relative overflow-hidden bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div
             className="absolute inset-0"
@@ -118,20 +109,17 @@ export default function HomePage() {
           ></div>
         </div>
 
-        {/* Hero Content */}
         <div className="relative z-10 h-full flex items-center justify-center px-4">
           <div className="text-center max-w-4xl mx-auto">
-            {/* Main Heading */}
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
               Predict. <span className="text-[#9b87f5]">Win.</span> Repeat.
             </h1>
 
-            {/* Subheading */}
             <p className="text-lg md:text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Join the top prediction platform where your foresight earns rewards. Trade shares on real-world events and score big wins.
+              Join the top prediction platform where your foresight earns
+              rewards. Trade shares on real-world events and score big wins.
             </p>
 
-            {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button
                 asChild
@@ -171,16 +159,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Animated Background Elements */}
         <div className="absolute top-10 left-10 w-20 h-20 bg-[#9b87f5]/10 rounded-full blur-xl animate-pulse"></div>
         <div className="absolute bottom-10 right-10 w-32 h-32 bg-[#7c3aed]/10 rounded-full blur-xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-[#9b87f5]/5 rounded-full blur-lg animate-bounce delay-500"></div>
 
-        {/* Bottom Gradient Fade */}
         <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[#0A0C14] to-transparent"></div>
       </section>
 
-      {/* Platform Stats */}
       <section className="py-16 px-4 bg-[#0A0C14]">
         <div className="container mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
