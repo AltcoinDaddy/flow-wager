@@ -1,7 +1,7 @@
-// get_pending_unresolved_markets.cdc
+
 import "FlowWager"
 
-// Get markets created by user that are on Pending Resolution but not resolved
+
 access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
     let allMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
     let pendingUnresolvedMarkets: [FlowWager.Market] = []
@@ -15,7 +15,7 @@ access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
     return pendingUnresolvedMarkets
 }
 
-// Alternative with additional details
+
 access(all) struct PendingMarketDetails {
     access(all) let market: FlowWager.Market
     access(all) let evidence: FlowWager.ResolutionEvidence?

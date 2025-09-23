@@ -13,8 +13,8 @@ access(all) struct interface ActiveTradeInterface {
     access(all) let endTime: UFix64
     access(all) let currentValue: UFix64
     access(all) let profitLoss: UFix64
-    access(all) let marketStatus: UInt8 // Added for debugging
-    access(all) let resolved: Bool // Added for debugging
+    access(all) let marketStatus: UInt8 
+    access(all) let resolved: Bool 
 }
 
 access(all) struct ActiveTrade: ActiveTradeInterface {
@@ -74,10 +74,10 @@ access(all) fun main(userAddress: Address): {String: AnyStruct} {
     for marketId in positions.keys {
         let position = positions[marketId]!
         if let market = FlowWager.getMarketById(marketId: marketId) {
-            // Include Active and PendingResolution markets
+            
             if !market.resolved && (market.status == FlowWager.MarketStatus.Active || market.status == FlowWager.MarketStatus.PendingResolution) {
                 let totalShares = position.optionAShares + position.optionBShares
-                let currentValue = totalShares // Simplified: assumes 1:1 share value
+                let currentValue = totalShares 
                 let profitLoss: UFix64 = currentValue >= position.totalInvested
                     ? currentValue - position.totalInvested
                     : position.totalInvested - currentValue
