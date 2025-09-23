@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// app/markets/[id]/page.tsx
+
 import * as fcl from '@onflow/fcl';
 import flowConfig from '@/lib/flow/config';
 import { getScript } from '@/lib/flow-wager-scripts';

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PointsManager } from "@/lib/points-system"; // 🎯 USE YOUR POINTS SYSTEM
+import { PointsManager } from "@/lib/points-system";
 import { useAuth } from "@/providers/auth-provider";
 import {
   getUsersByAddresses,
@@ -43,8 +41,8 @@ interface LeaderboardUser {
   username?: string;
   display_name?: string;
   profile_image_url?: string;
-  supabaseUser?: User | null; // Add this to store the actual Supabase user data
-  hasProfile?: boolean; // Add this to track if user has a profile
+  supabaseUser?: User | null;
+  hasProfile?: boolean;
 }
 
 export default function LeaderboardPage() {
@@ -55,7 +53,7 @@ export default function LeaderboardPage() {
     "total-points" | "market-creation" | "betting" | "resolution"
   >("total-points");
   const [timeframe, setTimeframe] = useState<"all-time" | "monthly" | "weekly">(
-    "all-time",
+    "all-time"
   );
 
   const { user } = useAuth();
@@ -67,7 +65,6 @@ export default function LeaderboardPage() {
 
       console.log("🏆 Fetching leaderboard data...");
 
-      // Get leaderboard data from your PointsManager
       const leaderboardData = await PointsManager.getLeaderboard(100);
 
       if (leaderboardData.length === 0) {
@@ -76,28 +73,24 @@ export default function LeaderboardPage() {
         return;
       }
 
-      // Extract all user addresses
       const userAddresses = leaderboardData.map((entry) => entry.user_address);
 
-      // Check which users exist in Supabase
       console.log("👥 Checking users in Supabase...");
       const supabaseUsersMap = await checkUsersInSupabase(userAddresses);
 
-      // Log some stats
       const foundUsers = Array.from(supabaseUsersMap.values()).filter(
-        (user) => user !== null,
+        (user) => user !== null
       );
       console.log(
-        `✅ Found ${foundUsers.length} users in Supabase out of ${userAddresses.length} total`,
+        `✅ Found ${foundUsers.length} users in Supabase out of ${userAddresses.length} total`
       );
 
-      // Format the data with real user information
       const formattedUsers: LeaderboardUser[] = leaderboardData.map(
         (entry, index) => {
           const supabaseUser = supabaseUsersMap.get(entry.user_address);
           const displayInfo = getUserDisplayInfo(
             supabaseUser!,
-            entry.user_address,
+            entry.user_address
           );
 
           return {
@@ -117,23 +110,20 @@ export default function LeaderboardPage() {
             supabaseUser,
             hasProfile: displayInfo.hasProfile,
           };
-        },
+        }
       );
 
-      // Sort by total points (highest first)
       formattedUsers.sort((a, b) => b.total_points - a.total_points);
 
-      // Re-assign ranks after sorting
       formattedUsers.forEach((user, index) => {
         user.rank = index + 1;
       });
 
       setUsers(formattedUsers);
 
-      // Find current user's rank
       if (user?.addr) {
         const currentUserEntry = formattedUsers.find(
-          (u) => u.user_address === user.addr,
+          (u) => u.user_address === user.addr
         );
         setUserRank(currentUserEntry || null);
       }
@@ -167,7 +157,7 @@ export default function LeaderboardPage() {
       case "total-points":
         return `${user.total_points.toLocaleString()} pts`;
       case "market-creation":
-        return `${user.markets_participated} markets`; // Using markets_participated since we don't have markets_created
+        return `${user.markets_participated} markets`;
       case "betting":
         return `${user.total_staked.toFixed(2)} FLOW staked`;
       case "resolution":
@@ -184,7 +174,7 @@ export default function LeaderboardPage() {
         return sortedUsers.sort((a, b) => b.total_points - a.total_points);
       case "market-creation":
         return sortedUsers.sort(
-          (a, b) => b.markets_participated - a.markets_participated,
+          (a, b) => b.markets_participated - a.markets_participated
         );
       case "betting":
         return sortedUsers.sort((a, b) => b.total_staked - a.total_staked);
@@ -237,7 +227,6 @@ export default function LeaderboardPage() {
   return (
     <div className="min-h-screen bg-[#0A0C14]">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8 shadow-2xl mb-8">
           <div className="flex items-center gap-3 mb-4">
             <Trophy className="h-8 w-8 text-yellow-500" />
@@ -249,7 +238,6 @@ export default function LeaderboardPage() {
             Top performers in the FlowWager Points system
           </p>
 
-          {/* Current User Rank */}
           {user && userRank && (
             <div className="flex items-center gap-4 p-4 bg-[#9b87f5]/10 border border-[#9b87f5]/20 rounded-lg">
               <div className="flex items-center gap-2">
@@ -265,7 +253,6 @@ export default function LeaderboardPage() {
             </div>
           )}
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <div className="bg-[#0A0C14]/50 rounded-lg p-3 text-center">
               <p className="text-2xl font-bold text-white">{users.length}</p>
@@ -294,7 +281,6 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* Category Selection */}
         <div className="mb-8">
           <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
             <CardHeader>
@@ -342,7 +328,6 @@ export default function LeaderboardPage() {
           </Card>
         </div>
 
-        {/* Top 3 Podium */}
         {sortedUsers.length >= 3 && (
           <div className="mb-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -353,8 +338,8 @@ export default function LeaderboardPage() {
                     index === 0
                       ? "ring-2 ring-yellow-500/50"
                       : index === 1
-                        ? "ring-2 ring-gray-400/50"
-                        : "ring-2 ring-amber-600/50"
+                      ? "ring-2 ring-gray-400/50"
+                      : "ring-2 ring-amber-600/50"
                   }`}
                 >
                   <CardHeader className="text-center pb-4">
@@ -411,7 +396,6 @@ export default function LeaderboardPage() {
           </div>
         )}
 
-        {/* Full Leaderboard */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
@@ -491,7 +475,6 @@ export default function LeaderboardPage() {
           </CardContent>
         </Card>
 
-        {/* Join Competition Banner */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] via-[#151923] to-[#0A0C14] rounded-2xl border border-gray-800/50 p-8  mt-8 text-white">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
