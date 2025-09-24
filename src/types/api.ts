@@ -1,5 +1,3 @@
-// src/types/api.ts
-// API request/response type definitions
 
 import type { Market, MarketActivity, MarketChartData, MarketOdds } from './market';
 import type { UserStats, UserPosition, UserActivityItem, UserAchievement, LeaderboardUser, UserSearchResult, UserNotification, UserPreferences } from './user';

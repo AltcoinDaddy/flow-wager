@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Market-related type definitions aligned with FlowWager contract
 export interface Market {
    id: string;
   title: string;

@@ -1,7 +1,3 @@
-// src/types/flow.ts
-// Flow blockchain and Cadence-specific type definitions
-
-// Flow argument type for transactions and scripts
 export interface FlowArgument {
   value: any;
   type: string;

@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/types/index.ts
-// Central export file for all types
+
 
 // Market types
 export * from './market';

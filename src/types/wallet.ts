@@ -1,5 +1,3 @@
-// src/types/wallet.ts
-// Wallet and blockchain-related type definitions
 
 export interface WalletState {
   isConnected: boolean;
