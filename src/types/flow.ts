@@ -3,7 +3,7 @@ export interface FlowArgument {
   type: string;
 }
 
-// Flow account key information
+
 export interface FlowAccountKey {
   index: number;
   publicKey: string;
@@ -14,7 +14,7 @@ export interface FlowAccountKey {
   revoked: boolean;
 }
 
-// Flow event structure
+
 export interface FlowEvent {
   type: string;
   transactionId: string;
@@ -23,7 +23,7 @@ export interface FlowEvent {
   data: any;
 }
 
-// Flow Client Library (FCL) types
+
 export interface FCLUser {
   addr: string | null;
   cid: string | null;

@@ -17,11 +17,10 @@ export interface Market {
   totalOptionAShares: string;
   totalOptionBShares: string;
   totalPool: string;
-  imageURI?: string; // ✅ Added image support
-  // Additional calculated fields
+  imageURI?: string; 
   totalBets?: number;
   totalParticipants?: number;
-  imageUrl?: string      // UFix64 from contract (not number)
+  imageUrl?: string      
 }
 
 export interface MarketMetadata {
@@ -31,7 +30,6 @@ export interface MarketMetadata {
   additionalInfo?: string;
 }
 
-// Contract-aligned enums (using numbers to match UInt8 values)
 export enum MarketStatus {
   Active = 0,
   Paused = 1,

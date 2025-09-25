@@ -11,9 +11,9 @@ export interface UserStats {
   winRate: number;
   roi: number; // Return on Investment
   rank?: number;
-  totalMarketsParticipated?: number; // Optional for backward compatibility
-  totalLosses?: number; // Optional for backward compatibility
-  winStreak?: number; // Optional for backward compatibility
+  totalMarketsParticipated?: number; 
+  totalLosses?: number; 
+  winStreak?: number; 
 }
 
 export interface UserPosition {

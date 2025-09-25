@@ -40,7 +40,7 @@ export interface AsyncState<T> {
   error: string | null;
 }
 
-// Common error types
+
 export interface ErrorResponse {
   code: string;
   message: string;
