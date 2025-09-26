@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
- 
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -28,12 +28,19 @@ import {
   RefreshCw,
   Shield,
   Activity,
+  BarChart,
   Target,
   Coins,
 } from "lucide-react";
 import type { Market } from "@/types/market";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface AdminStats {
@@ -45,9 +52,9 @@ interface AdminStats {
 }
 
 export default function AdminPage() {
-  const { user, isAuthenticated:loggedIn } = useAuth();
+  const { user, isAuthenticated: loggedIn } = useAuth();
   const router = useRouter();
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [adminStats, setAdminStats] = useState({
     totalMarkets: 0,
@@ -91,7 +98,9 @@ export default function AdminPage() {
       const markets = await fcl.query({ cadence: allMarketsScript });
       // Fetch pending markets (PendingResolution status)
       const pendingMarketsScript = await getPendingMarkets();
-      const pendingResolutionMarkets = await fcl.query({ cadence: pendingMarketsScript });
+      const pendingResolutionMarkets = await fcl.query({
+        cadence: pendingMarketsScript,
+      });
       // Find markets that are Active but have ended
       const now = Date.now() / 1000;
       const endedActiveMarkets = (markets || []).filter((market: any) => {
@@ -99,16 +108,20 @@ export default function AdminPage() {
       });
       // Merge and deduplicate by market.id
       const pendingMap = new Map();
-      (pendingResolutionMarkets || []).forEach((m: any) => pendingMap.set(m.id, m));
+      (pendingResolutionMarkets || []).forEach((m: any) =>
+        pendingMap.set(m.id, m),
+      );
       (endedActiveMarkets || []).forEach((m: any) => pendingMap.set(m.id, m));
       setAdminStats({
         totalMarkets: stats.totalMarkets || 0,
         activeMarkets: stats.activeMarkets || 0,
-        pendingResolution: (markets || []).filter((m: any) => m.status === 1).length,
+        pendingResolution: (markets || []).filter((m: any) => m.status === 1)
+          .length,
         totalVolume: stats.totalVolume?.toString() || "0.0",
-        avgMarketVolume: stats.totalMarkets > 0
-          ? (parseFloat(stats.totalVolume) / stats.totalMarkets).toFixed(2)
-          : "0.0",
+        avgMarketVolume:
+          stats.totalMarkets > 0
+            ? (parseFloat(stats.totalVolume) / stats.totalMarkets).toFixed(2)
+            : "0.0",
       });
       setRecentMarkets(markets || []);
       setPendingMarkets(Array.from(pendingMap.values()));
@@ -150,7 +163,16 @@ export default function AdminPage() {
   };
 
   const getCategoryName = (category: number) => {
-    const categories = ["Sports", "Politics", "Economics", "Entertainment", "Technology", "Science", "Weather", "Other"];
+    const categories = [
+      "Sports",
+      "Politics",
+      "Economics",
+      "Entertainment",
+      "Technology",
+      "Science",
+      "Weather",
+      "Other",
+    ];
     return categories[category] || "Other";
   };
 
@@ -161,16 +183,23 @@ export default function AdminPage() {
 
   // Market filtering, searching, and sorting logic
   const filteredMarkets: Market[] = recentMarkets
-    .filter((market) =>
-      marketSearch === "" || market.title.toLowerCase().includes(marketSearch.toLowerCase())
+    .filter(
+      (market) =>
+        marketSearch === "" ||
+        market.title.toLowerCase().includes(marketSearch.toLowerCase()),
     )
-    .filter((market) =>
-      marketStatusFilter === "all" || getStatusName(market.status) === marketStatusFilter
+    .filter(
+      (market) =>
+        marketStatusFilter === "all" ||
+        getStatusName(market.status) === marketStatusFilter,
     )
     .sort((a, b) => {
-      if (marketSort === "newest") return parseInt(b.createdAt) - parseInt(a.createdAt);
-      if (marketSort === "oldest") return parseInt(a.createdAt) - parseInt(b.createdAt);
-      if (marketSort === "volume") return parseFloat(b.totalPool) - parseFloat(a.totalPool);
+      if (marketSort === "newest")
+        return parseInt(b.createdAt) - parseInt(a.createdAt);
+      if (marketSort === "oldest")
+        return parseInt(a.createdAt) - parseInt(b.createdAt);
+      if (marketSort === "volume")
+        return parseFloat(b.totalPool) - parseFloat(a.totalPool);
       return 0;
     });
 
@@ -214,11 +243,13 @@ export default function AdminPage() {
         <Card className="bg-gray-900 border-gray-700/50">
           <CardContent className="bg-gray-900 pt-6 text-center">
             <Shield className="h-12 w-12 text-[#9b87f5] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Connect Your Wallet</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Connect Your Wallet
+            </h2>
             <p className="text-gray-400 mb-4">
               You need to connect your Flow wallet to access the admin panel.
             </p>
-            <Button 
+            <Button
               onClick={() => router.push("/markets")}
               className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
             >
@@ -263,14 +294,14 @@ export default function AdminPage() {
               />
               Refresh
             </Button>
-            <Button 
+            <Button
               variant="outline"
               className="border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:text-white"
             >
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
-            <Button 
+            <Button
               asChild
               className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
             >
@@ -287,29 +318,120 @@ export default function AdminPage() {
           <Card className="bg-gray-900 border-gray-700/50">
             <CardContent className="bg-gray-900 p-4 flex flex-col items-center gap-3">
               <BarChart3 className="h-6 w-6 text-[#9b87f5]" />
-              <span className="text-lg font-bold text-white">{adminStats.totalMarkets}</span>
-              <span className="text-xs sm:text-base text-white">Total Markets</span>
+              <span className="text-lg font-bold text-white">
+                {adminStats.totalMarkets}
+              </span>
+              <span className="text-xs sm:text-base text-white">
+                Total Markets
+              </span>
             </CardContent>
           </Card>
           <Card className="bg-gray-900 border-gray-700/50">
             <CardContent className="bg-gray-900 p-4 flex flex-col items-center gap-3 text-white">
               <Target className="h-6 w-6 text-blue-400" />
-              <span className="text-lg font-bold text-white">{adminStats.activeMarkets}</span>
-              <span className="text-xs sm:text-base text-white">Active Markets</span>
+              <span className="text-lg font-bold text-white">
+                {adminStats.activeMarkets}
+              </span>
+              <span className="text-xs sm:text-base text-white">
+                Active Markets
+              </span>
             </CardContent>
           </Card>
           <Card className="bg-gray-900 border-gray-700/50">
             <CardContent className="bg-gray-900 p-4 flex flex-col items-center gap-3">
               <Clock className="h-6 w-6 text-yellow-400" />
-              <span className="text-lg font-bold text-white">{adminStats.pendingResolution}</span>
-              <span className="text-xs sm:text-base text-white">Pending Resolution</span>
+              <span className="text-lg font-bold text-white">
+                {adminStats.pendingResolution}
+              </span>
+              <span className="text-xs sm:text-base text-white">
+                Pending Resolution
+              </span>
             </CardContent>
           </Card>
           <Card className="bg-gray-900 border-gray-700/50">
             <CardContent className="bg-gray-900 p-4 flex flex-col items-center gap-3">
               <DollarSign className="h-6 w-6 text-green-400" />
-              <span className="text-lg font-bold text-white">{formatCurrency(adminStats.totalVolume)}</span>
-              <span className="text-xs sm:text-base text-white">Total Volume</span>
+              <span className="text-lg font-bold text-white">
+                {formatCurrency(adminStats.totalVolume)}
+              </span>
+              <span className="text-xs sm:text-base text-white">
+                Total Volume
+              </span>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <BarChart className="h-8 w-8 text-[#9b87f5]" />
+                <h3 className="text-xl font-semibold text-white">
+                  Analytics Dashboard
+                </h3>
+              </div>
+              <p className="text-gray-400 mb-4">
+                View comprehensive market analytics, user insights, and platform
+                metrics powered by Dune Analytics.
+              </p>
+              <Button
+                asChild
+                className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+              >
+                <Link href="/admin/analytics">
+                  <BarChart className="h-4 w-4 mr-2" />
+                  View Analytics
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <Plus className="h-8 w-8 text-green-400" />
+                <h3 className="text-xl font-semibold text-white">
+                  Create Market
+                </h3>
+              </div>
+              <p className="text-gray-400 mb-4">
+                Create new prediction markets with custom categories, timing,
+                and betting limits.
+              </p>
+              <Button
+                asChild
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+              >
+                <Link href="/admin/create">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Market
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border-gray-800/50">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <AlertTriangle className="h-8 w-8 text-yellow-400" />
+                <h3 className="text-xl font-semibold text-white">
+                  Resolve Markets
+                </h3>
+              </div>
+              <p className="text-gray-400 mb-4">
+                Manage market resolutions and handle pending markets that need
+                admin attention.
+              </p>
+              <Button
+                asChild
+                className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white"
+              >
+                <Link href="/admin/resolve">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Manage Resolutions
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -338,11 +460,22 @@ export default function AdminPage() {
                     {pendingMarkets.map((market) => (
                       <tr key={market.id} className="border-b border-gray-800">
                         <td className="px-2 py-2 text-white">{market.title}</td>
-                        <td className="px-2 py-2 text-white">{market.status === 1 ? "Pending Resolution" : "Ended (Unresolved)"}</td>
-                        <td className="px-2 py-2 text-white">{formatCurrency(market.totalPool)}</td>
+                        <td className="px-2 py-2 text-white">
+                          {market.status === 1
+                            ? "Pending Resolution"
+                            : "Ended (Unresolved)"}
+                        </td>
+                        <td className="px-2 py-2 text-white">
+                          {formatCurrency(market.totalPool)}
+                        </td>
                         <td className="px-2 py-2 text-white">
                           <Link href={`/markets/${market.id}`}>
-                            <Button size="sm" className="w-full md:w-auto text-white">View</Button>
+                            <Button
+                              size="sm"
+                              className="w-full md:w-auto text-white"
+                            >
+                              View
+                            </Button>
                           </Link>
                         </td>
                       </tr>
@@ -361,12 +494,20 @@ export default function AdminPage() {
               <CardContent className="bg-gray-900">
                 <div className="flex items-center gap-2 mb-2">
                   <Coins className="h-5 w-5 text-white" />
-                  <span className="text-lg font-semibold text-white">Platform Fees</span>
-                  <span className="ml-2 text-sm text-white">{formatCurrency(availableFees)} FLOW available</span>
+                  <span className="text-lg font-semibold text-white">
+                    Platform Fees
+                  </span>
+                  <span className="ml-2 text-sm text-white">
+                    {formatCurrency(availableFees)} FLOW available
+                  </span>
                 </div>
-                <p className="text-gray-400 text-sm mb-2">Withdraw accumulated platform fees to the admin wallet.</p>
+                <p className="text-gray-400 text-sm mb-2">
+                  Withdraw accumulated platform fees to the admin wallet.
+                </p>
                 {withdrawError && (
-                  <div className="text-red-400 text-xs mb-2">{withdrawError}</div>
+                  <div className="text-red-400 text-xs mb-2">
+                    {withdrawError}
+                  </div>
                 )}
                 <Button
                   onClick={handleWithdrawFees}
@@ -388,18 +529,29 @@ export default function AdminPage() {
                 <Input
                   placeholder="Search markets..."
                   value={marketSearch}
-                  onChange={e => setMarketSearch(e.target.value)}
+                  onChange={(e) => setMarketSearch(e.target.value)}
                   className="w-full sm:w-64"
                 />
-                <Select value={marketStatusFilter} onValueChange={setMarketStatusFilter}>
+                <Select
+                  value={marketStatusFilter}
+                  onValueChange={setMarketStatusFilter}
+                >
                   <SelectTrigger className="w-full sm:w-40 text-white">
                     <SelectValue placeholder="Status" className="text-white" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 text-white border-0">
-                    <SelectItem value="all" className="text-white">All Statuses</SelectItem>
-                    <SelectItem value="Active" className="text-white">Active</SelectItem>
-                    <SelectItem value="Resolved" className="text-white">Resolved</SelectItem>
-                    <SelectItem value="Cancelled" className="text-white">Cancelled</SelectItem>
+                    <SelectItem value="all" className="text-white">
+                      All Statuses
+                    </SelectItem>
+                    <SelectItem value="Active" className="text-white">
+                      Active
+                    </SelectItem>
+                    <SelectItem value="Resolved" className="text-white">
+                      Resolved
+                    </SelectItem>
+                    <SelectItem value="Cancelled" className="text-white">
+                      Cancelled
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={marketSort} onValueChange={setMarketSort}>
@@ -407,20 +559,36 @@ export default function AdminPage() {
                     <SelectValue placeholder="Sort by" className="text-white" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 text-white border-0">
-                    <SelectItem value="newest" className="text-white">Newest</SelectItem>
-                    <SelectItem value="oldest" className="text-white">Oldest</SelectItem>
-                    <SelectItem value="volume" className="text-white">Volume</SelectItem>
+                    <SelectItem value="newest" className="text-white">
+                      Newest
+                    </SelectItem>
+                    <SelectItem value="oldest" className="text-white">
+                      Oldest
+                    </SelectItem>
+                    <SelectItem value="volume" className="text-white">
+                      Volume
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex gap-2 w-full md:w-auto">
-                <Button onClick={handleRefresh} disabled={isLoading} className="w-full md:w-auto text-white">
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                <Button
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                  className="w-full md:w-auto text-white"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+                  />
                   Refresh
                 </Button>
-                <Button asChild className="w-full md:w-auto bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white">
+                <Button
+                  asChild
+                  className="w-full md:w-auto bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white"
+                >
                   <Link href="/admin/create">
-                    <Plus className="h-4 w-4 mr-2" />Create Market
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Market
                   </Link>
                 </Button>
               </div>
@@ -430,7 +598,9 @@ export default function AdminPage() {
                 <thead>
                   <tr className="bg-[#151923]">
                     <th className="px-2 py-2 text-white">Title</th>
-                    <th className="px-2 py-2 hidden md:table-cell text-white">Status</th>
+                    <th className="px-2 py-2 hidden md:table-cell text-white">
+                      Status
+                    </th>
                     <th className="px-2 py-2 text-white">Volume</th>
                     <th className="px-2 py-2 text-white">Actions</th>
                   </tr>
@@ -439,11 +609,20 @@ export default function AdminPage() {
                   {filteredMarkets.map((market) => (
                     <tr key={market.id} className="border-b border-gray-800">
                       <td className="px-2 py-2 text-white">{market.title}</td>
-                      <td className="px-2 py-2 hidden md:table-cell text-white">{getStatusName(market.status)}</td>
-                      <td className="px-2 py-2 text-white">{formatCurrency(market.totalPool)}</td>
+                      <td className="px-2 py-2 hidden md:table-cell text-white">
+                        {getStatusName(market.status)}
+                      </td>
+                      <td className="px-2 py-2 text-white">
+                        {formatCurrency(market.totalPool)}
+                      </td>
                       <td className="px-2 py-2 text-white">
                         <Link href={`/markets/${market.id}`}>
-                          <Button size="sm" className="w-full md:w-auto text-white">View</Button>
+                          <Button
+                            size="sm"
+                            className="w-full md:w-auto text-white"
+                          >
+                            View
+                          </Button>
                         </Link>
                       </td>
                     </tr>
@@ -457,12 +636,14 @@ export default function AdminPage() {
         {/* User Management Section (placeholder for future integration) */}
         <Card className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] border border-gray-800/50 rounded-xl p-4">
           <CardContent className="bg-gradient-to-br from-[#1A1F2C] to-[#151923] text-white">
-            <h2 className="text-lg font-bold text-white mb-4">User Management</h2>
+            <h2 className="text-lg font-bold text-white mb-4">
+              User Management
+            </h2>
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <Input
                 placeholder="Search users by address or username..."
                 value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
+                onChange={(e) => setUserSearch(e.target.value)}
                 className="w-full sm:w-64"
               />
             </div>
@@ -480,24 +661,47 @@ export default function AdminPage() {
                   {/* Placeholder: Replace with real user data integration */}
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center text-gray-400 py-4 text-white">
+                      <td
+                        colSpan={4}
+                        className="text-center text-gray-400 py-4 text-white"
+                      >
                         User management coming soon...
                       </td>
                     </tr>
                   ) : (
                     users
-                      .filter(user =>
-                        userSearch === "" ||
-                        user.address.toLowerCase().includes(userSearch.toLowerCase()) ||
-                        (user.username && user.username.toLowerCase().includes(userSearch.toLowerCase()))
+                      .filter(
+                        (user) =>
+                          userSearch === "" ||
+                          user.address
+                            .toLowerCase()
+                            .includes(userSearch.toLowerCase()) ||
+                          (user.username &&
+                            user.username
+                              .toLowerCase()
+                              .includes(userSearch.toLowerCase())),
                       )
-                      .map(user => (
-                        <tr key={user.address} className="border-b border-gray-800">
-                          <td className="px-2 py-2 font-mono text-white">{user.address}</td>
-                          <td className="px-2 py-2 text-white">{user.username || "-"}</td>
-                          <td className="px-2 py-2 text-white">{user.marketsCreated || 0}</td>
+                      .map((user) => (
+                        <tr
+                          key={user.address}
+                          className="border-b border-gray-800"
+                        >
+                          <td className="px-2 py-2 font-mono text-white">
+                            {user.address}
+                          </td>
                           <td className="px-2 py-2 text-white">
-                            <Button size="sm" className="w-full md:w-auto text-white">View</Button>
+                            {user.username || "-"}
+                          </td>
+                          <td className="px-2 py-2 text-white">
+                            {user.marketsCreated || 0}
+                          </td>
+                          <td className="px-2 py-2 text-white">
+                            <Button
+                              size="sm"
+                              className="w-full md:w-auto text-white"
+                            >
+                              View
+                            </Button>
                           </td>
                         </tr>
                       ))
