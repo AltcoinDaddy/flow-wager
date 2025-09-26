@@ -48,12 +48,12 @@ export interface ErrorResponse {
   timestamp: number;
 }
 
-// Component prop helpers
+
 export type ComponentSize = 'sm' | 'md' | 'lg';
 export type ComponentVariant = 'default' | 'outline' | 'ghost' | 'destructive';
 export type ComponentColor = 'primary' | 'secondary' | 'success' | 'warning' | 'error';
 
-// types/market.ts
+
 export interface Market {
   id: string;
   title: string;

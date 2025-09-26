@@ -115,7 +115,7 @@ export interface WalletConnectionResponse {
   signature?: string;
 }
 
-// Account information
+
 export interface FlowAccount {
   address: string;
   balance: number;
@@ -142,7 +142,6 @@ export interface FlowContract {
   code: string;
 }
 
-// Transaction history
 export interface TransactionHistoryItem {
   id: string;
   txId: string;

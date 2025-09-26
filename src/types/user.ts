@@ -86,12 +86,12 @@ export interface LeaderboardUser {
   winRate?: number;
   totalVolume?: string;
   accuracy?: number;
-  change?: number; // rank change from previous period
+  change?: number; 
 }
 
 export interface LeaderboardResponse {
   users: LeaderboardUser[];
-  userRank?: number; // Current user's rank
+  userRank?: number; 
   period: 'all_time' | 'monthly' | 'weekly';
   sortBy: 'winnings' | 'win_rate' | 'streak' | 'roi';
 }
@@ -138,7 +138,7 @@ export interface PortfolioDataPoint {
   realizedPnL: number;
 }
 
-// Follow system types
+
 export interface UserFollow {
   follower: string;
   following: string;

@@ -56,7 +56,7 @@ export enum MarketCategory {
   Other = 8
 }
 
-// String mappings for display purposes
+
 export const MarketStatusLabels = {
   [MarketStatus.Active]: "Active",
   [MarketStatus.Paused]: "Paused",
@@ -83,14 +83,14 @@ export const MarketCategoryLabels = {
   [MarketCategory.Other]: "Other"
 } as const;
 
-// Position interface aligned with contract UserPosition struct
+
 export interface Position {
-  marketId: string;              // UInt64 as string
-  optionAShares: string;         // UFix64 as string
-  optionBShares: string;         // UFix64 as string
-  totalInvested: string;         // UFix64 as string
-  averagePrice: string;          // UFix64 as string
-  claimed: boolean;              // Bool from contract
+  marketId: string;             
+  optionAShares: string;         
+  optionBShares: string;       
+  totalInvested: string;         
+  averagePrice: string;         
+  claimed: boolean;             
 }
 
 export interface MarketFilter {
