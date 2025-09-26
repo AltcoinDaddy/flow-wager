@@ -218,7 +218,6 @@ const Page = () => {
           </ul>
         </aside>
 
-        {/* Main Content */}
         <main className="lg:w-3/4 space-y-8">
           {privacySections.map((section, index) => (
             <div

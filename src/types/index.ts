@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/types/index.ts
-// Central export file for all types
+
 
 // Market types
 export * from './market';
@@ -42,7 +40,7 @@ export interface AsyncState<T> {
   error: string | null;
 }
 
-// Common error types
+
 export interface ErrorResponse {
   code: string;
   message: string;
@@ -50,12 +48,12 @@ export interface ErrorResponse {
   timestamp: number;
 }
 
-// Component prop helpers
+
 export type ComponentSize = 'sm' | 'md' | 'lg';
 export type ComponentVariant = 'default' | 'outline' | 'ghost' | 'destructive';
 export type ComponentColor = 'primary' | 'secondary' | 'success' | 'warning' | 'error';
 
-// types/market.ts
+
 export interface Market {
   id: string;
   title: string;
