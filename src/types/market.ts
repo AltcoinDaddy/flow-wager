@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Market-related type definitions aligned with FlowWager contract
 export interface Market {
    id: string;
   title: string;
@@ -19,11 +17,10 @@ export interface Market {
   totalOptionAShares: string;
   totalOptionBShares: string;
   totalPool: string;
-  imageURI?: string; // ✅ Added image support
-  // Additional calculated fields
+  imageURI?: string; 
   totalBets?: number;
   totalParticipants?: number;
-  imageUrl?: string      // UFix64 from contract (not number)
+  imageUrl?: string      
 }
 
 export interface MarketMetadata {
@@ -33,7 +30,6 @@ export interface MarketMetadata {
   additionalInfo?: string;
 }
 
-// Contract-aligned enums (using numbers to match UInt8 values)
 export enum MarketStatus {
   Active = 0,
   Paused = 1,
@@ -60,7 +56,7 @@ export enum MarketCategory {
   Other = 8
 }
 
-// String mappings for display purposes
+
 export const MarketStatusLabels = {
   [MarketStatus.Active]: "Active",
   [MarketStatus.Paused]: "Paused",
@@ -87,14 +83,14 @@ export const MarketCategoryLabels = {
   [MarketCategory.Other]: "Other"
 } as const;
 
-// Position interface aligned with contract UserPosition struct
+
 export interface Position {
-  marketId: string;              // UInt64 as string
-  optionAShares: string;         // UFix64 as string
-  optionBShares: string;         // UFix64 as string
-  totalInvested: string;         // UFix64 as string
-  averagePrice: string;          // UFix64 as string
-  claimed: boolean;              // Bool from contract
+  marketId: string;             
+  optionAShares: string;         
+  optionBShares: string;       
+  totalInvested: string;         
+  averagePrice: string;         
+  claimed: boolean;             
 }
 
 export interface MarketFilter {

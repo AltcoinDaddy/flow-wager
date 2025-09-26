@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/types/user.ts
-// User-related type definitions
 
 export interface UserStats {
   address: string;
@@ -14,9 +11,9 @@ export interface UserStats {
   winRate: number;
   roi: number; // Return on Investment
   rank?: number;
-  totalMarketsParticipated?: number; // Optional for backward compatibility
-  totalLosses?: number; // Optional for backward compatibility
-  winStreak?: number; // Optional for backward compatibility
+  totalMarketsParticipated?: number; 
+  totalLosses?: number; 
+  winStreak?: number; 
 }
 
 export interface UserPosition {
@@ -89,12 +86,12 @@ export interface LeaderboardUser {
   winRate?: number;
   totalVolume?: string;
   accuracy?: number;
-  change?: number; // rank change from previous period
+  change?: number; 
 }
 
 export interface LeaderboardResponse {
   users: LeaderboardUser[];
-  userRank?: number; // Current user's rank
+  userRank?: number; 
   period: 'all_time' | 'monthly' | 'weekly';
   sortBy: 'winnings' | 'win_rate' | 'streak' | 'roi';
 }
@@ -141,7 +138,7 @@ export interface PortfolioDataPoint {
   realizedPnL: number;
 }
 
-// Follow system types
+
 export interface UserFollow {
   follower: string;
   following: string;

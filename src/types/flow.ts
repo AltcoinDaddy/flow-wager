@@ -1,13 +1,9 @@
-// src/types/flow.ts
-// Flow blockchain and Cadence-specific type definitions
-
-// Flow argument type for transactions and scripts
 export interface FlowArgument {
   value: any;
   type: string;
 }
 
-// Flow account key information
+
 export interface FlowAccountKey {
   index: number;
   publicKey: string;
@@ -18,7 +14,7 @@ export interface FlowAccountKey {
   revoked: boolean;
 }
 
-// Flow event structure
+
 export interface FlowEvent {
   type: string;
   transactionId: string;
@@ -27,7 +23,7 @@ export interface FlowEvent {
   data: any;
 }
 
-// Flow Client Library (FCL) types
+
 export interface FCLUser {
   addr: string | null;
   cid: string | null;
@@ -63,7 +59,7 @@ export interface FCLConfig {
   walletConnectProjectId?: string;
 }
 
-// Cadence value types
+
 export interface CadenceValue {
   type: string;
   value: any;
@@ -100,7 +96,7 @@ export interface CadenceDictionary extends CadenceValue {
   }>;
 }
 
-// Flow transaction types
+
 export interface FlowTransaction {
   cadence: string;
   args: FlowArgument[];
@@ -121,7 +117,7 @@ export interface FlowScript {
   args: FlowArgument[];
 }
 
-// Contract-specific types (matching Cadence structs)
+
 export interface CadenceMarket {
   id: string;
   creator: string;
@@ -164,7 +160,7 @@ export interface CadenceUserPosition {
   claimed: boolean;
 }
 
-// Flow event types
+
 export interface FlowEventType {
   MarketCreated: {
     marketId: string;
@@ -217,7 +213,7 @@ export interface ParsedFlowEvent<T extends FlowEventName = FlowEventName> {
   data: FlowEventType[T];
 }
 
-// Contract addresses and paths
+
 export interface ContractAddresses {
   FlowWager: string;
   MarketFactory?: string;

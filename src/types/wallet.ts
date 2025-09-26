@@ -1,5 +1,3 @@
-// src/types/wallet.ts
-// Wallet and blockchain-related type definitions
 
 export interface WalletState {
   isConnected: boolean;
@@ -32,7 +30,7 @@ export interface WalletCapabilities {
   hardwareWallet: boolean;
 }
 
-// Transaction types
+
 export interface TransactionStatus {
   status: 'pending' | 'sealed' | 'executed' | 'failed';
   txId: string;
@@ -64,7 +62,7 @@ export interface FlowEvent {
   data: any;
 }
 
-// Specific transaction types for FlowWager
+
 export interface BuySharesTransaction {
   marketId: number;
   isOptionA: boolean;
@@ -75,7 +73,7 @@ export interface CreateMarketTransaction {
   question: string;
   optionA: string;
   optionB: string;
-  category: number; // enum value
+  category: number; 
   imageURI: string;
   duration: number;
   isBreakingNews: boolean;
@@ -85,14 +83,14 @@ export interface CreateMarketTransaction {
 
 export interface ResolveMarketTransaction {
   marketId: number;
-  outcome: number; // enum value
+  outcome: number; 
 }
 
 export interface ClaimWinningsTransaction {
   marketId: number;
 }
 
-// Script query types
+
 export interface ScriptRequest {
   cadence: string;
   args: FlowArgument[];
@@ -104,7 +102,7 @@ export interface ScriptResult<T = any> {
   error?: string;
 }
 
-// Wallet connection flow
+
 export interface WalletConnectionRequest {
   provider: WalletProvider;
   redirectUrl?: string;
@@ -117,7 +115,7 @@ export interface WalletConnectionResponse {
   signature?: string;
 }
 
-// Account information
+
 export interface FlowAccount {
   address: string;
   balance: number;
@@ -144,7 +142,6 @@ export interface FlowContract {
   code: string;
 }
 
-// Transaction history
 export interface TransactionHistoryItem {
   id: string;
   txId: string;
