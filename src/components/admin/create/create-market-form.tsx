@@ -117,7 +117,7 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
       uploadPreset: !!uploadPreset,
     });
     throw new Error(
-      "Cloudinary not configured. Please check environment variables."
+      "Cloudinary not configured. Please check environment variables.",
     );
   }
 
@@ -135,7 +135,7 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      { method: "POST", body: formData }
+      { method: "POST", body: formData },
     );
 
     const data = await response.json();
@@ -143,7 +143,7 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
     if (!response.ok) {
       console.error("Cloudinary API error:", data);
       throw new Error(
-        data.error?.message || `Upload failed with status ${response.status}`
+        data.error?.message || `Upload failed with status ${response.status}`,
       );
     }
 
@@ -211,7 +211,7 @@ export function CreateMarketForm({
   }, []);
 
   const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -233,7 +233,7 @@ export function CreateMarketForm({
       !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
     ) {
       toast.error(
-        "Cloudinary not configured. Please check environment variables."
+        "Cloudinary not configured. Please check environment variables.",
       );
       console.error("Missing Cloudinary environment variables:", {
         NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:
@@ -317,8 +317,8 @@ export function CreateMarketForm({
       newErrors.endDate = "Market must end at least 1 hour from now";
     const durationHours =
       (endDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    if (durationHours > 720)
-      newErrors.endDate = "Market duration cannot exceed 30 days";
+    if (durationHours > 4320)
+      newErrors.endDate = "Market duration cannot exceed 6 months";
     if (!formData.resolutionSource.trim())
       newErrors.resolutionSource = "Resolution source is required";
     setErrors(newErrors);
@@ -386,12 +386,12 @@ export function CreateMarketForm({
       const transaction = await fcl.tx(transactionId).onceSealed();
       if (transaction.status === 5)
         throw new Error(
-          transaction.errorMessage || "Transaction expired/failed"
+          transaction.errorMessage || "Transaction expired/failed",
         );
       if (transaction.status === 4) {
         console.log("Transaction sealed successfully!");
         const marketCreatedEvent = transaction.events?.find((event: any) =>
-          event.type.includes("MarketCreated")
+          event.type.includes("MarketCreated"),
         );
         if (marketCreatedEvent)
           console.log("Market created event:", marketCreatedEvent);
@@ -433,7 +433,7 @@ export function CreateMarketForm({
     });
     if (!profile) {
       toast.error(
-        "You must create a FlowWager account before creating a market."
+        "You must create a FlowWager account before creating a market.",
       );
       throw new Error("User account not found");
     }
@@ -501,7 +501,7 @@ export function CreateMarketForm({
             marketId: Date.now(), // If you get the ID back
             timestamp: new Date().toISOString(),
           },
-          Date.now()
+          Date.now(),
         );
 
         console.log("✅ Market creation activity logged");
@@ -568,8 +568,8 @@ export function CreateMarketForm({
                 stepNumber < step
                   ? "bg-green-500 text-white"
                   : stepNumber === step
-                  ? "bg-[#9b87f5] text-white"
-                  : "bg-gray-700 text-gray-400"
+                    ? "bg-[#9b87f5] text-white"
+                    : "bg-gray-700 text-gray-400"
               }`}
             >
               {stepNumber < step ? <Check className="h-4 w-4" /> : stepNumber}
@@ -1007,7 +1007,7 @@ export function CreateMarketForm({
                 >
                   {
                     MARKET_CATEGORIES.find(
-                      (cat) => cat.value === formData.category
+                      (cat) => cat.value === formData.category,
                     )?.label
                   }
                 </Badge>
@@ -1031,7 +1031,7 @@ export function CreateMarketForm({
                 <p className="text-sm text-gray-400">
                   Ends{" "}
                   {new Date(
-                    `${formData.endDate}T${formData.endTime}`
+                    `${formData.endDate}T${formData.endTime}`,
                   ).toLocaleString()}
                 </p>
               </div>
