@@ -1,17 +1,4 @@
--- Flow Data Structure Diagnostic Query
--- Use this query to understand how Flow events are structured in Dune
--- This will help you adapt the other queries to work with your specific contract
 
--- First, let's see what Flow tables are available
--- Uncomment one section at a time to test
-
--- SECTION 1: Explore available Flow tables
--- SELECT table_name, table_schema
--- FROM information_schema.tables
--- WHERE table_schema LIKE '%flow%'
--- LIMIT 20;
-
--- SECTION 2: Look for your contract events (replace with your contract address)
 SELECT
     block_time,
     block_number,

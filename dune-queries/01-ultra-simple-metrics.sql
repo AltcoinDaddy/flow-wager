@@ -1,8 +1,4 @@
--- Ultra Simple Flow Wager Metrics Query
--- This is the most basic possible query to get started with Flow + Dune
--- Test this first to ensure basic connectivity works
 
--- Simple event count by type
 SELECT
     event_type,
     COUNT(*) as event_count,

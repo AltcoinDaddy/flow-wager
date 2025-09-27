@@ -1,6 +1,3 @@
--- Flow Wager Market Metrics Query
--- This query provides comprehensive metrics about prediction markets on Flow blockchain
--- Query ID: Replace with your actual Dune query ID after creation
 
 WITH market_events AS (
   SELECT

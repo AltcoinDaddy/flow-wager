@@ -1,6 +1,4 @@
--- Flow Wager Trending Markets Query
--- This query identifies the most popular and trending prediction markets
--- Query ID: Replace with your actual Dune query ID after creation
+
 
 WITH market_events AS (
   SELECT

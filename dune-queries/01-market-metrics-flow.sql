@@ -1,9 +1,4 @@
--- Flow Wager Market Metrics Query (Flow Optimized)
--- This query provides comprehensive metrics about prediction markets on Flow blockchain
--- Optimized for Flow's event structure and Dune's SQL engine
--- Query ID: Replace with your actual Dune query ID after creation
 
--- Since Flow events might have different structure, let's start simple and build up
 WITH market_events AS (
   SELECT
     block_time,

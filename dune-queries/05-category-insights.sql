@@ -1,6 +1,4 @@
--- Flow Wager Category Insights Query
--- This query provides comprehensive analysis of prediction market performance by category
--- Query ID: Replace with your actual Dune query ID after creation
+
 
 WITH market_events AS (
   SELECT
