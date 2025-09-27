@@ -1,8 +1,4 @@
--- Flow Table Discovery Query
--- Use this to find the correct table structure for Flow blockchain data in Dune
--- Run this first to understand what Flow tables and columns are available
 
--- Step 1: Find all Flow-related tables
 SELECT
     table_schema,
     table_name,

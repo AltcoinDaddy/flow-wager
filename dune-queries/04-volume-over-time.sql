@@ -1,6 +1,4 @@
--- Flow Wager Volume Over Time Query
--- This query provides daily volume, market creation, and user activity metrics
--- Query ID: Replace with your actual Dune query ID after creation
+
 
 WITH date_series AS (
   SELECT

@@ -1,8 +1,4 @@
--- Most Basic Flow Test Query
--- This is the simplest possible query to test Flow data access in Dune
--- Use this to verify your contract address and basic connectivity
 
--- Test 1: Check if your contract exists in Dune's Flow data
 SELECT
     COUNT(*) as total_events,
     'Contract found in Dune' as status

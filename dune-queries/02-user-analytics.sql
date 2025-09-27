@@ -1,6 +1,4 @@
--- Flow Wager User Analytics Query
--- This query provides detailed analytics for individual users on the prediction market platform
--- Query ID: Replace with your actual Dune query ID after creation
+
 
 WITH user_bets AS (
   SELECT

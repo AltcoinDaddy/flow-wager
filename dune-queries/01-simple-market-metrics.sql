@@ -1,8 +1,4 @@
--- Simple Flow Wager Market Metrics Query
--- Basic query to test Flow data structure in Dune
--- Start with this simple version and expand based on what works
 
--- Test basic event access first
 SELECT
     COUNT(*) as total_events,
     COUNT(DISTINCT tx_hash) as unique_transactions,
