@@ -1,4 +1,4 @@
-// src/components/comments/comments-section.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

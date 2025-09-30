@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -663,7 +661,7 @@ export default function AdminPage() {
                     <tr>
                       <td
                         colSpan={4}
-                        className="text-center text-gray-400 py-4 text-white"
+                        className="text-center py-4 text-white"
                       >
                         User management coming soon...
                       </td>

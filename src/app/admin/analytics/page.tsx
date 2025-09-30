@@ -13,7 +13,6 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0A0C14] via-[#151923] to-[#1A1F2C]">
       <div className="container mx-auto px-4 py-8">
-        {/* Page Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">
             <BarChart3 className="h-8 w-8 text-[#9b87f5]" />
@@ -23,8 +22,6 @@ export default function AnalyticsPage() {
             Comprehensive insights into your Flow Wager prediction market platform
           </p>
         </div>
-
-        {/* Quick Stats Overview */}
         <div className="mb-6">
           <Card className="bg-gradient-to-r from-[#9b87f5]/10 to-[#8b5cf6]/10 border-[#9b87f5]/20">
             <CardHeader>
