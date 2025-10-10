@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,6 +17,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   placeBetTransaction as buyShares,
   createUserAccountTransaction,
@@ -23,30 +46,35 @@ import {
 } from "@/lib/flow-wager-scripts";
 import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
+import { useForteActions } from "@/hooks/useForteActions";
 import type { Market } from "@/types/market";
 import {
   addBetToHistory,
   getCookie,
   setCookie,
   type BetInfo,
+  getUserBetHistory,
 } from "@/utils/cookies";
 import * as fcl from "@onflow/fcl";
 import {
   Calculator,
-  CheckCircle,
-  DollarSign,
-  Edit3,
   Loader2,
   LogIn,
-  TrendingUp,
-  User,
   UserPlus,
   Wallet,
-  Zap
+  Zap,
+  Bot,
+  Clock,
+  Timer,
+  ChevronDown,
+  ChevronRight,
+  Info,
+  AlertCircle,
+  Settings,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PointsManager } from '@/lib/points-system'; // 🎯 CHANGE THIS LINE
+import { PointsManager, type ActivityDetails } from "@/lib/points-system";
 
 interface BetDialogProps {
   open: boolean;
@@ -63,6 +91,24 @@ interface UserAccountStatus {
   showCreateForm: boolean;
 }
 
+interface AutomationSettings {
+  enabled: boolean;
+  type: "immediate" | "conditional" | "scheduled";
+  conditions: {
+    minOdds?: number;
+    maxOdds?: number;
+    priceThreshold?: number;
+    timeWindow?: { start: string; end: string };
+    maxSlippage?: number;
+    stopLoss?: number;
+  };
+  autoRebet: boolean;
+  rebetSettings: {
+    maxAttempts: number;
+    delayBetween: number;
+  };
+}
+
 export function BetDialog({
   open,
   onOpenChange,
@@ -70,11 +116,22 @@ export function BetDialog({
   initialSide = "optionA",
   onBetSuccess,
 }: BetDialogProps) {
-  const { user, balance, refreshBalance, login:logIn } = useAuth();
+  const { user, balance, refreshBalance, login: logIn } = useAuth();
+  const {
+    isInitialized: forteInitialized,
+    isLoading: forteLoading,
+    createConditionalBet,
+    createAdvancedBetConditions,
+    initialize: initializeForte,
+  } = useForteActions();
+
   const [side, setSide] = useState<"optionA" | "optionB">(initialSide);
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("immediate");
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+
   const [userAccount, setUserAccount] = useState<UserAccountStatus>({
     exists: false,
     isCreating: false,
@@ -85,6 +142,18 @@ export function BetDialog({
   // Account creation form fields
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
+
+  // Automation settings
+  const [automation, setAutomation] = useState<AutomationSettings>({
+    enabled: false,
+    type: "immediate",
+    conditions: {},
+    autoRebet: false,
+    rebetSettings: {
+      maxAttempts: 3,
+      delayBetween: 60,
+    },
+  });
 
   // Calculate market percentages and prices
   const totalShares =
@@ -100,303 +169,213 @@ export function BetDialog({
   const optionBPrice = optionBPercentage / 100;
 
   const currentPrice = side === "optionA" ? optionAPrice : optionBPrice;
-  const shares = amount ? parseFloat(amount) / currentPrice : 0;
-  const maxPayout = shares * 1; // Each share pays 1 FLOW if correct
-  const potentialProfit = maxPayout - (parseFloat(amount) || 0);
 
-  // Check user account status when dialog opens and wallet is connected
+  // Calculate current odds
+  const optionAOdds = optionAPrice > 0 ? 1 / optionAPrice : 1;
+  const optionBOdds = optionBPrice > 0 ? 1 / optionBPrice : 1;
+  const currentOdds = side === "optionA" ? optionAOdds : optionBOdds;
+
   useEffect(() => {
-    if (open && user?.addr) {
-      checkUserAccount();
-      if (!username) {
-        setUsername(`user_${user.addr.slice(-8)}`);
-      }
-      if (!displayName) {
-        setDisplayName(`FlowWager User ${user.addr.slice(0, 6)}...${user.addr.slice(-4)}`);
-      }
-    } else {
-      setUserAccount((prev) => ({
-        ...prev,
-        exists: false,
-        showCreateForm: false,
-        error: null,
-      }));
+    if (open) {
+      setSide(initialSide);
+      setAmount("");
+      setError(null);
+      setAutomation({
+        enabled: false,
+        type: "immediate",
+        conditions: {},
+        autoRebet: false,
+        rebetSettings: {
+          maxAttempts: 3,
+          delayBetween: 60,
+        },
+      });
+      setActiveTab("immediate");
     }
-  }, [open, user?.addr]);
+  }, [open, initialSide]);
 
   useEffect(() => {
-    setSide(initialSide);
-  }, [initialSide]);
+    const initConfig = async () => {
+      try {
+        flowConfig();
+      } catch (error) {
+        console.error("Failed to initialize Flow config:", error);
+      }
+    };
+
+    if (open && user) {
+      initConfig();
+      checkUserAccount();
+    }
+  }, [open, user]);
 
   const checkUserAccount = async () => {
     if (!user?.addr) return;
 
     try {
-      setUserAccount((prev) => ({ ...prev, isCreating: false, error: null }));
-
-      const cachedAccount = getCookie(`flow_wager_account_${user.addr}`);
-      if (cachedAccount === "exists") {
-        setUserAccount((prev) => ({ ...prev, exists: true }));
-        return;
-      }
-
-      flowConfig();
-      const userAccountScript = await getUserAccount();
-      const accountData = await fcl.query({
-        cadence: userAccountScript,
-        args: (arg, t) => [arg(user.addr || "", t.Address)],
+      const getUserAccountScript = await getUserAccount();
+      const profile = await fcl.query({
+        cadence: getUserAccountScript,
+        args: (arg: any, t: any) => [arg(user.addr, t.Address)],
       });
 
-      const accountExists = accountData !== null && accountData !== undefined;
-      setUserAccount((prev) => ({
-        ...prev,
-        exists: accountExists,
-        showCreateForm: !accountExists,
-      }));
-
-      if (accountExists) {
-        setCookie(`flow_wager_account_${user.addr}`, "exists");
-      }
-    } catch (error: any) {
-      console.error("Error checking user account:", error);
-      setUserAccount((prev) => ({
-        ...prev,
-        error: `Failed to check account status: ${error.message || "Unknown error"}`,
-        exists: false,
-        showCreateForm: true,
-      }));
-      toast.error("Failed to verify account status. Please try again.");
-    }
-  };
-
-  const showCreateAccountForm = () => {
-    setUserAccount((prev) => ({ ...prev, showCreateForm: true, error: null }));
-  };
-
-  const hideCreateAccountForm = () => {
-    setUserAccount((prev) => ({ ...prev, showCreateForm: false, error: null }));
-  };
-
-  const createAccount = async () => {
-    if (!user?.addr || !username.trim() || !displayName.trim()) {
-      setUserAccount((prev) => ({
-        ...prev,
-        error: "Username and display name are required",
-      }));
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-      setUserAccount((prev) => ({
-        ...prev,
-        error: "Username can only contain letters, numbers, and underscores",
-      }));
-      return;
-    }
-
-    if (username.length < 3 || username.length > 20) {
-      setUserAccount((prev) => ({
-        ...prev,
-        error: "Username must be between 3 and 20 characters",
-      }));
-      return;
-    }
-
-    try {
-      setUserAccount((prev) => ({ ...prev, isCreating: true, error: null }));
-      console.log("Creating account with:", { username, displayName, address: user.addr });
-
-      flowConfig();
-      const createAccountScript = await createUserAccountTransaction();
-      const authorization = fcl.currentUser().authorization;
-      const transactionId = await fcl.mutate({
-        cadence: createAccountScript,
-        args: (arg, t) => [
-          arg(username.trim(), t.String),
-          arg(displayName.trim(), t.String),
-          arg(`https://api.dicebear.com/9.x/pixel-art/png?seed=${user.addr}`, t.String),
-        ],
-        proposer: authorization,
-        payer: authorization,
-        authorizations: [authorization],
-        limit: 9999,
-      });
-
-      console.log("Account creation transaction ID:", transactionId);
-      const transaction = await fcl.tx(transactionId).onceSealed();
-      console.log("Account creation transaction result:", transaction);
-
-      if (transaction.status === 4) {
-        setUserAccount((prev) => ({
-          ...prev,
-          exists: true,
-          isCreating: false,
-          showCreateForm: false,
-        }));
-        setCookie(`flow_wager_account_${user.addr}`, "exists");
-        toast.success(`FlowWager account "${username}" created successfully!`);
-      } else {
-        throw new Error(`Account creation failed: ${transaction.errorMessage || "Unknown error"}`);
-      }
-    } catch (error: any) {
-      console.error("Error creating account:", error);
-      let errorMessage = "Failed to create account";
-
-      if (error.message?.includes("User rejected")) {
-        errorMessage = "Account creation was cancelled";
-      } else if (error.message?.includes("User already exists") || error.message?.includes("account already exists")) {
-        errorMessage = "Account already exists";
-        setUserAccount((prev) => ({
-          ...prev,
-          exists: true,
-          isCreating: false,
-          showCreateForm: false,
-        }));
-        setCookie(`flow_wager_account_${user.addr}`, "exists");
-        toast.success("Account already exists - you're ready to bet!");
-        return;
-      } else if (error.message?.includes("Username already taken")) {
-        errorMessage = "This username is already taken. Please choose another.";
-      } else if (error.message?.includes("script")) {
-        errorMessage = "Error loading account creation script. Please try again.";
-      } else if (error.message?.includes("network") || error.message?.includes("connection")) {
-        errorMessage = "Network error. Please check your connection and try again.";
-      } else if (error.message) {
-        errorMessage = error.message.substring(0, 150) + (error.message.length > 150 ? "..." : "");
-      }
-
-      setUserAccount((prev) => ({
-        ...prev,
-        error: errorMessage,
+      setUserAccount({
+        exists: !!profile,
         isCreating: false,
-      }));
-      toast.error(errorMessage);
+        error: null,
+        showCreateForm: !profile,
+      });
+    } catch (error) {
+      console.error("Error checking user account:", error);
+      setUserAccount({
+        exists: false,
+        isCreating: false,
+        error: "Failed to check account status",
+        showCreateForm: true,
+      });
     }
   };
 
   const connectWallet = async () => {
     try {
-      setError(null);
       await logIn();
-      toast.success("Wallet connected successfully!");
-    } catch (error: any) {
-      console.error("Error connecting wallet:", error);
-      setError("Failed to connect wallet. Please try again.");
-      toast.error("Failed to connect wallet. Please try again.");
+    } catch (error) {
+      console.error("Wallet connection failed:", error);
+      toast.error("Failed to connect wallet");
     }
   };
 
-  const placeBet = async () => {
-    if (!user || !amount || !userAccount.exists) {
-      setError("Please connect wallet and create an account");
+  const createAccount = async () => {
+    if (!username.trim() || !displayName.trim()) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    const betAmount = parseFloat(amount);
-    const userBalanceNum = parseFloat(balance || "0");
-
-    if (betAmount > userBalanceNum) {
-      setError(`Insufficient balance. You have ${balance} FLOW`);
-      return;
-    }
-
-    if (market.status !== 0) {
-      setError("Market is not active for betting");
-      return;
-    }
-
-    if (betAmount < parseFloat(market.minBet) || betAmount > parseFloat(market.maxBet)) {
-      setError(`Bet amount must be between ${market.minBet} and ${market.maxBet} FLOW`);
-      return;
-    }
+    setUserAccount((prev) => ({ ...prev, isCreating: true, error: null }));
 
     try {
-      setIsLoading(true);
-      setError(null);
-
-      flowConfig();
-      const buySharesScript = await buyShares();
+      await flowConfig();
+      const createAccountScript = await createUserAccountTransaction();
       const authorization = fcl.currentUser().authorization;
-      const transactionId = await fcl.mutate({
-        cadence: buySharesScript,
-        args: (arg, t) => [
-          arg(market.id, t.UInt64),
-          arg(side === "optionA" ? 0 : 1, t.UInt8),
-          arg(betAmount.toFixed(8), t.UFix64),
+
+      const txId = await fcl.mutate({
+        cadence: createAccountScript,
+        args: (arg: any, t: any) => [
+          arg(username.trim(), t.String),
+          arg(displayName.trim(), t.String),
         ],
         proposer: authorization,
         payer: authorization,
         authorizations: [authorization],
-        limit: 9999,
+        limit: 1000,
       });
 
-      console.log("Bet placement transaction ID:", transactionId);
-      const transaction = await fcl.tx(transactionId).onceSealed();
-      console.log("Bet placement transaction result:", transaction);
+      toast.loading("Creating account...");
+      const result = await fcl.tx(txId).onceSealed();
+      toast.dismiss();
 
-      if (transaction.status === 4) {
+      if (result.status === 4) {
+        toast.success("Account created successfully!");
+        setUserAccount({
+          exists: true,
+          isCreating: false,
+          error: null,
+          showCreateForm: false,
+        });
+        setUsername("");
+        setDisplayName("");
+      } else {
+        throw new Error("Transaction failed");
+      }
+    } catch (error) {
+      console.error("Account creation failed:", error);
+      setUserAccount((prev) => ({
+        ...prev,
+        isCreating: false,
+        error: "Failed to create account",
+      }));
+      toast.error("Failed to create account");
+    }
+  };
+
+  const placeBet = async () => {
+    if (!user?.addr || !amount || !isValidAmount) return;
+
+    // Check if this is an automated bet
+    if (automation.enabled && automation.type !== "immediate") {
+      return placeAutomatedBet();
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await flowConfig();
+      const buySharesScript = await buyShares();
+      const authorization = fcl.currentUser().authorization;
+
+      const txId = await fcl.mutate({
+        cadence: buySharesScript,
+        args: (arg: any, t: any) => [
+          arg(market.id, t.String),
+          arg(amount, t.UFix64),
+          arg(side === "optionA", t.Bool),
+        ],
+        proposer: authorization,
+        payer: authorization,
+        authorizations: [authorization],
+        limit: 1000,
+      });
+
+      toast.loading("Placing bet...");
+      const result = await fcl.tx(txId).onceSealed();
+      toast.dismiss();
+
+      if (result.status === 4) {
+        toast.success("Bet placed successfully!");
+
+        // Add to bet history
         const betInfo: BetInfo = {
           marketId: market.id,
-          side,
-          amount: betAmount,
-          shares,
-          timestamp: Date.now(),
-          transactionId,
           marketTitle: market.title,
+          side: side,
+          amount: parseFloat(amount),
+          shares: parseFloat(amount) / currentPrice,
+          timestamp: Date.now(),
+          transactionId: txId,
           optionName: side === "optionA" ? market.optionA : market.optionB,
         };
+        addBetToHistory(user.addr, betInfo);
 
-        addBetToHistory(user.addr ?? "", betInfo);
-
-        // 🎯 UPDATE THIS: Use your existing points system
+        // Award points for betting
         try {
-          await PointsManager.awardPoints(
-            `${user?.addr}`,
-            'PLACE_BET',
-            {
-              marketId: parseInt(market.id),
-              betAmount: betAmount,
-              marketTitle: market.title,
-              marketCategory: market.category?.toString() || 'unknown',
-              outcome: side === "optionA" ? market.optionA : market.optionB,
-              transactionId
-            },
-            parseInt(market.id)
-          );
-          console.log('✅ Betting points awarded successfully');
+          await PointsManager.awardPoints(user.addr, "PLACE_BET", {
+            betAmount: parseFloat(amount),
+            marketTitle: market.title,
+            marketId: parseInt(market.id),
+          });
         } catch (pointsError) {
-          console.error('❌ Error awarding betting points:', pointsError);
+          console.error("Error awarding points:", pointsError);
         }
-
-        toast.success(`Successfully placed ${betAmount} FLOW bet on "${betInfo.optionName}"! +40 FlowWager Points!`);
 
         await refreshBalance();
         onBetSuccess?.();
-        setAmount("");
         onOpenChange(false);
       } else {
-        throw new Error(`Transaction failed: ${transaction.errorMessage || "Unknown error"}`);
+        throw new Error("Transaction failed");
       }
     } catch (error: any) {
-      console.error("Betting error:", error);
-      let errorMessage = "Failed to place bet";
+      console.error("Bet placement failed:", error);
 
-      if (error.message?.includes("Insufficient balance")) {
-        errorMessage = "Insufficient FLOW balance in your wallet";
-      } else if (error.message?.includes("User rejected")) {
-        errorMessage = "Transaction was cancelled";
-      } else if (error.message?.includes("Market not found") || error.message?.includes("Market does not exist")) {
-        errorMessage = "Market not found or inactive";
-      } else if (error.message?.includes("Invalid option")) {
-        errorMessage = "Invalid betting option selected";
-      } else if (error.message?.includes("User positions resource not found")) {
-        errorMessage = "User account not properly initialized. Please try creating account again.";
-        setUserAccount((prev) => ({ ...prev, showCreateForm: true }));
-      } else if (error.message?.includes("capability")) {
-        errorMessage = "Account setup issue. Please ensure your account is properly configured.";
-        setUserAccount((prev) => ({ ...prev, showCreateForm: true }));
-      } else if (error.message) {
-        errorMessage = error.message.substring(0, 100) + (error.message.length > 100 ? "..." : "");
+      let errorMessage = "Failed to place bet. Please try again.";
+      if (error?.message) {
+        if (error.message.includes("insufficient balance")) {
+          errorMessage = "Insufficient balance to place this bet.";
+        } else if (error.message.includes("market ended")) {
+          errorMessage = "This market has already ended.";
+        } else if (error.message.includes("market resolved")) {
+          errorMessage = "This market has already been resolved.";
+        }
       }
 
       setError(errorMessage);
@@ -406,13 +385,92 @@ export function BetDialog({
     }
   };
 
+  const placeAutomatedBet = async () => {
+    if (!forteInitialized) {
+      toast.error("Forte Actions not initialized. Please initialize first.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const conditions = createAdvancedBetConditions({
+        minOdds: automation.conditions.minOdds,
+        maxOdds: automation.conditions.maxOdds,
+        priceThreshold: automation.conditions.priceThreshold,
+        timeWindow: automation.conditions.timeWindow
+          ? {
+              start: new Date(automation.conditions.timeWindow.start).getTime(),
+              end: new Date(automation.conditions.timeWindow.end).getTime(),
+            }
+          : undefined,
+        maxSlippage: automation.conditions.maxSlippage,
+        stopLoss: automation.conditions.stopLoss,
+        autoRebet: automation.autoRebet,
+        rebetConditions: automation.autoRebet
+          ? automation.rebetSettings
+          : undefined,
+      });
+
+      const result = await createConditionalBet({
+        marketId: market.id,
+        amount: amount,
+        prediction: side === "optionA",
+        conditions,
+      });
+
+      if (result.success) {
+        toast.success("Automated bet scheduled successfully!");
+        onBetSuccess?.();
+        onOpenChange(false);
+      } else {
+        throw new Error(result.error || "Failed to create automated bet");
+      }
+    } catch (error: any) {
+      console.error("Automated bet failed:", error);
+      setError(error.message || "Failed to create automated bet");
+      toast.error(error.message || "Failed to create automated bet");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAutomationChange = (field: string, value: any) => {
+    setAutomation((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleConditionChange = (field: string, value: any) => {
+    setAutomation((prev) => ({
+      ...prev,
+      conditions: {
+        ...prev.conditions,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleTimeWindowChange = (field: "start" | "end", value: string) => {
+    setAutomation((prev) => ({
+      ...prev,
+      conditions: {
+        ...prev.conditions,
+        timeWindow: {
+          ...prev.conditions.timeWindow,
+          start:
+            field === "start" ? value : prev.conditions.timeWindow?.start || "",
+          end: field === "end" ? value : prev.conditions.timeWindow?.end || "",
+        },
+      },
+    }));
+  };
+
   const formatCurrency = (value: string | number) => {
     const num = typeof value === "string" ? parseFloat(value) : value;
     return isNaN(num) ? "0.00" : num.toFixed(2);
-  };
-
-  const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`;
   };
 
   const minBet = parseFloat(market.minBet);
@@ -432,20 +490,55 @@ export function BetDialog({
     Math.min(maxBet, userBalanceNum).toString(),
   ].filter(
     (amt, index, arr) =>
-      arr.indexOf(amt) === index && parseFloat(amt) <= userBalanceNum
+      arr.indexOf(amt) === index && parseFloat(amt) <= userBalanceNum,
   );
+
+  const getEstimatedPayout = () => {
+    if (!amount) return "0.00";
+    return (parseFloat(amount) * currentOdds).toFixed(2);
+  };
+
+  const getBetTypeIcon = () => {
+    switch (automation.type) {
+      case "conditional":
+        return <Bot className="h-4 w-4" />;
+      case "scheduled":
+        return <Clock className="h-4 w-4" />;
+      default:
+        return <Zap className="h-4 w-4" />;
+    }
+  };
+
+  const getBetTypeDescription = () => {
+    switch (automation.type) {
+      case "conditional":
+        return "Bet will execute when conditions are met";
+      case "scheduled":
+        return "Bet will execute at specified time";
+      default:
+        return "Bet will execute immediately";
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-md w-full mx-auto backdrop-blur-xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-2xl w-full mx-auto backdrop-blur-xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="space-y-3 pb-4 flex-shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-[#9b87f5]/10 rounded-lg">
-              <Zap className="h-5 w-5 text-[#9b87f5]" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-[#9b87f5]/10 rounded-lg">
+                <Zap className="h-5 w-5 text-[#9b87f5]" />
+              </div>
+              <DialogTitle className="text-xl text-white">
+                Place Your Bet
+              </DialogTitle>
             </div>
-            <DialogTitle className="text-xl text-white">
-              Place Your Bet
-            </DialogTitle>
+            {forteInitialized && (
+              <Badge variant="secondary" className="text-xs">
+                <Bot className="h-3 w-3 mr-1" />
+                Automation Ready
+              </Badge>
+            )}
           </div>
 
           {/* Market Preview */}
@@ -460,10 +553,10 @@ export function BetDialog({
               <div className="text-xs text-gray-500">Current Odds</div>
               <div className="flex space-x-3 text-xs">
                 <span className="text-[#9b87f5]">
-                  {market.optionA}: {formatPercentage(optionAPercentage)}
+                  {market.optionA}: {formatCurrency(optionAOdds)}x
                 </span>
                 <span className="text-gray-400">
-                  {market.optionB}: {formatPercentage(optionBPercentage)}
+                  {market.optionB}: {formatCurrency(optionBOdds)}x
                 </span>
               </div>
             </div>
@@ -494,260 +587,628 @@ export function BetDialog({
           ) : (
             <>
               {/* User Account Status */}
-              <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 rounded-xl p-3 border border-gray-800/50">
-                {!userAccount.showCreateForm ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        {userAccount.exists ? (
-                          <CheckCircle className="h-4 w-4 text-green-400" />
-                        ) : (
-                          <UserPlus className="h-4 w-4 text-yellow-400" />
-                        )}
-                        <span className="text-sm font-medium text-gray-300">
-                          {userAccount.exists ? "Account Ready" : "Account Setup Required"}
-                        </span>
-                      </div>
-                      {!userAccount.exists && (
-                        <Button
-                          size="sm"
-                          onClick={showCreateAccountForm}
-                          disabled={userAccount.isCreating}
-                          className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white text-xs px-2 py-1 h-7"
-                        >
-                          <UserPlus className="h-3 w-3 mr-1" />
-                          Create Account
-                        </Button>
-                      )}
-                    </div>
-                    {!userAccount.exists && !userAccount.error && (
-                      <p className="text-xs text-gray-400 mt-2">
-                        Create a FlowWager account to start placing bets.
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium text-white flex items-center space-x-2">
-                        <User className="h-4 w-4 text-[#9b87f5]" />
-                        <span>Create Your Account</span>
-                      </h4>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={hideCreateAccountForm}
-                        className="text-gray-400 hover:text-white h-6 w-6 p-0"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="username" className="text-xs text-gray-400 mb-1 block">
-                          Username
-                        </Label>
-                        <div className="relative">
-                          <User className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-500" />
-                          <Input
-                            id="username"
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="Enter username"
-                            className="pl-7 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-8 text-sm focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
-                            maxLength={20}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          3-20 characters, letters, numbers, and underscores only
-                        </p>
-                      </div>
-                      <div>
-                        <Label htmlFor="displayName" className="text-xs text-gray-400 mb-1 block">
-                          Display Name
-                        </Label>
-                        <div className="relative">
-                          <Edit3 className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-500" />
-                          <Input
-                            id="displayName"
-                            type="text"
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                            placeholder="Enter display name"
-                            className="pl-7 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-8 text-sm focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
-                            maxLength={50}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          This is how others will see your name
-                        </p>
-                      </div>
-                      <div className="flex space-x-2 pt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={hideCreateAccountForm}
-                          className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-8 text-xs"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={createAccount}
-                          disabled={userAccount.isCreating || !username.trim() || !displayName.trim()}
-                          className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-8 text-xs"
-                        >
-                          {userAccount.isCreating ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Creating...
-                            </>
-                          ) : (
-                            "Create Account"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {userAccount.error && (
-                  <Alert className="border-red-500/50 bg-red-500/10 mt-3">
-                    <AlertDescription className="text-red-400 text-xs">
-                      {userAccount.error}
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              {/* Side Selection */}
-              {userAccount.exists && (
-                <>
-                  <div className="space-y-3">
-                    <Label className="text-gray-300 flex items-center space-x-2 text-sm">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Choose your prediction</span>
-                    </Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        variant={side === "optionA" ? "default" : "outline"}
-                        onClick={() => setSide("optionA")}
-                        className={`h-14 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
-                          side === "optionA"
-                            ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25"
-                            : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
-                        }`}
-                      >
-                        <span className="font-semibold text-xs text-center line-clamp-1">{market.optionA}</span>
-                        <span className="text-xs opacity-80">
-                          {formatPercentage(optionAPercentage)}
-                        </span>
-                      </Button>
-                      <Button
-                        variant={side === "optionB" ? "default" : "outline"}
-                        onClick={() => setSide("optionB")}
-                        className={`h-14 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${
-                          side === "optionB"
-                            ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white shadow-lg shadow-[#9b87f5]/25"
-                            : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-[#9b87f5]/50"
-                        }`}
-                      >
-                        <span className="font-semibold text-xs text-center line-clamp-1">{market.optionB}</span>
-                        <span className="text-xs opacity-80">
-                          {formatPercentage(optionBPercentage)}
-                        </span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-gray-800/50" />
-
-                  {/* Amount Input */}
-                  <div className="space-y-3">
-                    <Label
-                      htmlFor="amount"
-                      className="text-gray-300 flex items-center space-x-2 text-sm"
-                    >
-                      <Wallet className="h-4 w-4" />
-                      <span>Bet Amount (FLOW)</span>
-                    </Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              {userAccount.showCreateForm ? (
+                <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-white">
+                      <UserPlus className="h-5 w-5" />
+                      Create Your Profile
+                    </CardTitle>
+                    <CardDescription>
+                      Create a profile to start betting on Flow Wager
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="username" className="text-gray-300">
+                        Username *
+                      </Label>
                       <Input
-                        id="amount"
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                        min={minBet}
-                        max={maxBet}
-                        step="0.01"
-                        className="pl-10 bg-[#0A0C14] border-gray-700 text-white placeholder-gray-500 h-10 text-base font-medium focus:border-[#9b87f5] focus:ring-[#9b87f5]/20"
+                        id="username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Enter username"
+                        className="bg-[#0A0C14] border-gray-700 text-white"
                       />
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {quickAmounts.map((quickAmount) => (
-                        <Button
-                          key={quickAmount}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAmount(quickAmount)}
-                          className="border-gray-700 text-gray-300 hover:bg-[#9b87f5]/10 hover:border-[#9b87f5]/50 text-xs h-8"
-                        >
-                          {formatCurrency(quickAmount)}
-                        </Button>
-                      ))}
+                    <div>
+                      <Label htmlFor="displayName" className="text-gray-300">
+                        Display Name *
+                      </Label>
+                      <Input
+                        id="displayName"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Enter display name"
+                        className="bg-[#0A0C14] border-gray-700 text-white"
+                      />
                     </div>
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Min: {formatCurrency(market.minBet)}</span>
-                      <span>Max: {formatCurrency(market.maxBet)}</span>
-                    </div>
-                    {amount && !isValidAmount && (
-                      <Alert className="border-red-500/50 bg-red-500/10">
-                        <AlertDescription className="text-red-400 text-xs">
-                          Amount must be between {formatCurrency(market.minBet)} and{" "}
-                          {formatCurrency(market.maxBet)} FLOW
+                    <Button
+                      onClick={createAccount}
+                      disabled={
+                        userAccount.isCreating ||
+                        !username.trim() ||
+                        !displayName.trim()
+                      }
+                      className="w-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+                    >
+                      {userAccount.isCreating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Create Account
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Betting Type Selector */}
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-3 bg-[#1A1F2C] border-gray-800">
+                      <TabsTrigger
+                        value="immediate"
+                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
+                        onClick={() =>
+                          handleAutomationChange("type", "immediate")
+                        }
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Immediate
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="conditional"
+                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
+                        disabled={!forteInitialized}
+                        onClick={() =>
+                          handleAutomationChange("type", "conditional")
+                        }
+                      >
+                        <Bot className="h-4 w-4 mr-2" />
+                        Conditional
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="scheduled"
+                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
+                        disabled={!forteInitialized}
+                        onClick={() =>
+                          handleAutomationChange("type", "scheduled")
+                        }
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        Scheduled
+                      </TabsTrigger>
+                    </TabsList>
+
+                    {!forteInitialized && (
+                      <Alert className="mt-2">
+                        <Info className="h-4 w-4" />
+                        <AlertDescription className="flex items-center justify-between">
+                          <span>
+                            Initialize Forte Actions to use automation features
+                          </span>
+                          <Button
+                            size="sm"
+                            onClick={initializeForte}
+                            disabled={forteLoading}
+                            className="ml-2"
+                          >
+                            {forteLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Initialize"
+                            )}
+                          </Button>
                         </AlertDescription>
                       </Alert>
                     )}
-                  </div>
+
+                    <TabsContent value="immediate" className="space-y-4 mt-4">
+                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-gray-400 mb-3">
+                            Place your bet immediately at current market prices
+                          </p>
+
+                          {/* Bet Amount and Side Selection - Immediate */}
+                          <div className="space-y-4">
+                            {/* Side Selection */}
+                            <div>
+                              <Label className="text-gray-300 text-sm font-medium mb-2 block">
+                                Choose Your Prediction
+                              </Label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                  variant={
+                                    side === "optionA" ? "default" : "outline"
+                                  }
+                                  onClick={() => setSide("optionA")}
+                                  className={`p-3 h-auto ${
+                                    side === "optionA"
+                                      ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white"
+                                      : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C]"
+                                  }`}
+                                >
+                                  <div className="text-center">
+                                    <div className="font-medium text-sm">
+                                      {market.optionA}
+                                    </div>
+                                    <div className="text-xs opacity-80">
+                                      {formatCurrency(optionAOdds)}x odds
+                                    </div>
+                                  </div>
+                                </Button>
+                                <Button
+                                  variant={
+                                    side === "optionB" ? "default" : "outline"
+                                  }
+                                  onClick={() => setSide("optionB")}
+                                  className={`p-3 h-auto ${
+                                    side === "optionB"
+                                      ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white"
+                                      : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C]"
+                                  }`}
+                                >
+                                  <div className="text-center">
+                                    <div className="font-medium text-sm">
+                                      {market.optionB}
+                                    </div>
+                                    <div className="text-xs opacity-80">
+                                      {formatCurrency(optionBOdds)}x odds
+                                    </div>
+                                  </div>
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Amount Input */}
+                            <div>
+                              <Label
+                                htmlFor="amount"
+                                className="text-gray-300 text-sm font-medium mb-2 block"
+                              >
+                                Bet Amount (FLOW)
+                              </Label>
+                              <Input
+                                id="amount"
+                                type="number"
+                                step="0.01"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="bg-[#0A0C14] border-gray-700 text-white h-12 text-lg"
+                              />
+                              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                                <span>
+                                  Balance: {formatCurrency(balance)} FLOW
+                                </span>
+                                <span>
+                                  Min: {formatCurrency(market.minBet)} | Max:{" "}
+                                  {formatCurrency(market.maxBet)}
+                                </span>
+                              </div>
+
+                              {/* Quick Amount Buttons */}
+                              {quickAmounts.length > 0 && (
+                                <div className="flex gap-2 mt-2">
+                                  {quickAmounts.map((quickAmount) => (
+                                    <Button
+                                      key={quickAmount}
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setAmount(quickAmount)}
+                                      className="text-xs border-gray-700 text-gray-400 hover:text-white hover:border-[#9b87f5]"
+                                    >
+                                      {formatCurrency(quickAmount)}
+                                    </Button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="conditional" className="space-y-4 mt-4">
+                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-gray-400 mb-3">
+                            Set conditions for when your bet should be placed
+                            automatically
+                          </p>
+
+                          <div className="space-y-4">
+                            {/* Basic Bet Setup */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-gray-300 text-sm">
+                                  Prediction
+                                </Label>
+                                <Select
+                                  value={side}
+                                  onValueChange={(
+                                    value: "optionA" | "optionB",
+                                  ) => setSide(value)}
+                                >
+                                  <SelectTrigger className="bg-[#0A0C14] border-gray-700 text-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="optionA">
+                                      {market.optionA}
+                                    </SelectItem>
+                                    <SelectItem value="optionB">
+                                      {market.optionB}
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-gray-300 text-sm">
+                                  Amount (FLOW)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={amount}
+                                  onChange={(e) => setAmount(e.target.value)}
+                                  placeholder="0.00"
+                                  className="bg-[#0A0C14] border-gray-700 text-white"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Odds Conditions */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-gray-300 text-sm">
+                                  Min Odds
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={automation.conditions.minOdds || ""}
+                                  onChange={(e) =>
+                                    handleConditionChange(
+                                      "minOdds",
+                                      e.target.value
+                                        ? parseFloat(e.target.value)
+                                        : undefined,
+                                    )
+                                  }
+                                  placeholder="1.50"
+                                  className="bg-[#0A0C14] border-gray-700 text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-gray-300 text-sm">
+                                  Max Odds
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={automation.conditions.maxOdds || ""}
+                                  onChange={(e) =>
+                                    handleConditionChange(
+                                      "maxOdds",
+                                      e.target.value
+                                        ? parseFloat(e.target.value)
+                                        : undefined,
+                                    )
+                                  }
+                                  placeholder="5.00"
+                                  className="bg-[#0A0C14] border-gray-700 text-white"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Advanced Settings Collapsible */}
+                            <Collapsible
+                              open={showAdvancedSettings}
+                              onOpenChange={setShowAdvancedSettings}
+                            >
+                              <CollapsibleTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full justify-between text-gray-400 hover:text-white"
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <Settings className="h-4 w-4" />
+                                    Advanced Settings
+                                  </span>
+                                  {showAdvancedSettings ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="space-y-4">
+                                {/* Time Window */}
+                                <div>
+                                  <Label className="text-gray-300 text-sm mb-2 block">
+                                    Time Window (Optional)
+                                  </Label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <Label className="text-xs text-gray-400">
+                                        Start Time
+                                      </Label>
+                                      <Input
+                                        type="datetime-local"
+                                        value={
+                                          automation.conditions.timeWindow
+                                            ?.start || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleTimeWindowChange(
+                                            "start",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="bg-[#0A0C14] border-gray-700 text-white text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs text-gray-400">
+                                        End Time
+                                      </Label>
+                                      <Input
+                                        type="datetime-local"
+                                        value={
+                                          automation.conditions.timeWindow
+                                            ?.end || ""
+                                        }
+                                        onChange={(e) =>
+                                          handleTimeWindowChange(
+                                            "end",
+                                            e.target.value,
+                                          )
+                                        }
+                                        className="bg-[#0A0C14] border-gray-700 text-white text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Risk Management */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <Label className="text-gray-300 text-sm">
+                                      Max Slippage (%)
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={
+                                        automation.conditions.maxSlippage || ""
+                                      }
+                                      onChange={(e) =>
+                                        handleConditionChange(
+                                          "maxSlippage",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      placeholder="5.0"
+                                      className="bg-[#0A0C14] border-gray-700 text-white"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-gray-300 text-sm">
+                                      Stop Loss (%)
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      step="0.1"
+                                      value={
+                                        automation.conditions.stopLoss || ""
+                                      }
+                                      onChange={(e) =>
+                                        handleConditionChange(
+                                          "stopLoss",
+                                          e.target.value
+                                            ? parseFloat(e.target.value)
+                                            : undefined,
+                                        )
+                                      }
+                                      placeholder="10.0"
+                                      className="bg-[#0A0C14] border-gray-700 text-white"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Auto-Rebet */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      id="auto-rebet"
+                                      checked={automation.autoRebet}
+                                      onCheckedChange={(checked) =>
+                                        handleAutomationChange(
+                                          "autoRebet",
+                                          checked,
+                                        )
+                                      }
+                                    />
+                                    <Label
+                                      htmlFor="auto-rebet"
+                                      className="text-gray-300 text-sm"
+                                    >
+                                      Enable auto-rebet on failure
+                                    </Label>
+                                  </div>
+                                  {automation.autoRebet && (
+                                    <div className="grid grid-cols-2 gap-4 pl-6">
+                                      <div>
+                                        <Label className="text-gray-300 text-sm">
+                                          Max Attempts
+                                        </Label>
+                                        <Slider
+                                          value={[
+                                            automation.rebetSettings
+                                              .maxAttempts,
+                                          ]}
+                                          onValueChange={([value]) =>
+                                            setAutomation((prev) => ({
+                                              ...prev,
+                                              rebetSettings: {
+                                                ...prev.rebetSettings,
+                                                maxAttempts: value,
+                                              },
+                                            }))
+                                          }
+                                          max={10}
+                                          min={1}
+                                          step={1}
+                                          className="mt-2"
+                                        />
+                                        <div className="text-xs text-gray-400 text-center mt-1">
+                                          {automation.rebetSettings.maxAttempts}{" "}
+                                          attempts
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <Label className="text-gray-300 text-sm">
+                                          Delay (seconds)
+                                        </Label>
+                                        <Slider
+                                          value={[
+                                            automation.rebetSettings
+                                              .delayBetween,
+                                          ]}
+                                          onValueChange={([value]) =>
+                                            setAutomation((prev) => ({
+                                              ...prev,
+                                              rebetSettings: {
+                                                ...prev.rebetSettings,
+                                                delayBetween: value,
+                                              },
+                                            }))
+                                          }
+                                          max={300}
+                                          min={10}
+                                          step={10}
+                                          className="mt-2"
+                                        />
+                                        <div className="text-xs text-gray-400 text-center mt-1">
+                                          {
+                                            automation.rebetSettings
+                                              .delayBetween
+                                          }
+                                          s delay
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="scheduled" className="space-y-4 mt-4">
+                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
+                        <CardContent className="p-4">
+                          <div className="text-center py-8">
+                            <Timer className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-400">
+                              Scheduled betting coming soon
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Schedule bets to execute at specific times
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Bet Summary */}
                   {amount && isValidAmount && (
-                    <div className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 rounded-xl p-3 border border-gray-800/50">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Calculator className="h-4 w-4 text-[#9b87f5]" />
-                        <span className="text-sm font-medium text-gray-300">
-                          Bet Summary
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">Betting on:</span>
-                          <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30 font-medium text-xs">
-                            {side === "optionA" ? market.optionA : market.optionB}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">Amount:</span>
-                          <span className="text-white font-medium">
-                            {formatCurrency(amount)} FLOW
+                    <Card className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 border border-gray-800/50">
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Calculator className="h-4 w-4 text-[#9b87f5]" />
+                          <span className="text-sm font-medium text-gray-300">
+                            Bet Summary
                           </span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">Shares:</span>
-                          <span className="text-white font-medium">
-                            {formatCurrency(shares)}
-                          </span>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Betting on:</span>
+                            <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
+                              {side === "optionA"
+                                ? market.optionA
+                                : market.optionB}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Amount:</span>
+                            <span className="text-white font-medium">
+                              {formatCurrency(amount)} FLOW
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Current Odds:</span>
+                            <span className="text-white font-medium">
+                              {formatCurrency(currentOdds)}x
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">
+                              Potential Payout:
+                            </span>
+                            <span className="text-green-400 font-medium">
+                              {getEstimatedPayout()} FLOW
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400">Execution:</span>
+                            <div className="flex items-center gap-1 text-white font-medium">
+                              {getBetTypeIcon()}
+                              <span className="capitalize">
+                                {automation.type}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+                        <div className="mt-3 p-2 bg-[#9b87f5]/10 rounded text-xs text-gray-400">
+                          {getBetTypeDescription()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {amount && !isValidAmount && (
+                    <Alert className="border-red-500/50 bg-red-500/10">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-red-400 text-xs">
+                        Amount must be between {formatCurrency(market.minBet)}{" "}
+                        and {formatCurrency(market.maxBet)} FLOW, and not exceed
+                        your balance.
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </>
               )}
 
               {error && (
                 <Alert className="border-red-500/50 bg-red-500/10">
+                  <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-red-400 text-xs">
                     {error}
                   </AlertDescription>
@@ -762,7 +1223,7 @@ export function BetDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-10"
+            className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-12"
             disabled={isLoading || userAccount.isCreating}
           >
             Cancel
@@ -770,18 +1231,31 @@ export function BetDialog({
           {user && userAccount.exists ? (
             <Button
               onClick={placeBet}
-              disabled={!amount || !isValidAmount || isLoading}
-              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-10 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200 disabled:opacity-50"
+              disabled={
+                !amount ||
+                !isValidAmount ||
+                isLoading ||
+                (automation.type !== "immediate" && !forteInitialized)
+              }
+              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200 disabled:opacity-50"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Placing Bet...
+                  {automation.type === "immediate"
+                    ? "Placing Bet..."
+                    : "Creating Automation..."}
                 </>
               ) : (
                 <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Place Bet
+                  {getBetTypeIcon()}
+                  <span className="ml-2">
+                    {automation.type === "immediate"
+                      ? "Place Bet"
+                      : automation.type === "conditional"
+                        ? "Create Conditional Bet"
+                        : "Schedule Bet"}
+                  </span>
                 </>
               )}
             </Button>
@@ -789,7 +1263,7 @@ export function BetDialog({
             <Button
               onClick={connectWallet}
               disabled={isLoading || userAccount.isCreating}
-              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-10 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200"
+              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200"
             >
               <LogIn className="h-4 w-4 mr-2" />
               Connect Wallet

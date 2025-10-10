@@ -18,6 +18,7 @@ import {
   BookOpen,
   FileText,
   Shield,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/providers/auth-provider";
@@ -100,6 +101,15 @@ export function MobileNav() {
               >
                 <Trophy className="h-5 w-5" style={{ color: "#9b87f5" }} />
                 <span className="font-medium">Leaderboard</span>
+              </Link>
+
+              <Link
+                href="/forte"
+                onClick={handleLinkClick}
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors hover:bg-[#2a2d3a]"
+              >
+                <Zap className="h-5 w-5" style={{ color: "#9b87f5" }} />
+                <span className="font-medium">Forte Automation</span>
               </Link>
 
               {isAuthenticated && walletAddress && (
