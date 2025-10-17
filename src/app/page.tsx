@@ -72,7 +72,7 @@ export default function HomePage() {
           </div>
 
           {/* Coming Soon Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          {/*<div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="bg-[#1A1F2C]/50 backdrop-blur border border-gray-800 rounded-xl p-6 hover:border-[#9b87f5]/30 transition-all duration-300">
               <div className="bg-[#9b87f5]/10 w-12 h-12 rounded-lg flex items-center justify-center mb-4 mx-auto">
                 <TrendingUp className="h-6 w-6 text-[#9b87f5]" />
@@ -111,7 +111,7 @@ export default function HomePage() {
                 seamless integration with Ethereum tooling
               </p>
             </div>
-          </div>
+          </div>*/}
         </div>
 
         {/* Animated Background Elements */}
