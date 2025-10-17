@@ -14,12 +14,17 @@ import {
 } from "@/lib/forte-actions";
 import { toast } from "sonner";
 
+// Feature flag for Forte Actions - enabled by default in development
+const FORTE_ACTIONS_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_FORTE_ACTIONS !== "false";
+
 export interface UseForteActionsReturn {
   // State
   isInitialized: boolean;
   isLoading: boolean;
   scheduledTransactions: ScheduledTransaction[];
   error: string | null;
+  isAvailable: boolean;
 
   // Actions
   initialize: () => Promise<void>;
@@ -97,10 +102,18 @@ export const useForteActions = (): UseForteActionsReturn => {
     }
   }, [user?.addr]);
 
-  // Initialize Forte Actions for the user
+  // Initialize Forte Actions for the user (opt-in only)
   const initialize = useCallback(async () => {
+    if (!FORTE_ACTIONS_ENABLED) {
+      const error = "Forte automation features are currently disabled";
+      setError(error);
+      toast.error(error);
+      return;
+    }
+
     if (!user?.addr) {
-      setError("User not authenticated");
+      setError("Please connect your wallet first");
+      toast.error("Please connect your wallet first");
       return;
     }
 
@@ -108,20 +121,25 @@ export const useForteActions = (): UseForteActionsReturn => {
       setIsLoading(true);
       setError(null);
 
-      const result = await initializeFlowActions();
+      // Show user what's happening
+      toast.info("Setting up Forte automation features...");
+
+      const result = await initializeFlowActions(user.addr);
 
       if (result.success) {
         setIsInitialized(true);
-        toast.success("Forte Actions initialized successfully!");
+        toast.success(
+          "🚀 Forte automation is now active! You can now create conditional and scheduled bets.",
+        );
         await refreshScheduledTransactions();
       } else {
         setError(result.error || "Failed to initialize Forte Actions");
-        toast.error("Failed to initialize Forte Actions");
+        toast.error(`Setup failed: ${result.error || "Unknown error"}`);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(errorMessage);
-      toast.error("Error initializing Forte Actions");
+      toast.error(`Error during setup: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +149,10 @@ export const useForteActions = (): UseForteActionsReturn => {
   const createConditionalBet = useCallback(
     async (params: ConditionalBetParams): Promise<FlowActionResult> => {
       if (!isInitialized) {
-        throw new Error("Forte Actions not initialized");
+        const error =
+          "Forte automation not set up yet. Please initialize it first.";
+        toast.error(error);
+        return { success: false, error };
       }
 
       try {
@@ -174,7 +195,10 @@ export const useForteActions = (): UseForteActionsReturn => {
   const scheduleMarketResolution = useCallback(
     async (params: OracleResolutionParams): Promise<FlowActionResult> => {
       if (!isInitialized) {
-        throw new Error("Forte Actions not initialized");
+        const error =
+          "Forte automation not set up yet. Please initialize it first.";
+        toast.error(error);
+        return { success: false, error };
       }
 
       try {
@@ -213,7 +237,10 @@ export const useForteActions = (): UseForteActionsReturn => {
   const setupAutomatedPayout = useCallback(
     async (marketId: string): Promise<FlowActionResult> => {
       if (!isInitialized) {
-        throw new Error("Forte Actions not initialized");
+        const error =
+          "Forte automation not set up yet. Please initialize it first.";
+        toast.error(error);
+        return { success: false, error };
       }
 
       try {
@@ -247,7 +274,10 @@ export const useForteActions = (): UseForteActionsReturn => {
   const cancelAction = useCallback(
     async (actionId: string): Promise<FlowActionResult> => {
       if (!isInitialized) {
-        throw new Error("Forte Actions not initialized");
+        const error =
+          "Forte automation not set up yet. Please initialize it first.";
+        toast.error(error);
+        return { success: false, error };
       }
 
       try {
@@ -328,24 +358,53 @@ export const useForteActions = (): UseForteActionsReturn => {
     }
   }, [isInitialized, user?.addr, refreshScheduledTransactions]);
 
-  // Auto-initialize on user login
+  // Check if user has Forte Actions resources without auto-initializing
   useEffect(() => {
-    if (user?.addr && !isInitialized) {
-      // Auto-initialize after a short delay to ensure user is fully authenticated
-      const timer = setTimeout(() => {
-        initialize();
-      }, 1000);
+    const checkForteStatus = async () => {
+      if (user?.addr && !isInitialized && FORTE_ACTIONS_ENABLED) {
+        try {
+          // Check if user already has Forte Actions initialized (demo mode)
+          if (typeof window !== "undefined") {
+            const isInitialized =
+              localStorage.getItem(`forte_actions_initialized_${user.addr}`) ===
+              "true";
+            if (isInitialized) {
+              // Set current user for demo
+              localStorage.setItem("forte_current_user", user.addr);
+              setIsInitialized(true);
+              // Load scheduled transactions
+              const scheduledTxs = await getScheduledTransactions(user.addr);
+              setScheduledTransactions(scheduledTxs);
+              console.log("✅ Forte Actions already initialized (Demo Mode)", {
+                user: user.addr,
+              });
+            } else {
+              console.log("ℹ️ Forte Actions not yet initialized for user", {
+                user: user.addr,
+              });
+              setIsInitialized(false);
+            }
+          }
+        } catch (err) {
+          // User doesn't have Forte Actions initialized yet - this is expected
+          console.log("Forte Actions not yet initialized for user");
+          setIsInitialized(false);
+        }
+      } else if (!FORTE_ACTIONS_ENABLED) {
+        setIsInitialized(false);
+      }
+    };
 
-      return () => clearTimeout(timer);
-    }
-  }, [user?.addr, isInitialized, initialize]);
+    checkForteStatus();
+  }, [user?.addr]);
 
   return {
     // State
-    isInitialized,
+    isInitialized: FORTE_ACTIONS_ENABLED && isInitialized,
     isLoading,
-    scheduledTransactions,
-    error,
+    scheduledTransactions: FORTE_ACTIONS_ENABLED ? scheduledTransactions : [],
+    error: FORTE_ACTIONS_ENABLED ? error : null,
+    isAvailable: FORTE_ACTIONS_ENABLED,
 
     // Actions
     initialize,

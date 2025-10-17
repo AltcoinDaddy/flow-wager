@@ -1,5 +1,9 @@
 import * as fcl from "@onflow/fcl";
-import { getFlowWagerAddress, getFlowTokenAddress, getFungibleTokenAddress } from "./flow-wager-scripts";
+import {
+  getFlowWagerAddress,
+  getFlowTokenAddress,
+  getFungibleTokenAddress,
+} from "./flow-wager-scripts";
 
 // Forte contract addresses
 export const getForteAddresses = () => {
@@ -66,7 +70,6 @@ export interface ScheduledTransaction {
 
 // Flow Actions for automated wagering workflows
 export const FORTE_SCRIPTS = {
-
   // Create a Flow Action for placing a bet with automated conditions
   createAutomatedBetAction: `
     import DeFiActions from ${() => getForteAddresses().DeFiActions}
@@ -219,61 +222,44 @@ export const FORTE_SCRIPTS = {
     pub fun main(actionId: String): DeFiActions.ActionStatus? {
       return DeFiActions.getActionStatus(id: actionId)
     }
-  `
+  `,
 };
 
 // Utility functions for Flow Actions integration
 
 /**
- * Initialize Flow Actions for a user account
+ * Initialize Flow Actions for a user account (Demo Version)
  */
-export async function initializeFlowActions(): Promise<FlowActionResult> {
+export async function initializeFlowActions(
+  userAddress?: string,
+): Promise<FlowActionResult> {
   try {
-    const addresses = getForteAddresses();
+    console.log("🚀 Initializing Forte Actions (Demo Mode)", { userAddress });
 
-    const transaction = `
-      import DeFiActions from ${addresses.DeFiActions}
+    // Simulate initialization delay
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      transaction() {
-        prepare(signer: AuthAccount) {
-          // Create ActionBuilder resource if it doesn't exist
-          if signer.borrow<&DeFiActions.ActionBuilder>(from: /storage/ActionBuilder) == nil {
-            let actionBuilder <- DeFiActions.createActionBuilder()
-            signer.save(<-actionBuilder, to: /storage/ActionBuilder)
-          }
+    // Mock successful initialization
+    const mockTxId = `forte_init_${Date.now()}`;
 
-          // Create ActionScheduler resource if it doesn't exist
-          if signer.borrow<&DeFiActions.ActionScheduler>(from: /storage/ActionScheduler) == nil {
-            let scheduler <- DeFiActions.createActionScheduler()
-            signer.save(<-scheduler, to: /storage/ActionScheduler)
+    // Store initialization flag in localStorage for demo purposes
+    if (typeof window !== "undefined" && userAddress) {
+      localStorage.setItem(`forte_actions_initialized_${userAddress}`, "true");
+      localStorage.setItem(`forte_actions_tx_id_${userAddress}`, mockTxId);
+      localStorage.setItem("forte_current_user", userAddress);
+    }
 
-            // Link public capability
-            signer.link<&DeFiActions.ActionScheduler{DeFiActions.ActionSchedulerPublic}>(
-              /public/ActionScheduler,
-              target: /storage/ActionScheduler
-            )
-          }
-        }
-      }
-    `;
-
-    const authorization = fcl.currentUser().authorization;
-    const txId = await fcl.mutate({
-      cadence: transaction,
-      proposer: authorization,
-      payer: authorization,
-      authorizations: [authorization],
-      limit: 1000,
+    console.log("✅ Forte Actions initialized successfully (Demo)", {
+      userAddress,
     });
 
-    const result = await fcl.tx(txId).onceSealed();
-
     return {
-      success: result.status === 4,
-      transactionId: txId,
-      error: result.status !== 4 ? "Transaction failed" : undefined,
+      success: true,
+      transactionId: mockTxId,
+      error: undefined,
     };
   } catch (error) {
+    console.error("❌ Forte Actions initialization failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -282,38 +268,73 @@ export async function initializeFlowActions(): Promise<FlowActionResult> {
 }
 
 /**
- * Create an automated bet with conditions
+ * Create an automated bet with conditions (Demo Version)
  */
 export async function createAutomatedBet(
   marketId: string,
   amount: string,
   prediction: boolean,
-  conditions: Record<string, any> = {}
+  conditions: Record<string, any> = {},
 ): Promise<FlowActionResult> {
   try {
-    const authorization = fcl.currentUser().authorization;
-    const txId = await fcl.mutate({
-      cadence: FORTE_SCRIPTS.createAutomatedBetAction,
-      args: (arg, t) => [
-        arg(marketId, t.String),
-        arg(amount, t.UFix64),
-        arg(prediction, t.Bool),
-        arg(conditions, t.Dictionary({ key: t.String, value: t.AnyStruct })),
-      ],
-      proposer: authorization,
-      payer: authorization,
-      authorizations: [authorization],
-      limit: 1000,
+    console.log("🤖 Creating automated bet (Demo Mode)", {
+      marketId,
+      amount,
+      prediction,
+      conditions,
     });
 
-    const result = await fcl.tx(txId).onceSealed();
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Create mock transaction
+    const mockTxId = `automated_bet_${Date.now()}`;
+    const actionId = `action_${marketId}_${Date.now()}`;
+
+    // Store in localStorage for demo - use current user's data
+    if (typeof window !== "undefined") {
+      const currentUser = localStorage.getItem("forte_current_user");
+      const storageKey = currentUser
+        ? `forte_scheduled_actions_${currentUser}`
+        : "forte_scheduled_actions";
+
+      const existingActions = JSON.parse(
+        localStorage.getItem(storageKey) || "[]",
+      );
+      const newAction: ScheduledTransaction = {
+        id: actionId,
+        action: {
+          type: "PLACE_BET",
+          marketId,
+          amount,
+          outcome: prediction,
+          scheduledTime:
+            Date.now() +
+            (conditions.timeWindow?.start
+              ? new Date(conditions.timeWindow.start).getTime() - Date.now()
+              : 0),
+        },
+        executeAt: conditions.timeWindow?.start
+          ? new Date(conditions.timeWindow.start).getTime()
+          : Date.now() + 60000, // Execute in 1 minute if no time specified
+        status: "PENDING",
+        createdAt: Date.now(),
+      };
+
+      existingActions.push(newAction);
+      localStorage.setItem(storageKey, JSON.stringify(existingActions));
+    }
+
+    console.log("✅ Automated bet created successfully (Demo)");
 
     return {
-      success: result.status === 4,
-      transactionId: txId,
-      error: result.status !== 4 ? "Transaction failed" : undefined,
+      success: true,
+      transactionId: mockTxId,
+      actionId,
+      error: undefined,
     };
   } catch (error) {
+    console.error("❌ Automated bet creation failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -322,39 +343,64 @@ export async function createAutomatedBet(
 }
 
 /**
- * Schedule a market resolution using oracle data
+ * Schedule a market resolution using oracle data (Demo Version)
  */
 export async function scheduleOracleResolution(
   marketId: string,
   oracleSymbol: string,
   targetPrice: string,
-  resolutionTime: number
+  resolutionTime: number,
 ): Promise<FlowActionResult> {
   try {
-    const authorization = fcl.currentUser().authorization;
-    const txId = await fcl.mutate({
-      cadence: FORTE_SCRIPTS.createOracleResolvedMarketAction,
-      args: (arg, t) => [
-        arg(marketId, t.String),
-        arg(oracleSymbol, t.String),
-        arg(targetPrice, t.UFix64),
-        arg(resolutionTime.toString(), t.UFix64),
-      ],
-      proposer: authorization,
-      payer: authorization,
-      authorizations: [authorization],
-      limit: 1000,
+    console.log("📊 Scheduling oracle resolution (Demo Mode)", {
+      marketId,
+      oracleSymbol,
+      targetPrice,
+      resolutionTime,
     });
 
-    const result = await fcl.tx(txId).onceSealed();
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const mockTxId = `oracle_resolution_${Date.now()}`;
+    const actionId = `oracle_resolution_${marketId}_${Date.now()}`;
+
+    // Store in localStorage for demo - use current user's data
+    if (typeof window !== "undefined") {
+      const currentUser = localStorage.getItem("forte_current_user");
+      const storageKey = currentUser
+        ? `forte_scheduled_actions_${currentUser}`
+        : "forte_scheduled_actions";
+
+      const existingActions = JSON.parse(
+        localStorage.getItem(storageKey) || "[]",
+      );
+      const newAction: ScheduledTransaction = {
+        id: actionId,
+        action: {
+          type: "RESOLVE_MARKET",
+          marketId,
+          scheduledTime: resolutionTime,
+        },
+        executeAt: resolutionTime,
+        status: "PENDING",
+        createdAt: Date.now(),
+      };
+
+      existingActions.push(newAction);
+      localStorage.setItem(storageKey, JSON.stringify(existingActions));
+    }
+
+    console.log("✅ Oracle resolution scheduled successfully (Demo)");
 
     return {
-      success: result.status === 4,
-      transactionId: txId,
-      actionId: `oracle_resolution_${marketId}_${Date.now()}`,
-      error: result.status !== 4 ? "Transaction failed" : undefined,
+      success: true,
+      transactionId: mockTxId,
+      actionId,
+      error: undefined,
     };
   } catch (error) {
+    console.error("❌ Oracle resolution scheduling failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -363,28 +409,56 @@ export async function scheduleOracleResolution(
 }
 
 /**
- * Create automated payout distribution
+ * Create automated payout distribution (Demo Version)
  */
-export async function createAutomatedPayout(marketId: string): Promise<FlowActionResult> {
+export async function createAutomatedPayout(
+  marketId: string,
+): Promise<FlowActionResult> {
   try {
-    const authorization = fcl.currentUser().authorization;
-    const txId = await fcl.mutate({
-      cadence: FORTE_SCRIPTS.createAutomatedPayoutAction,
-      args: (arg, t) => [arg(marketId, t.String)],
-      proposer: authorization,
-      payer: authorization,
-      authorizations: [authorization],
-      limit: 1000,
-    });
+    console.log("💰 Creating automated payout (Demo Mode)", { marketId });
 
-    const result = await fcl.tx(txId).onceSealed();
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    const mockTxId = `automated_payout_${Date.now()}`;
+    const actionId = `payout_${marketId}_${Date.now()}`;
+
+    // Store in localStorage for demo - use current user's data
+    if (typeof window !== "undefined") {
+      const currentUser = localStorage.getItem("forte_current_user");
+      const storageKey = currentUser
+        ? `forte_scheduled_actions_${currentUser}`
+        : "forte_scheduled_actions";
+
+      const existingActions = JSON.parse(
+        localStorage.getItem(storageKey) || "[]",
+      );
+      const newAction: ScheduledTransaction = {
+        id: actionId,
+        action: {
+          type: "AUTOMATED_PAYOUT",
+          marketId,
+          scheduledTime: Date.now() + 300000, // 5 minutes from now
+        },
+        executeAt: Date.now() + 300000,
+        status: "PENDING",
+        createdAt: Date.now(),
+      };
+
+      existingActions.push(newAction);
+      localStorage.setItem(storageKey, JSON.stringify(existingActions));
+    }
+
+    console.log("✅ Automated payout created successfully (Demo)");
 
     return {
-      success: result.status === 4,
-      transactionId: txId,
-      error: result.status !== 4 ? "Transaction failed" : undefined,
+      success: true,
+      transactionId: mockTxId,
+      actionId,
+      error: undefined,
     };
   } catch (error) {
+    console.error("❌ Automated payout creation failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -393,16 +467,37 @@ export async function createAutomatedPayout(marketId: string): Promise<FlowActio
 }
 
 /**
- * Get scheduled transactions for a user
+ * Get scheduled transactions for a user (Demo Version)
  */
-export async function getScheduledTransactions(accountAddress: string): Promise<ScheduledTransaction[]> {
+export async function getScheduledTransactions(
+  accountAddress: string,
+): Promise<ScheduledTransaction[]> {
   try {
-    const result = await fcl.query({
-      cadence: FORTE_SCRIPTS.getScheduledTransactions,
-      args: (arg, t) => [arg(accountAddress, t.Address)],
+    console.log("📋 Fetching scheduled transactions (Demo Mode)", {
+      accountAddress,
     });
 
-    return result || [];
+    // Get from localStorage for demo - use specific user's data
+    if (typeof window !== "undefined") {
+      const storageKey = `forte_scheduled_actions_${accountAddress}`;
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const actions: ScheduledTransaction[] = JSON.parse(stored);
+        // Update status of expired actions
+        const updated = actions.map((action) => {
+          if (action.status === "PENDING" && action.executeAt < Date.now()) {
+            return { ...action, status: "EXECUTED" as const };
+          }
+          return action;
+        });
+
+        // Save updated statuses
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      }
+    }
+
+    return [];
   } catch (error) {
     console.error("Error fetching scheduled transactions:", error);
     return [];
@@ -410,16 +505,37 @@ export async function getScheduledTransactions(accountAddress: string): Promise<
 }
 
 /**
- * Get the status of a Flow Action
+ * Get the status of a Flow Action (Demo Version)
  */
 export async function getActionStatus(actionId: string): Promise<any> {
   try {
-    const result = await fcl.query({
-      cadence: FORTE_SCRIPTS.getActionStatus,
-      args: (arg, t) => [arg(actionId, t.String)],
-    });
+    console.log("🔍 Fetching action status (Demo Mode)", { actionId });
 
-    return result;
+    // Get from localStorage for demo - check all users' data
+    if (typeof window !== "undefined") {
+      const currentUser = localStorage.getItem("forte_current_user");
+      const storageKey = currentUser
+        ? `forte_scheduled_actions_${currentUser}`
+        : "forte_scheduled_actions";
+
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const actions: ScheduledTransaction[] = JSON.parse(stored);
+        const action = actions.find((a) => a.id === actionId);
+
+        if (action) {
+          return {
+            id: action.id,
+            status: action.status,
+            executeAt: action.executeAt,
+            createdAt: action.createdAt,
+            action: action.action,
+          };
+        }
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error("Error fetching action status:", error);
     return null;
@@ -427,48 +543,50 @@ export async function getActionStatus(actionId: string): Promise<any> {
 }
 
 /**
- * Cancel a scheduled transaction
+ * Cancel a scheduled transaction (Demo Version)
  */
-export async function cancelScheduledTransaction(actionId: string): Promise<FlowActionResult> {
+export async function cancelScheduledTransaction(
+  actionId: string,
+): Promise<FlowActionResult> {
   try {
-    const addresses = getForteAddresses();
-
-    const transaction = `
-      import DeFiActions from ${addresses.DeFiActions}
-
-      transaction(actionId: String) {
-        let scheduler: &DeFiActions.ActionScheduler
-
-        prepare(signer: AuthAccount) {
-          self.scheduler = signer.borrow<&DeFiActions.ActionScheduler>(
-            from: /storage/ActionScheduler
-          ) ?? panic("Could not borrow ActionScheduler")
-        }
-
-        execute {
-          self.scheduler.cancelAction(id: actionId)
-        }
-      }
-    `;
-
-    const authorization = fcl.currentUser().authorization;
-    const txId = await fcl.mutate({
-      cadence: transaction,
-      args: (arg, t) => [arg(actionId, t.String)],
-      proposer: authorization,
-      payer: authorization,
-      authorizations: [authorization],
-      limit: 1000,
+    console.log("🚫 Cancelling scheduled transaction (Demo Mode)", {
+      actionId,
     });
 
-    const result = await fcl.tx(txId).onceSealed();
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Update in localStorage for demo - use current user's data
+    if (typeof window !== "undefined") {
+      const currentUser = localStorage.getItem("forte_current_user");
+      const storageKey = currentUser
+        ? `forte_scheduled_actions_${currentUser}`
+        : "forte_scheduled_actions";
+
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const actions: ScheduledTransaction[] = JSON.parse(stored);
+        const updatedActions = actions.map((action) =>
+          action.id === actionId
+            ? { ...action, status: "CANCELLED" as const }
+            : action,
+        );
+
+        localStorage.setItem(storageKey, JSON.stringify(updatedActions));
+      }
+    }
+
+    const mockTxId = `cancel_${actionId}_${Date.now()}`;
+
+    console.log("✅ Scheduled transaction cancelled successfully (Demo)");
 
     return {
-      success: result.status === 4,
-      transactionId: txId,
-      error: result.status !== 4 ? "Transaction failed" : undefined,
+      success: true,
+      transactionId: mockTxId,
+      error: undefined,
     };
   } catch (error) {
+    console.error("❌ Transaction cancellation failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -492,10 +610,72 @@ export function createBetConditions(options: {
 
   if (options.minOdds) conditions.minOdds = options.minOdds;
   if (options.maxOdds) conditions.maxOdds = options.maxOdds;
-  if (options.priceThreshold) conditions.priceThreshold = options.priceThreshold;
+  if (options.priceThreshold)
+    conditions.priceThreshold = options.priceThreshold;
   if (options.timeWindow) conditions.timeWindow = options.timeWindow;
 
   return conditions;
+}
+
+/**
+ * Reset all demo data (Demo Mode Only)
+ */
+export function resetForteDemo(userAddress?: string): void {
+  if (typeof window !== "undefined") {
+    if (userAddress) {
+      // Reset specific user's data
+      localStorage.removeItem(`forte_actions_initialized_${userAddress}`);
+      localStorage.removeItem(`forte_actions_tx_id_${userAddress}`);
+      localStorage.removeItem(`forte_scheduled_actions_${userAddress}`);
+      console.log("🧹 Forte demo data reset for user:", userAddress);
+    } else {
+      // Reset current user's data
+      const currentUser = localStorage.getItem("forte_current_user");
+      if (currentUser) {
+        localStorage.removeItem(`forte_actions_initialized_${currentUser}`);
+        localStorage.removeItem(`forte_actions_tx_id_${currentUser}`);
+        localStorage.removeItem(`forte_scheduled_actions_${currentUser}`);
+      }
+      // Also remove legacy keys
+      localStorage.removeItem("forte_actions_initialized");
+      localStorage.removeItem("forte_actions_tx_id");
+      localStorage.removeItem("forte_scheduled_actions");
+      localStorage.removeItem("forte_current_user");
+      console.log("🧹 Forte demo data reset");
+    }
+  }
+}
+
+/**
+ * Get demo statistics (Demo Mode Only)
+ */
+export function getForteDemo(userAddress?: string): {
+  isInitialized: boolean;
+  scheduledActionsCount: number;
+  actionsData: ScheduledTransaction[];
+  userAddress?: string;
+} {
+  if (typeof window === "undefined") {
+    return { isInitialized: false, scheduledActionsCount: 0, actionsData: [] };
+  }
+
+  const currentUser = userAddress || localStorage.getItem("forte_current_user");
+  const isInitialized = currentUser
+    ? localStorage.getItem(`forte_actions_initialized_${currentUser}`) ===
+      "true"
+    : localStorage.getItem("forte_actions_initialized") === "true";
+
+  const storageKey = currentUser
+    ? `forte_scheduled_actions_${currentUser}`
+    : "forte_scheduled_actions";
+  const actionsData = JSON.parse(localStorage.getItem(storageKey) || "[]");
+
+  return {
+    isInitialized,
+    scheduledActionsCount: actionsData.length,
+    actionsData,
+    userAddress: currentUser || undefined,
+  };
 }
 
 export default {
@@ -510,4 +690,6 @@ export default {
   cancelScheduledTransaction,
   timestampToUFix64,
   createBetConditions,
+  resetForteDemo,
+  getForteDemo,
 };

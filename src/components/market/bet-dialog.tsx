@@ -693,9 +693,16 @@ export function BetDialog({
                       <Alert className="mt-2">
                         <Info className="h-4 w-4" />
                         <AlertDescription className="flex items-center justify-between">
-                          <span>
-                            Initialize Forte Actions to use automation features
-                          </span>
+                          <div>
+                            <span>
+                              Initialize Forte Actions to use automation
+                              features
+                            </span>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              🧪 Demo Mode - All automation features work with
+                              mock transactions
+                            </div>
+                          </div>
                           <Button
                             size="sm"
                             onClick={initializeForte}
@@ -710,6 +717,13 @@ export function BetDialog({
                           </Button>
                         </AlertDescription>
                       </Alert>
+                    )}
+
+                    {forteInitialized && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        🧪 Demo Mode Active - Automation features are working
+                        with mock transactions
+                      </div>
                     )}
 
                     <TabsContent value="immediate" className="space-y-4 mt-4">

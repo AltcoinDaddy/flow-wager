@@ -1,12 +1,18 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
+import React, { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import {
   Zap,
   Clock,
@@ -25,74 +31,106 @@ import {
   Lightbulb,
   Rocket,
   Bot,
-  Activity
-} from 'lucide-react';
-import { ScheduledTransactionsPanel } from '@/components/forte/ScheduledTransactionsPanel';
-import { ConditionalBetDialog } from '@/components/forte/ConditionalBetDialog';
-import { useForteActions } from '@/hooks/useForteActions';
-import { useAuth } from '@/providers/auth-provider';
+  Activity,
+} from "lucide-react";
+import { ScheduledTransactionsPanel } from "@/components/forte/ScheduledTransactionsPanel";
+import { ConditionalBetDialog } from "@/components/forte/ConditionalBetDialog";
+import { useForteActions } from "@/hooks/useForteActions";
+import { useAuth } from "@/providers/auth-provider";
+import { ForteStatusDebug } from "@/components/debug/ForteStatusDebug";
+import { UserAutomationSummary } from "@/components/forte/UserAutomationSummary";
 
 export default function FortePage() {
   const { user } = useAuth();
   const { isInitialized, isLoading, scheduledTransactions } = useForteActions();
-  const [showConditionalBetDialog, setShowConditionalBetDialog] = useState(false);
+  const [showConditionalBetDialog, setShowConditionalBetDialog] =
+    useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   const features = [
     {
       icon: <Bot className="h-8 w-8 text-blue-500" />,
       title: "Automated Betting",
-      description: "Set conditions and let smart contracts place bets automatically when criteria are met",
-      benefits: ["Time-based execution", "Price threshold triggers", "Odds-based conditions", "Risk management"],
-      status: "Available"
+      description:
+        "Set conditions and let smart contracts place bets automatically when criteria are met",
+      benefits: [
+        "Time-based execution",
+        "Price threshold triggers",
+        "Odds-based conditions",
+        "Risk management",
+      ],
+      status: "Available",
     },
     {
       icon: <Clock className="h-8 w-8 text-green-500" />,
       title: "Scheduled Transactions",
-      description: "Schedule market resolutions and payouts to execute at specific times",
-      benefits: ["Automated market closure", "Time-locked payouts", "Recurring actions", "Blockchain cron jobs"],
-      status: "Available"
+      description:
+        "Schedule market resolutions and payouts to execute at specific times",
+      benefits: [
+        "Automated market closure",
+        "Time-locked payouts",
+        "Recurring actions",
+        "Blockchain cron jobs",
+      ],
+      status: "Available",
     },
     {
       icon: <Target className="h-8 w-8 text-purple-500" />,
       title: "Oracle Integration",
-      description: "Resolve markets automatically using real-world data from price oracles",
-      benefits: ["Real-time price feeds", "Automated resolution", "Trustless execution", "Multi-source data"],
-      status: "Available"
+      description:
+        "Resolve markets automatically using real-world data from price oracles",
+      benefits: [
+        "Real-time price feeds",
+        "Automated resolution",
+        "Trustless execution",
+        "Multi-source data",
+      ],
+      status: "Available",
     },
     {
       icon: <TrendingUp className="h-8 w-8 text-orange-500" />,
       title: "DeFi Composability",
-      description: "Combine betting with other DeFi protocols for advanced strategies",
-      benefits: ["Yield farming integration", "Liquidity provision", "Cross-protocol actions", "Complex workflows"],
-      status: "Coming Soon"
-    }
+      description:
+        "Combine betting with other DeFi protocols for advanced strategies",
+      benefits: [
+        "Yield farming integration",
+        "Liquidity provision",
+        "Cross-protocol actions",
+        "Complex workflows",
+      ],
+      status: "Coming Soon",
+    },
   ];
 
   const useCases = [
     {
       title: "Dollar Cost Averaging Bets",
-      description: "Automatically place small bets over time to average out market volatility",
+      description:
+        "Automatically place small bets over time to average out market volatility",
       icon: <BarChart3 className="h-6 w-6" />,
-      complexity: "Medium"
+      complexity: "Medium",
     },
     {
       title: "Price Target Betting",
-      description: "Bet on cryptocurrency prices reaching specific targets using oracle data",
+      description:
+        "Bet on cryptocurrency prices reaching specific targets using oracle data",
       icon: <Target className="h-6 w-6" />,
-      complexity: "Easy"
+      complexity: "Easy",
     },
     {
       title: "Event-Driven Wagering",
-      description: "Create markets that automatically resolve based on external events",
+      description:
+        "Create markets that automatically resolve based on external events",
       icon: <Calendar className="h-6 w-6" />,
-      complexity: "Advanced"
+      complexity: "Advanced",
     },
     {
       title: "Risk-Managed Trading",
-      description: "Implement stop-losses and take-profits for your betting strategies",
+      description:
+        "Implement stop-losses and take-profits for your betting strategies",
       icon: <Shield className="h-6 w-6" />,
-      complexity: "Medium"
-    }
+      complexity: "Medium",
+    },
   ];
 
   return (
@@ -104,7 +142,8 @@ export default function FortePage() {
           <h1 className="text-4xl font-bold">Forte Network Features</h1>
         </div>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Advanced automation and DeFi capabilities for Flow Wager powered by the Forte network upgrade
+          Advanced automation and DeFi capabilities for Flow Wager powered by
+          the Forte network upgrade
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -124,24 +163,30 @@ export default function FortePage() {
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Please connect your wallet to access Forte features and create automated transactions.
+            Please connect your wallet to access Forte features and create
+            automated transactions.
           </AlertDescription>
         </Alert>
       ) : !isInitialized ? (
         <Alert>
           <Lightbulb className="h-4 w-4" />
           <AlertDescription>
-            Initialize Forte Actions to start using advanced automation features. This is a one-time setup.
+            Initialize Forte Actions to start using advanced automation
+            features. This is a one-time setup.
           </AlertDescription>
         </Alert>
       ) : (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertDescription>
-            Forte Actions initialized! You can now create automated transactions and scheduled actions.
+            Forte Actions initialized! You can now create automated transactions
+            and scheduled actions.
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Personal Automation Summary */}
+      {user?.addr && <UserAutomationSummary className="mt-6" />}
 
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
@@ -166,21 +211,27 @@ export default function FortePage() {
                     <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                     <div>
                       <p className="font-medium">Flow Actions</p>
-                      <p className="text-sm text-muted-foreground">Composable DeFi workflow automation</p>
+                      <p className="text-sm text-muted-foreground">
+                        Composable DeFi workflow automation
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                     <div>
                       <p className="font-medium">Scheduled Transactions</p>
-                      <p className="text-sm text-muted-foreground">Time-based smart contract execution</p>
+                      <p className="text-sm text-muted-foreground">
+                        Time-based smart contract execution
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                     <div>
                       <p className="font-medium">Enhanced Composability</p>
-                      <p className="text-sm text-muted-foreground">Complex interconnected applications</p>
+                      <p className="text-sm text-muted-foreground">
+                        Complex interconnected applications
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -204,13 +255,23 @@ export default function FortePage() {
                       </Badge>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Scheduled Actions:</span>
-                      <span className="font-medium">{scheduledTransactions.length}</span>
+                      <span className="text-muted-foreground">
+                        Scheduled Actions:
+                      </span>
+                      <span className="font-medium">
+                        {scheduledTransactions.length}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Active Automations:</span>
+                      <span className="text-muted-foreground">
+                        Active Automations:
+                      </span>
                       <span className="font-medium">
-                        {scheduledTransactions.filter(t => t.status === 'PENDING').length}
+                        {
+                          scheduledTransactions.filter(
+                            (t) => t.status === "PENDING",
+                          ).length
+                        }
                       </span>
                     </div>
                     <Button
@@ -248,7 +309,9 @@ export default function FortePage() {
                   <Bot className="h-8 w-8" />
                   <div className="text-center">
                     <p className="font-medium">Conditional Bet</p>
-                    <p className="text-xs text-muted-foreground">Automate betting with conditions</p>
+                    <p className="text-xs text-muted-foreground">
+                      Automate betting with conditions
+                    </p>
                   </div>
                 </Button>
 
@@ -260,7 +323,9 @@ export default function FortePage() {
                   <Clock className="h-8 w-8" />
                   <div className="text-center">
                     <p className="font-medium">Schedule Resolution</p>
-                    <p className="text-xs text-muted-foreground">Auto-resolve with oracles</p>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-resolve with oracles
+                    </p>
                   </div>
                 </Button>
 
@@ -272,7 +337,9 @@ export default function FortePage() {
                   <TrendingUp className="h-8 w-8" />
                   <div className="text-center">
                     <p className="font-medium">Auto Payouts</p>
-                    <p className="text-xs text-muted-foreground">Automated distribution</p>
+                    <p className="text-xs text-muted-foreground">
+                      Automated distribution
+                    </p>
                   </div>
                 </Button>
               </div>
@@ -290,7 +357,11 @@ export default function FortePage() {
                       {feature.icon}
                       <CardTitle className="text-lg">{feature.title}</CardTitle>
                     </div>
-                    <Badge variant={feature.status === 'Available' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={
+                        feature.status === "Available" ? "default" : "secondary"
+                      }
+                    >
                       {feature.status}
                     </Badge>
                   </div>
@@ -334,7 +405,8 @@ export default function FortePage() {
             <CardHeader>
               <CardTitle>Use Case Examples</CardTitle>
               <CardDescription>
-                Real-world scenarios where Forte automation can enhance your wagering experience
+                Real-world scenarios where Forte automation can enhance your
+                wagering experience
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -345,7 +417,9 @@ export default function FortePage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {useCase.icon}
-                          <CardTitle className="text-base">{useCase.title}</CardTitle>
+                          <CardTitle className="text-base">
+                            {useCase.title}
+                          </CardTitle>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           {useCase.complexity}
@@ -377,7 +451,7 @@ export default function FortePage() {
             <CardContent>
               <div className="bg-muted p-4 rounded-lg">
                 <pre className="text-sm overflow-x-auto">
-{`// Example: Create a conditional bet
+                  {`// Example: Create a conditional bet
 import { useForteActions } from '@/hooks/useForteActions';
 
 const { createConditionalBet } = useForteActions();
@@ -407,6 +481,30 @@ const handleConditionalBet = async () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Debug Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>System Status & Debug</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDebug(!showDebug)}
+            >
+              {showDebug ? "Hide Debug" : "Show Debug"}
+            </Button>
+          </div>
+          <CardDescription>
+            Check current Forte Actions status and troubleshoot issues
+          </CardDescription>
+        </CardHeader>
+        {showDebug && (
+          <CardContent>
+            <ForteStatusDebug />
+          </CardContent>
+        )}
+      </Card>
 
       {/* Conditional Bet Dialog */}
       <ConditionalBetDialog
