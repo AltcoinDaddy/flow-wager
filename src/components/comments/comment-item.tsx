@@ -1,4 +1,4 @@
-// src/components/comments/comment-item.tsx - Mobile-friendly version
+
 "use client";
 
 import { useState } from "react";

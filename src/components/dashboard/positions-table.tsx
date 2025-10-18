@@ -210,7 +210,7 @@ export function PositionsTable({
     loadData();
   }, [targetUserAddress, propPositions]);
 
-  // Enhanced position filtering and sorting
+  
   const filteredPositions = positions
     .filter(position => {
       // Find associated market data

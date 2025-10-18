@@ -21,7 +21,7 @@ export const OwnerOnly: React.FC<OwnerOnlyProps> = ({
   const { user } = useAuth();
   const { isOwner, isLoading, error, contractAddress, userAddress } = useContractOwner();
 
-  // Debug info for development
+  
   if (showDebugInfo && process.env.NODE_ENV === 'development') {
     console.log("OwnerOnly Debug:", {
       userLoggedIn: user?.loggedIn,

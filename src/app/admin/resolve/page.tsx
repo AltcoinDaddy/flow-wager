@@ -34,13 +34,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, JSX, Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-// Import your Flow Wager scripts
 import {
   getAllMarkets,
   resolveMarketTransaction
 } from '@/lib/flow-wager-scripts';
 
-// Import your existing types
 import type {
   Market
 } from "@/types/market";
@@ -50,10 +48,9 @@ import {
   MarketOutcome
 } from "@/types/market";
 
-// Your existing auth hook
 import { useAuth } from "@/providers/auth-provider";
 
-// Resolution form data interface
+
 interface ResolutionData {
   outcome: string;
   evidence: string;
@@ -134,7 +131,7 @@ function AdminResolveContent(): JSX.Element {
     fetchMarkets();
   }, [loggedIn]);
 
-  // Load specific market if ID provided
+  
   useEffect(() => {
     if (marketIdParam && markets.length > 0) {
       const market = markets.find((m: Market) => m.id === marketIdParam);
