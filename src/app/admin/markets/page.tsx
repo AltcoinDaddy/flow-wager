@@ -32,7 +32,6 @@ import {
   Target,
   Activity,
   DollarSign,
-  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as fcl from "@onflow/fcl";
@@ -41,24 +40,19 @@ import flowConfig from "@/lib/flow/config";
 // Import your Flow Wager scripts
 import {
   getAllMarkets,
-  getMarketById,
   getPlatformStats,
   getContractInfo,
 } from "@/lib/flow-wager-scripts";
 
 // Import your existing types
 import type { Market } from "@/types/market";
-import {
-  MarketCategoryLabels,
-  MarketStatus,
-  MarketCategory,
-} from "@/types/market";
+import { MarketCategoryLabels, MarketCategory } from "@/types/market";
 
 // Your existing auth hook
 import { useAuth } from "@/providers/auth-provider";
 
 export default function AdminMarketsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // State management
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -66,17 +60,19 @@ export default function AdminMarketsPage() {
   const [marketsError, setMarketsError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(null);
-  const [platformStats, setPlatformStats] = useState<any>(null);
-  const [contractInfo, setContractInfo] = useState<any>(null);
+  const [platformStats, setPlatformStats] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [contractInfo, setContractInfo] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   // Filter and search state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [selectedMarkets, setSelectedMarkets] = useState<string[]>([]);
-
-  // Simple admin check
-  const isAdmin = isAuthenticated && user?.addr;
 
   // Helper function to convert numeric status to string
   const getStatusName = (status: number): string => {
@@ -225,7 +221,9 @@ export default function AdminMarketsPage() {
       market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       market.creator.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const marketStatusString = getStatusName(typeof market.status === 'number' ? market.status : 0);
+    const marketStatusString = getStatusName(
+      typeof market.status === "number" ? market.status : 0,
+    );
     const matchesStatus =
       statusFilter === "all" || marketStatusString === statusFilter;
 
@@ -238,17 +236,31 @@ export default function AdminMarketsPage() {
   // Calculate summary stats
   const summaryStats = {
     total: markets.length,
-    active: markets.filter((m) => getStatusName(typeof m.status === 'number' ? m.status : 0) === "Active").length,
-    resolved: markets.filter((m) => getStatusName(typeof m.status === 'number' ? m.status : 0) === "Resolved").length,
-    cancelled: markets.filter((m) => getStatusName(typeof m.status === 'number' ? m.status : 0) === "Cancelled").length,
+    active: markets.filter(
+      (m) =>
+        getStatusName(typeof m.status === "number" ? m.status : 0) === "Active",
+    ).length,
+    resolved: markets.filter(
+      (m) =>
+        getStatusName(typeof m.status === "number" ? m.status : 0) ===
+        "Resolved",
+    ).length,
+    cancelled: markets.filter(
+      (m) =>
+        getStatusName(typeof m.status === "number" ? m.status : 0) ===
+        "Cancelled",
+    ).length,
     totalVolume: markets.reduce(
       (sum, m) => sum + parseFloat(m.totalPool || "0"),
-      0
+      0,
     ),
     pendingResolution: markets.filter((m) => {
       const now = Date.now() / 1000;
       const endTime = parseFloat(m.endTime);
-      return endTime < now && getStatusName(typeof m.status === 'number' ? m.status : 0) === "Active";
+      return (
+        endTime < now &&
+        getStatusName(typeof m.status === "number" ? m.status : 0) === "Active"
+      );
     }).length,
   };
 
@@ -276,8 +288,9 @@ export default function AdminMarketsPage() {
 
   const getStatusBadge = (status: string | number) => {
     // Convert numeric status to string if needed
-    const statusString = typeof status === 'number' ? getStatusName(status) : status;
-    
+    const statusString =
+      typeof status === "number" ? getStatusName(status) : status;
+
     switch (statusString) {
       case "Active":
         return (
@@ -485,12 +498,16 @@ export default function AdminMarketsPage() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <Activity className="h-5 w-5 text-[#9b87f5]" />
-                  <span className="font-medium text-white">Market Operations</span>
+                  <span className="font-medium text-white">
+                    Market Operations
+                  </span>
                 </div>
-                <div className="text-sm text-gray-400">
-                  Live data from contract:{" "}
-                  {process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT}
-                </div>
+                {contractInfo && Object.keys(contractInfo).length > 0 ? (
+                  <div className="text-sm text-gray-400">
+                    Live data from contract:{" "}
+                    {String(process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT)}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex items-center space-x-2">
@@ -519,7 +536,11 @@ export default function AdminMarketsPage() {
                     Resolve Markets
                   </Link>
                 </Button>
-                <Button size="sm" asChild className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white">
+                <Button
+                  size="sm"
+                  asChild
+                  className="bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white"
+                >
                   <Link href="/admin/create">
                     <Plus className="h-4 w-4 mr-2" />
                     Create Market
@@ -622,10 +643,9 @@ export default function AdminMarketsPage() {
                             variant="outline"
                             className="border-gray-600 text-gray-300"
                           >
-                            {
-                              MarketCategoryLabels[market.category as MarketCategory] ||
-                              "Unknown"
-                            }
+                            {MarketCategoryLabels[
+                              market.category as MarketCategory
+                            ] || "Unknown"}
                           </Badge>
                           <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
                             #{market.id}
@@ -695,15 +715,23 @@ export default function AdminMarketsPage() {
                     {/* Market Options */}
                     <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-700">
                       <div className="flex items-center justify-between p-2 bg-green-900/20 border border-green-700/50 rounded">
-                        <span className="text-sm text-green-300">{market.optionA}</span>
+                        <span className="text-sm text-green-300">
+                          {market.optionA}
+                        </span>
                         <span className="text-sm text-green-400">
-                          {parseFloat(market.totalOptionAShares).toLocaleString()}
+                          {parseFloat(
+                            market.totalOptionAShares,
+                          ).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-blue-900/20 border border-blue-700/50 rounded">
-                        <span className="text-sm text-blue-300">{market.optionB}</span>
+                        <span className="text-sm text-blue-300">
+                          {market.optionB}
+                        </span>
                         <span className="text-sm text-blue-400">
-                          {parseFloat(market.totalOptionBShares).toLocaleString()}
+                          {parseFloat(
+                            market.totalOptionBShares,
+                          ).toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -770,7 +798,9 @@ export default function AdminMarketsPage() {
                   {lastAction === "refresh" &&
                     "Refreshing markets from blockchain..."}
                   {lastAction === "export" && "Exporting market data..."}
-                  {lastAction && !["refresh", "export"].includes(lastAction) && "Processing..."}
+                  {lastAction &&
+                    !["refresh", "export"].includes(lastAction) &&
+                    "Processing..."}
                 </span>
               </div>
             </CardContent>

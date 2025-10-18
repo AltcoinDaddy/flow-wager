@@ -34,13 +34,13 @@ export function Header() {
 
             <div className="flex items-center gap-4">
               {/* Automation Summary - Hidden on small screens */}
-              {/* Wallet Button */}
-              <Button
+              <WalletButton />
+              {/*<Button
                 size="lg"
                 className="border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-4 text-lg font-semibold rounded-lg"
               >
                 Coming Soon
-              </Button>
+              </Button>*/}
             </div>
           </div>
         </div>
