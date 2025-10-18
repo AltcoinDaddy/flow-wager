@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { WalletButton } from "./wallet-button";
+import { Button } from "../ui/button";
+// import { UserAutomationSummary } from "../forte/UserAutomationSummary";
 
 export function Header() {
   return (
@@ -29,8 +31,17 @@ export function Header() {
                 </div>
               </Link>
             </div>
-            {/* Wallet Button */}
-            <WalletButton />
+
+            <div className="flex items-center gap-4">
+              {/* Automation Summary - Hidden on small screens */}
+              {/* Wallet Button */}
+              <Button
+                size="lg"
+                className="border-[#9b87f5] text-[#9b87f5] hover:bg-[#9b87f5] hover:text-white px-8 py-4 text-lg font-semibold rounded-lg"
+              >
+                Coming Soon
+              </Button>
+            </div>
           </div>
         </div>
       </div>

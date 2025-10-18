@@ -40,7 +40,6 @@ import {
 import { useAuth } from "@/providers/auth-provider";
 import {
   truncateAddress,
-  formatTime,
   copyToClipboard,
   getFlowscanUrl,
   getAvatarFallback,

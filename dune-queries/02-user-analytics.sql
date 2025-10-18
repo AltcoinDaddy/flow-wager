@@ -1,221 +1,187 @@
+-- Flow Wager User Analytics Query
+-- This query provides comprehensive user statistics for a specific address
+-- Parameters: contract_address, user_address
 
-
-WITH user_bets AS (
-  SELECT
-    JSON_EXTRACT_SCALAR(event_data, '$.bettor') as user_address,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    CAST(JSON_EXTRACT_SCALAR(event_data, '$.amount') AS DECIMAL(18,8)) as bet_amount,
-    JSON_EXTRACT_SCALAR(event_data, '$.option') as bet_option,
-    block_time,
-    tx_hash
-  FROM flow_events
+WITH user_events AS (
+  SELECT *
+  FROM flow.core.fact_events
   WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'BetPlaced'
-    AND JSON_EXTRACT_SCALAR(event_data, '$.bettor') = '{{user_address}}'
+    AND (
+      json_extract_scalar(event_data, '$.bettor') = '{{user_address}}'
+      OR json_extract_scalar(event_data, '$.creator') = '{{user_address}}'
+      OR json_extract_scalar(event_data, '$.winner') = '{{user_address}}'
+    )
 ),
 
-user_market_creations AS (
+user_bets AS (
   SELECT
-    JSON_EXTRACT_SCALAR(event_data, '$.creator') as user_address,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    JSON_EXTRACT_SCALAR(event_data, '$.category') as category,
-    block_time
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'MarketCreated'
-    AND JSON_EXTRACT_SCALAR(event_data, '$.creator') = '{{user_address}}'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.bettor') as bettor,
+    CAST(json_extract_scalar(event_data, '$.amount') AS DOUBLE) as amount,
+    json_extract_scalar(event_data, '$.option') as option,
+    block_time as bet_time
+  FROM user_events
+  WHERE event_type = 'BetPlaced'
+    AND json_extract_scalar(event_data, '$.bettor') = '{{user_address}}'
 ),
 
-market_resolutions AS (
+user_markets_created AS (
   SELECT
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    JSON_EXTRACT_SCALAR(event_data, '$.winningOption') as winning_option,
-    block_time as resolution_time
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'MarketResolved'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.category') as category,
+    json_extract_scalar(event_data, '$.creator') as creator,
+    block_time as created_at
+  FROM user_events
+  WHERE event_type = 'MarketCreated'
+    AND json_extract_scalar(event_data, '$.creator') = '{{user_address}}'
 ),
 
 user_winnings AS (
   SELECT
-    JSON_EXTRACT_SCALAR(event_data, '$.winner') as user_address,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    CAST(JSON_EXTRACT_SCALAR(event_data, '$.amount') AS DECIMAL(18,8)) as winning_amount,
-    block_time
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'WinningsClaimed'
-    AND JSON_EXTRACT_SCALAR(event_data, '$.winner') = '{{user_address}}'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.winner') as winner,
+    CAST(json_extract_scalar(event_data, '$.amount') AS DOUBLE) as amount,
+    block_time as claimed_at
+  FROM user_events
+  WHERE event_type = 'WinningsClaimed'
+    AND json_extract_scalar(event_data, '$.winner') = '{{user_address}}'
 ),
 
-category_names AS (
-  SELECT 0 as category_id, 'Sports' as category_name
-  UNION ALL SELECT 1, 'Entertainment'
-  UNION ALL SELECT 2, 'Technology'
-  UNION ALL SELECT 3, 'Economics'
-  UNION ALL SELECT 4, 'Weather'
-  UNION ALL SELECT 5, 'Crypto'
-  UNION ALL SELECT 6, 'Politics'
-  UNION ALL SELECT 7, 'Breaking News'
-  UNION ALL SELECT 8, 'Other'
-),
-
-user_bet_outcomes AS (
+-- Get market resolutions to determine wins/losses
+market_resolutions AS (
   SELECT
-    ub.user_address,
-    ub.market_id,
-    ub.bet_amount,
-    ub.bet_option,
-    ub.block_time as bet_time,
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.winningOption') as winning_option,
+    block_time as resolved_at
+  FROM flow.core.fact_events
+  WHERE contract_address = '{{contract_address}}'
+    AND event_type = 'MarketResolved'
+),
+
+-- Determine bet outcomes
+bet_outcomes AS (
+  SELECT
+    ub.*,
     mr.winning_option,
+    mr.resolved_at,
     CASE
-      WHEN mr.winning_option = ub.bet_option THEN 'win'
-      WHEN mr.winning_option IS NOT NULL AND mr.winning_option != ub.bet_option THEN 'loss'
+      WHEN mr.winning_option = ub.option THEN 'win'
+      WHEN mr.winning_option IS NOT NULL AND mr.winning_option != ub.option THEN 'loss'
       ELSE 'pending'
     END as outcome,
-    COALESCE(uw.winning_amount, 0) as payout
+    uw.amount as winnings_amount
   FROM user_bets ub
   LEFT JOIN market_resolutions mr ON ub.market_id = mr.market_id
-  LEFT JOIN user_winnings uw ON ub.market_id = uw.market_id AND ub.user_address = uw.user_address
+  LEFT JOIN user_winnings uw ON ub.market_id = uw.market_id
 ),
 
-bet_streaks AS (
+-- Calculate streaks
+bet_sequence AS (
   SELECT
-    user_address,
+    *,
+    ROW_NUMBER() OVER (ORDER BY bet_time) as bet_sequence,
+    LAG(outcome) OVER (ORDER BY bet_time) as prev_outcome
+  FROM bet_outcomes
+  WHERE outcome IN ('win', 'loss')
+),
+
+streak_groups AS (
+  SELECT
+    *,
+    SUM(CASE WHEN outcome != prev_outcome OR prev_outcome IS NULL THEN 1 ELSE 0 END)
+      OVER (ORDER BY bet_sequence) as streak_group
+  FROM bet_sequence
+),
+
+streak_lengths AS (
+  SELECT
+    streak_group,
     outcome,
-    COUNT(*) as streak_length,
-    ROW_NUMBER() OVER (PARTITION BY user_address ORDER BY COUNT(*) DESC) as streak_rank
-  FROM (
-    SELECT
-      user_address,
-      outcome,
-      SUM(CASE WHEN outcome != LAG(outcome) OVER (PARTITION BY user_address ORDER BY bet_time) THEN 1 ELSE 0 END)
-        OVER (PARTITION BY user_address ORDER BY bet_time) as streak_group
-    FROM user_bet_outcomes
-    WHERE outcome IN ('win', 'loss')
-    ORDER BY bet_time
-  ) streak_groups
-  WHERE outcome = 'win'
-  GROUP BY user_address, outcome, streak_group
+    COUNT(*) as streak_length
+  FROM streak_groups
+  GROUP BY streak_group, outcome
 ),
 
-user_category_preferences AS (
+-- Category preferences
+category_preferences AS (
   SELECT
-    umc.user_address,
-    cn.category_name,
-    COUNT(*) as markets_in_category,
-    ROW_NUMBER() OVER (PARTITION BY umc.user_address ORDER BY COUNT(*) DESC) as category_rank
-  FROM user_market_creations umc
-  LEFT JOIN category_names cn ON CAST(umc.category AS INTEGER) = cn.category_id
-  GROUP BY umc.user_address, cn.category_name
-),
-
-betting_category_preferences AS (
-  SELECT
-    ub.user_address,
-    cn.category_name,
-    COUNT(*) as bets_in_category,
-    SUM(ub.bet_amount) as volume_in_category,
-    ROW_NUMBER() OVER (PARTITION BY ub.user_address ORDER BY COUNT(*) DESC) as bet_category_rank
+    COALESCE(umc.category, 'Unknown') as category,
+    COUNT(*) as bet_count,
+    SUM(ub.amount) as total_volume
   FROM user_bets ub
-  LEFT JOIN (
-    SELECT
-      JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-      JSON_EXTRACT_SCALAR(event_data, '$.category') as category
-    FROM flow_events
-    WHERE contract_address = '{{contract_address}}'
-      AND event_type = 'MarketCreated'
-  ) mc ON ub.market_id = mc.market_id
-  LEFT JOIN category_names cn ON CAST(mc.category AS INTEGER) = cn.category_id
-  GROUP BY ub.user_address, cn.category_name
+  LEFT JOIN flow.core.fact_events fe ON
+    fe.contract_address = '{{contract_address}}'
+    AND fe.event_type = 'MarketCreated'
+    AND json_extract_scalar(fe.event_data, '$.marketId') = ub.market_id
+  LEFT JOIN user_markets_created umc ON ub.market_id = umc.market_id
+  GROUP BY umc.category
 ),
 
-user_rankings AS (
+-- User ranking calculation
+all_users_stats AS (
+  SELECT
+    json_extract_scalar(event_data, '$.bettor') as user_address,
+    COUNT(*) as total_bets,
+    SUM(CAST(json_extract_scalar(event_data, '$.amount') AS DOUBLE)) as total_volume
+  FROM flow.core.fact_events
+  WHERE contract_address = '{{contract_address}}'
+    AND event_type = 'BetPlaced'
+  GROUP BY json_extract_scalar(event_data, '$.bettor')
+),
+
+user_ranking AS (
   SELECT
     user_address,
-    total_winnings - total_bets as net_profit,
-    ROW_NUMBER() OVER (ORDER BY (total_winnings - total_bets) DESC) as profit_rank
-  FROM (
-    SELECT
-      ub.user_address,
-      SUM(ub.bet_amount) as total_bets,
-      SUM(ub.payout) as total_winnings
-    FROM user_bet_outcomes ub
-    GROUP BY ub.user_address
-  ) user_totals
+    total_volume,
+    ROW_NUMBER() OVER (ORDER BY total_volume DESC) as rank
+  FROM all_users_stats
 )
 
 -- Main user analytics query
 SELECT
   '{{user_address}}' as user_id,
 
-  -- Betting Statistics
-  COUNT(DISTINCT ubo.market_id) as total_bets,
-  COALESCE(SUM(ubo.bet_amount), 0) as total_volume,
-  COALESCE(AVG(ubo.bet_amount), 0) as avg_bet_size,
-
-  -- Win/Loss Statistics
-  COUNT(CASE WHEN ubo.outcome = 'win' THEN 1 END) as total_wins,
-  COUNT(CASE WHEN ubo.outcome = 'loss' THEN 1 END) as total_losses,
+  -- Betting statistics
+  COUNT(ub.market_id) as total_bets,
+  COALESCE(SUM(ub.amount), 0) as total_volume,
   CASE
-    WHEN COUNT(CASE WHEN outcome IN ('win', 'loss') THEN 1 END) > 0
-    THEN CAST(COUNT(CASE WHEN outcome = 'win' THEN 1 END) AS DOUBLE) /
-         CAST(COUNT(CASE WHEN outcome IN ('win', 'loss') THEN 1 END) AS DOUBLE)
-    ELSE 0.0
+    WHEN COUNT(ub.market_id) > 0
+    THEN COALESCE(SUM(ub.amount), 0) / COUNT(ub.market_id)
+    ELSE 0
+  END as avg_bet_size,
+
+  -- Performance metrics
+  CASE
+    WHEN COUNT(CASE WHEN bo.outcome IN ('win', 'loss') THEN 1 END) > 0
+    THEN CAST(COUNT(CASE WHEN bo.outcome = 'win' THEN 1 END) AS DOUBLE) /
+         COUNT(CASE WHEN bo.outcome IN ('win', 'loss') THEN 1 END)
+    ELSE 0
   END as win_rate,
 
-  -- Financial Performance
-  COALESCE(SUM(ubo.payout), 0) as total_winnings,
-  COALESCE(SUM(ubo.payout) - SUM(ubo.bet_amount), 0) as profit_loss,
+  -- Profit/Loss calculation
+  COALESCE(SUM(bo.winnings_amount), 0) - COALESCE(SUM(ub.amount), 0) as profit_loss,
 
-  -- Market Creation
-  COALESCE(
-    (SELECT COUNT(*) FROM user_market_creations WHERE user_address = '{{user_address}}'),
-    0
-  ) as markets_created,
+  -- Market creation
+  COUNT(DISTINCT umc.market_id) as markets_created,
 
-  -- Favorite Category (based on betting activity)
-  COALESCE(
-    (SELECT category_name FROM betting_category_preferences
-     WHERE user_address = '{{user_address}}' AND bet_category_rank = 1),
-    'Unknown'
+  -- Longest winning streak
+  COALESCE(MAX(CASE WHEN sl.outcome = 'win' THEN sl.streak_length END), 0) as longest_streak,
+
+  -- Favorite category
+  (
+    SELECT category
+    FROM category_preferences
+    WHERE category IS NOT NULL
+    ORDER BY bet_count DESC, total_volume DESC
+    LIMIT 1
   ) as favorite_category,
 
-  -- Longest Win Streak
-  COALESCE(
-    (SELECT MAX(streak_length) FROM bet_streaks
-     WHERE user_address = '{{user_address}}' AND outcome = 'win'),
-    0
-  ) as longest_streak,
+  -- User rank
+  COALESCE(ur.rank, 0) as user_rank
 
-  -- User Rank
-  COALESCE(
-    (SELECT profit_rank FROM user_rankings
-     WHERE user_address = '{{user_address}}'),
-    0
-  ) as user_rank
-
-FROM user_bet_outcomes ubo
-WHERE ubo.user_address = '{{user_address}}'
-
-UNION ALL
-
--- Return empty row if user has no activity
-SELECT
-  '{{user_address}}' as user_id,
-  0 as total_bets,
-  0 as total_volume,
-  0 as avg_bet_size,
-  0 as total_wins,
-  0 as total_losses,
-  0 as win_rate,
-  0 as total_winnings,
-  0 as profit_loss,
-  0 as markets_created,
-  'Sports' as favorite_category,
-  0 as longest_streak,
-  0 as user_rank
-WHERE NOT EXISTS (
-  SELECT 1 FROM user_bet_outcomes WHERE user_address = '{{user_address}}'
-)
-LIMIT 1;
+FROM user_bets ub
+LEFT JOIN bet_outcomes bo ON ub.market_id = bo.market_id AND ub.bet_time = bo.bet_time
+LEFT JOIN user_markets_created umc ON umc.creator = '{{user_address}}'
+LEFT JOIN streak_lengths sl ON sl.outcome = 'win'
+LEFT JOIN user_ranking ur ON ur.user_address = '{{user_address}}'
+GROUP BY ur.rank;

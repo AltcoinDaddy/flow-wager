@@ -1,138 +1,142 @@
+-- Flow Wager Platform Market Metrics Query
+-- This query provides comprehensive platform statistics for the specified timeframe
+-- Parameters: contract_address, timeframe (7d, 30d, 90d)
 
-WITH market_events AS (
+WITH time_filter AS (
   SELECT
-    block_time,
-    tx_hash,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    JSON_EXTRACT_SCALAR(event_data, '$.question') as question,
-    JSON_EXTRACT_SCALAR(event_data, '$.category') as category,
-    JSON_EXTRACT_SCALAR(event_data, '$.endTime') as end_time,
-    JSON_EXTRACT_SCALAR(event_data, '$.creator') as creator,
-    JSON_EXTRACT_SCALAR(event_data, '$.minBet') as min_bet,
-    JSON_EXTRACT_SCALAR(event_data, '$.maxBet') as max_bet
-  FROM flow_events
+    CASE
+      WHEN '{{timeframe}}' = '7d' THEN current_date - interval '7' day
+      WHEN '{{timeframe}}' = '30d' THEN current_date - interval '30' day
+      WHEN '{{timeframe}}' = '90d' THEN current_date - interval '90' day
+      ELSE current_date - interval '30' day
+    END as start_date
+),
+
+market_events AS (
+  SELECT *
+  FROM flow.core.fact_events
   WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'MarketCreated'
-    AND block_time >= CURRENT_DATE - INTERVAL '{{timeframe}}'
+    AND block_time >= (SELECT start_date FROM time_filter)
 ),
 
-bet_events AS (
+markets_created AS (
   SELECT
-    block_time,
-    tx_hash,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    JSON_EXTRACT_SCALAR(event_data, '$.bettor') as bettor,
-    CAST(JSON_EXTRACT_SCALAR(event_data, '$.amount') AS DECIMAL(18,8)) as amount,
-    JSON_EXTRACT_SCALAR(event_data, '$.option') as option
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'BetPlaced'
-    AND block_time >= CURRENT_DATE - INTERVAL '{{timeframe}}'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.question') as question,
+    json_extract_scalar(event_data, '$.category') as category,
+    json_extract_scalar(event_data, '$.endTime') as end_time,
+    json_extract_scalar(event_data, '$.creator') as creator,
+    block_time as created_at
+  FROM market_events
+  WHERE event_type = 'MarketCreated'
 ),
 
-resolution_events AS (
+bets_placed AS (
   SELECT
-    block_time,
-    tx_hash,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    JSON_EXTRACT_SCALAR(event_data, '$.winningOption') as winning_option,
-    JSON_EXTRACT_SCALAR(event_data, '$.resolver') as resolver
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'MarketResolved'
-    AND block_time >= CURRENT_DATE - INTERVAL '{{timeframe}}'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.bettor') as bettor,
+    CAST(json_extract_scalar(event_data, '$.amount') AS DOUBLE) as amount,
+    json_extract_scalar(event_data, '$.option') as option,
+    block_time as bet_time
+  FROM market_events
+  WHERE event_type = 'BetPlaced'
 ),
 
-fee_events AS (
+markets_resolved AS (
   SELECT
-    block_time,
-    tx_hash,
-    JSON_EXTRACT_SCALAR(event_data, '$.marketId') as market_id,
-    CAST(JSON_EXTRACT_SCALAR(event_data, '$.amount') AS DECIMAL(18,8)) as fee_amount
-  FROM flow_events
-  WHERE contract_address = '{{contract_address}}'
-    AND event_type = 'FeeCollected'
-    AND block_time >= CURRENT_DATE - INTERVAL '{{timeframe}}'
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    json_extract_scalar(event_data, '$.winningOption') as winning_option,
+    json_extract_scalar(event_data, '$.resolver') as resolver,
+    block_time as resolved_at
+  FROM market_events
+  WHERE event_type = 'MarketResolved'
 ),
 
-category_names AS (
-  SELECT 0 as category_id, 'Sports' as category_name
-  UNION ALL SELECT 1, 'Entertainment'
-  UNION ALL SELECT 2, 'Technology'
-  UNION ALL SELECT 3, 'Economics'
-  UNION ALL SELECT 4, 'Weather'
-  UNION ALL SELECT 5, 'Crypto'
-  UNION ALL SELECT 6, 'Politics'
-  UNION ALL SELECT 7, 'Breaking News'
-  UNION ALL SELECT 8, 'Other'
-),
-
-market_stats AS (
+fees_collected AS (
   SELECT
-    m.market_id,
-    m.question,
-    cn.category_name,
-    COUNT(DISTINCT b.bettor) as unique_bettors,
-    COALESCE(SUM(b.amount), 0) as total_volume,
-    COUNT(b.tx_hash) as total_bets,
-    CASE WHEN r.market_id IS NOT NULL THEN 1 ELSE 0 END as is_resolved,
-    CAST(m.end_time AS DECIMAL) as end_time_unix,
-    CAST(m.end_time AS DOUBLE) - UNIX_TIMESTAMP(m.block_time) as duration_seconds
-  FROM market_events m
-  LEFT JOIN bet_events b ON m.market_id = b.market_id
-  LEFT JOIN resolution_events r ON m.market_id = r.market_id
-  LEFT JOIN category_names cn ON CAST(m.category AS INTEGER) = cn.category_id
-  GROUP BY 1,2,3,4,8,9
+    json_extract_scalar(event_data, '$.marketId') as market_id,
+    CAST(json_extract_scalar(event_data, '$.amount') AS DOUBLE) as fee_amount,
+    block_time as fee_time
+  FROM market_events
+  WHERE event_type = 'FeeCollected'
+),
+
+market_durations AS (
+  SELECT
+    mc.market_id,
+    mc.category,
+    CASE
+      WHEN mr.resolved_at IS NOT NULL AND mc.end_time IS NOT NULL
+      THEN (UNIX_TIMESTAMP(mr.resolved_at) - CAST(mc.end_time AS DOUBLE)) / 3600.0
+      ELSE NULL
+    END as duration_hours
+  FROM markets_created mc
+  LEFT JOIN markets_resolved mr ON mc.market_id = mr.market_id
+),
+
+category_stats AS (
+  SELECT
+    COALESCE(mc.category, 'Unknown') as category,
+    COUNT(DISTINCT mc.market_id) as market_count,
+    COALESCE(SUM(bp.amount), 0) as total_volume,
+    COUNT(DISTINCT bp.bettor) as unique_bettors
+  FROM markets_created mc
+  LEFT JOIN bets_placed bp ON mc.market_id = bp.market_id
+  GROUP BY mc.category
 )
 
--- Main metrics output
+-- Main metrics query
 SELECT
-  COUNT(DISTINCT market_id) as total_markets,
-  COALESCE(SUM(total_volume), 0) as total_volume,
-  COUNT(DISTINCT CASE WHEN total_bets > 0 THEN market_id END) as markets_with_activity,
-  COUNT(DISTINCT CASE WHEN is_resolved = 1 THEN market_id END) as successful_resolutions,
-  AVG(duration_seconds / 3600.0) as avg_duration_hours,
-  (
-    SELECT category_name
-    FROM market_stats
-    GROUP BY category_name
-    ORDER BY COUNT(*) DESC
-    LIMIT 1
-  ) as top_category,
-  COALESCE(
-    (SELECT SUM(fee_amount) FROM fee_events),
-    0
-  ) as total_fees,
-  COUNT(DISTINCT
-    CASE WHEN total_bets > 0
-    THEN (SELECT COUNT(DISTINCT bettor) FROM bet_events WHERE market_id IN (SELECT market_id FROM market_stats))
-    END
-  ) as active_users
+  -- Basic counts
+  COUNT(DISTINCT mc.market_id) as total_markets,
+  COUNT(DISTINCT bp.bettor) as active_users,
+  COUNT(DISTINCT mr.market_id) as successful_resolutions,
 
-FROM market_stats
+  -- Volume metrics
+  COALESCE(SUM(bp.amount), 0) as total_volume,
+  COALESCE(SUM(fc.fee_amount), 0) as total_fees,
+  CASE
+    WHEN COUNT(DISTINCT bp.bettor) > 0
+    THEN COALESCE(SUM(bp.amount), 0) / COUNT(DISTINCT bp.bettor)
+    ELSE 0
+  END as avg_volume_per_user,
+
+  -- Duration metrics
+  AVG(md.duration_hours) as avg_duration,
+
+  -- Success rate
+  CASE
+    WHEN COUNT(DISTINCT mc.market_id) > 0
+    THEN CAST(COUNT(DISTINCT mr.market_id) AS DOUBLE) / COUNT(DISTINCT mc.market_id)
+    ELSE 0
+  END as success_rate,
+
+  -- Top category
+  (
+    SELECT category
+    FROM category_stats
+    ORDER BY total_volume DESC
+    LIMIT 1
+  ) as top_category
+
+FROM markets_created mc
+LEFT JOIN bets_placed bp ON mc.market_id = bp.market_id
+LEFT JOIN markets_resolved mr ON mc.market_id = mr.market_id
+LEFT JOIN fees_collected fc ON mc.market_id = fc.market_id
+LEFT JOIN market_durations md ON mc.market_id = md.market_id
 
 UNION ALL
 
--- Category breakdown
+-- Category breakdown (returned as additional rows)
 SELECT
   NULL as total_markets,
-  NULL as total_volume,
-  NULL as markets_with_activity,
+  NULL as active_users,
   NULL as successful_resolutions,
-  NULL as avg_duration_hours,
-  category_name as top_category,
+  cs.total_volume,
   NULL as total_fees,
-  NULL as active_users
-FROM (
-  SELECT
-    category_name,
-    COUNT(*) as market_count,
-    SUM(total_volume) as category_volume,
-    ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) as rn
-  FROM market_stats
-  WHERE category_name IS NOT NULL
-  GROUP BY category_name
-  ORDER BY market_count DESC
-  LIMIT 10
-) category_stats
-WHERE rn <= 10;
+  NULL as avg_volume_per_user,
+  NULL as avg_duration,
+  NULL as success_rate,
+  cs.category as top_category
+FROM category_stats cs
+ORDER BY cs.total_volume DESC;

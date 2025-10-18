@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { BetDialog } from "@/components/market/bet-dialog";
+import { BetDialog } from "@/components/market/bet-dialog-original";
 import { CommentsSection } from "@/components/comments/comments-section";
 import { CountdownTimer } from "@/components/market/countdown-timer";
 import { MarketError } from "@/components/market/market-error";
