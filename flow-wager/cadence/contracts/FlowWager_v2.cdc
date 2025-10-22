@@ -107,7 +107,8 @@ access(all) contract FlowWagerV2 {
             resolved: Bool,
             winningOption: UInt8?,
             totalPool: UFix64,
-            imageUrl: String
+            imageUrl: String,
+            totalShares: [UFix64]
         ) {
             pre {
                 options.length >= 2: "Must have at least 2 options"
@@ -136,13 +137,7 @@ access(all) contract FlowWagerV2 {
             self.optionCount = UInt8(options.length)
 
             // Initialize total shares array with zeros
-            var sharesArray: [UFix64] = []
-            var i = 0
-            while i < options.length {
-                sharesArray.append(0.0)
-                i = i + 1
-            }
-            self.totalShares = sharesArray
+            self.totalShares = totalShares
         }
     }
 
@@ -599,7 +594,8 @@ access(all) contract FlowWagerV2 {
                 resolved: true,
                 winningOption: winningOptionIndex,
                 totalPool: market.totalPool,
-                imageUrl: market.imageUrl
+                imageUrl: market.imageUrl,
+                totalShares: market.totalShares
             )
 
             FlowWagerV2.markets[marketId] = updatedMarket
@@ -782,6 +778,19 @@ access(all) contract FlowWagerV2 {
         let newMarketVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
         self.marketVaults[marketId] <-! newMarketVault
 
+
+            // --- FIXED ---
+                // We must now create and pass the initial totalShares array,
+                // which will be all zeros.
+                var sharesArray: [UFix64] = []
+                var j = 0
+                while j < options.length {
+                    sharesArray.append(0.0)
+                    j = j + 1
+                }
+
+
+
         let market = Market(
             id: marketId,
             title: title,
@@ -796,7 +805,8 @@ access(all) contract FlowWagerV2 {
             resolved: false,
             winningOption: nil,
             totalPool: 0.0,
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            totalShares: sharesArray
         )
 
         self.markets[marketId] = market
@@ -892,7 +902,8 @@ access(all) contract FlowWagerV2 {
             resolved: false,
             winningOption: nil,
             totalPool: market.totalPool,
-            imageUrl: market.imageUrl
+            imageUrl: market.imageUrl,
+            totalShares: market.totalShares
         )
 
         self.markets[marketId] = updatedMarket
@@ -905,7 +916,12 @@ access(all) contract FlowWagerV2 {
 
     /// Deposits payment into a market vault
     /// Called by transactions when placing bets
-    access(contract) fun depositToMarketVault(marketId: UInt64, vault: @FlowToken.Vault) {
+    access(contract) fun depositToMarketVault(marketId: UInt64, vault: @FlowToken.Vault,
+    // --- FIXED ---
+            // Added parameters to know which shares to update
+            optionIndex: UInt8,
+            betAmount: UFix64
+    ) {
         pre {
             self.marketVaults[marketId] != nil: "Market vault does not exist"
         }
@@ -922,6 +938,14 @@ access(all) contract FlowWagerV2 {
 
         // Update market total pool by creating new Market struct
         if let market = self.markets[marketId] {
+
+        // --- FIXED ---
+                    // Create a new totalShares array by updating the specific index
+                    var newTotalShares = market.totalShares
+                    newTotalShares[Int(optionIndex)] = newTotalShares[Int(optionIndex)] + betAmount
+
+
+
             let updatedMarket = Market(
                 id: market.id,
                 title: market.title,
@@ -936,7 +960,8 @@ access(all) contract FlowWagerV2 {
                 resolved: market.resolved,
                 winningOption: market.winningOption,
                 totalPool: market.totalPool + amount,
-                imageUrl: market.imageUrl
+                imageUrl: market.imageUrl,
+                totalShares: newTotalShares
             )
             self.markets[marketId] = updatedMarket
         }
@@ -1026,30 +1051,45 @@ access(all) contract FlowWagerV2 {
         return false
     }
 
-    /// Calculates winnings for a user in a resolved market
     access(all) fun calculateWinnings(
-        marketId: UInt64,
-        userPosition: UserPosition
-    ): UFix64 {
-        pre {
-            self.markets[marketId] != nil: "Market does not exist"
+            marketId: UInt64,
+            userPosition: UserPosition
+        ): UFix64 {
+            pre {
+                self.markets[marketId] != nil: "Market does not exist"
+            }
+
+            let market = self.markets[marketId]!
+
+            // 1. Check if market is resolved
+            assert(market.resolved, message: "Market is not resolved")
+            assert(market.winningOption != nil, message: "No winning option set")
+
+            // 2. Check if user has already claimed
+            assert(!userPosition.claimed, message: "Winnings already claimed")
+
+            // 3. Get user's winning shares
+            let winningOptionIndex = market.winningOption!
+            let userWinningShares = userPosition.optionShares[Int(winningOptionIndex)]
+
+            // 4. Check if user actually won
+            assert(userWinningShares > 0.0, message: "User did not bet on winning option")
+
+            // 5. Get total winning shares from the (now fixed) market struct
+            let totalWinningShares = market.totalShares[Int(winningOptionIndex)]
+
+            // This should not happen if anyone won, but good to check
+            if totalWinningShares == 0.0 {
+                return 0.0
+            }
+
+            // 6. Calculate payout
+            let fee = self.platformFeePercentage / 100.0
+            let distributablePool = market.totalPool * (1.0 - fee)
+            let payout = (userWinningShares / totalWinningShares) * distributablePool
+
+            return payout
         }
-
-        let market = self.markets[marketId]!
-
-        assert(market.resolved, message: "Market is not resolved")
-        assert(market.winningOption != nil, message: "No winning option set")
-        assert(!userPosition.claimed, message: "Winnings already claimed")
-
-        let winningOptionIndex = market.winningOption!
-        let winningShares = userPosition.optionShares[Int(winningOptionIndex)]
-
-        assert(winningShares > 0.0, message: "User did not bet on winning option")
-
-        // Note: The transaction must calculate total winning shares
-        // This function only validates and returns the user's share amount
-        return winningShares
-    }
 
     /// Marks a position as claimed
     /// Called after winnings are withdrawn

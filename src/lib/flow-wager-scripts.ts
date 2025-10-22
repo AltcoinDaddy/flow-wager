@@ -29,6 +29,14 @@ export const getFungibleTokenAddress = () => {
         "0x9a0766d93b6608b7";
 };
 
+export const getFlowWagerV2Address = () => {
+  const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+  return network === "mainnet"
+    ? process.env.NEXT_PUBLIC_FLOWWAGER_CONTRACT || "0x512a5459cb3a2b20"
+    : process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT ||
+        "0x512a5459cb3a2b20";
+};
+
 const CADENCE_SCRIPTS = {
   getAllPendingMarkets: `
     import FlowWager from ${getFlowWagerAddress()}
