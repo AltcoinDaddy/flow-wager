@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from "react";
 import * as fcl from "@onflow/fcl";
 import { toast } from "sonner";

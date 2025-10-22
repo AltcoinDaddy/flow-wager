@@ -38,11 +38,8 @@ export function Header() {
               {/* Automation Summary - Hidden on small screens */}
               {pathname === "/" ? (
                 <>
-                  <WalletButton />
-                </>
-              ) : (
-                <>
-                  <Button
+                  
+                   <Button
                     size="lg"
                     className="w-full flex items-center justify-center space-x-2"
                     style={{
@@ -53,6 +50,10 @@ export function Header() {
                   >
                     Coming Soon
                   </Button>
+                </>
+              ) : (
+                <>
+                 <WalletButton />
                 </>
               )}
             </div>

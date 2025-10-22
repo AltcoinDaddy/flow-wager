@@ -1,71 +1,36 @@
-import "FlowWager"
+import "FlowWagerV2"
 import "FungibleToken"
 import "FlowToken"
 
-    transaction(marketId: UInt64, option: UInt8, betAmount: UFix64) {
-        let betVault: @FlowToken.Vault
-        let userPositionsCap: Capability<&FlowWager.UserPositions>
-        let signerAddress: Address
+transaction(marketId: UInt64, optionIndex: UInt8, betAmount: UFix64) {
+    let betVault: @FlowToken.Vault
+    let signerAddress: Address
 
-        prepare(signer: auth(Storage, Capabilities, BorrowValue) &Account) {
-            self.signerAddress = signer.address
-            // Borrow FlowToken vault
-            let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-                from: /storage/flowTokenVault
-            ) ?? panic("Could not borrow FlowToken vault")
-            
-            // Withdraw the bet amount
-            self.betVault <- vault.withdraw(amount: betAmount) as! @FlowToken.Vault
+    prepare(signer: auth(Storage, BorrowValue) &Account) {
+        self.signerAddress = signer.address
 
-            // Initialize UserPositions if not present
-            if !signer.storage.check<@FlowWager.UserPositions>(from: FlowWager.UserPositionsStoragePath) {
-                let userPositions <- FlowWager.createUserPositions()
-                signer.storage.save(<-userPositions, to: FlowWager.UserPositionsStoragePath)
-                signer.capabilities.publish(
-                    signer.capabilities.storage.issue<&{FlowWager.UserPositionsPublic}>(FlowWager.UserPositionsStoragePath),
-                    at: FlowWager.UserPositionsPublicPath
-                )
-            }
+        // Borrow and withdraw from user's Flow vault
+        let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+            from: /storage/flowTokenVault
+        ) ?? panic("Could not borrow FlowToken vault")
 
-            // Get UserPositions capability from storage path
-            let storageCap = signer.capabilities.storage.issue<&FlowWager.UserPositions>(FlowWager.UserPositionsStoragePath)
-            self.userPositionsCap = storageCap
-            
-            // Verify UserPositions exists and check position limit
-            let userPositionsRef = signer.storage.borrow<&FlowWager.UserPositions>(
-                from: FlowWager.UserPositionsStoragePath
-            ) ?? panic("User positions resource not found for account")
-            
-            if !userPositionsRef.positions.containsKey(marketId) {
-                assert(
-                    UInt64(userPositionsRef.positions.length) < FlowWager.maxPositionsPerUser,
-                    message: "User has reached the maximum number of distinct market positions"
-                )
-            }
-        }
+        self.betVault <- vault.withdraw(amount: betAmount) as! @FlowToken.Vault
 
-        execute {
-            // Create new position
-            let newPosition = FlowWager.UserPosition(
-                marketId: marketId,
-                optionAShares: option == FlowWager.MarketOutcome.OptionA.rawValue ? betAmount : 0.0,
-                optionBShares: option == FlowWager.MarketOutcome.OptionB.rawValue ? betAmount : 0.0,
-                totalInvested: betAmount,
-                claimed: false
+        // Ensure user has UserPositions initialized
+        if !signer.storage.check<@FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath) {
+            let userPositions <- FlowWagerV2.createUserPositions()
+            signer.storage.save(<-userPositions, to: FlowWagerV2.UserPositionsStoragePath)
+
+            let userPositionsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserPositionsPublic}>(
+                FlowWagerV2.UserPositionsStoragePath
             )
-
-            // Call placeBet with capability and position
-            FlowWager.placeBet(
-                userAddress: self.signerAddress,
-                marketId: marketId,
-                option: option,
-                betVault: <-self.betVault,
-                userPositionsCap: self.userPositionsCap,
-                newPosition: newPosition
-            )
-
-            log("Bet placed successfully on market ".concat(marketId.toString()))
-            log("Bet amount: ".concat(betAmount.toString()).concat(" FLOW"))
-            log("Option selected: ".concat(option.toString()))
+            signer.capabilities.publish(userPositionsCap, at: FlowWagerV2.UserPositionsPublicPath)
         }
     }
+
+    execute {
+        // This requires a public placeBet function in FlowWagerV2
+        // Currently not exposed in the contract
+        panic("placeBet function not available - requires contract update")
+    }
+}

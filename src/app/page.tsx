@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Zap, TrendingUp, Users, Shield } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function HomePage() {
+  const pathname = usePathname();
   return (
     <div className="min-h-screen bg-gradient-to-r from-[#0A0C14] via-[#1A1F2C] to-[#0A0C14]">
       {/* Hero Section */}

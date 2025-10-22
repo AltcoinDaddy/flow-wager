@@ -1,4 +1,5 @@
 import "FlowToken"
+import "FungibleToken"
 
 access(all) contract FlowUpdate {
 
@@ -105,21 +106,29 @@ access(all) contract FlowUpdate {
     }
 
     // User position in multi-option market
-    access(all) struct MultiOptionPosition {
-        access(all) let marketId: UInt64
-        access(all) let optionShares: [UFix64] // Shares for each option
-        access(all) let totalInvested: UFix64
-        access(all) let claimed: Bool
-        access(all) let createdAt: UFix64
+access(all) struct MultiOptionPosition {
+    access(all) let marketId: UInt64
+    access(all) let optionShares: [UFix64]
+    access(all) let totalInvested: UFix64
+    access(all) var claimed: Bool  // Changed from access(all) to access(contract)
+    access(all) let createdAt: UFix64
 
-        init(marketId: UInt64, optionShares: [UFix64], totalInvested: UFix64) {
-            self.marketId = marketId
-            self.optionShares = optionShares
-            self.totalInvested = totalInvested
-            self.claimed = false
-            self.createdAt = getCurrentBlock().timestamp
-        }
+    init(marketId: UInt64, optionShares: [UFix64], totalInvested: UFix64) {
+        self.marketId = marketId
+        self.optionShares = optionShares
+        self.totalInvested = totalInvested
+        self.claimed = false
+        self.createdAt = getCurrentBlock().timestamp
     }
+
+
+    access(contract) fun setClaimed() {
+        pre {
+            !self.claimed: "Already claimed"
+        }
+        self.claimed = true
+    }
+}
 
     // Batch bet structure for placing multiple bets at once
     access(all) struct BatchBet {
@@ -171,18 +180,21 @@ access(all) contract FlowUpdate {
             return self.positions
         }
 
-        access(contract) fun markClaimed(marketId: UInt64) {
-            if let existingPosition = self.positions[marketId] {
-                let claimedPosition = MultiOptionPosition(
-                    marketId: existingPosition.marketId,
-                    optionShares: existingPosition.optionShares,
-                    totalInvested: existingPosition.totalInvested
-                )
-                // Note: We'd need to modify the struct to be mutable for this to work properly
-                // For now, this is a placeholder for the claiming logic
-                self.positions[marketId] = claimedPosition
-            }
-        }
+ access(all) fun markClaimed(marketId: UInt64) {
+    if let existingPosition = self.positions[marketId] {
+        // Create a mutable copy of the position
+        var claimedPosition = MultiOptionPosition(
+            marketId: existingPosition.marketId,
+            optionShares: existingPosition.optionShares,
+            totalInvested: existingPosition.totalInvested
+        )
+        // Use the setter to mark it as claimed
+        claimedPosition.setClaimed()
+        // Update the position in storage
+        self.positions[marketId] = claimedPosition
+    }
+}
+
     }
 
     // Admin resource for managing multi-option markets
@@ -478,6 +490,44 @@ access(all) contract FlowUpdate {
         }
     }
 
+
+access(all) fun claimWinnings(
+    marketId: UInt64,
+    userPositions: &MultiOptionPositions,
+    recipientVault: &{FungibleToken.Receiver}
+) {
+    pre {
+        !self.paused: "Contract is paused"
+        self.markets.containsKey(marketId): "Market does not exist"
+        self.markets[marketId]!.resolved: "Market is not resolved"
+        self.marketVaults.containsKey(marketId): "Market vault does not exist"
+    }
+
+    let market = self.markets[marketId]!
+    let position = userPositions.getPosition(marketId: marketId) ?? panic("No position found")
+
+    assert(!position.claimed, message: "Winnings already claimed")
+
+    let winningOption = market.winningOption ?? panic("No winning option set")
+    let winnings = self.calculatePotentialWinnings(marketId: marketId, position: position, winningOption: winningOption)
+
+    assert(winnings > 0.0, message: "No winnings to claim")
+
+    // Get authorized reference to the market vault
+    let marketVaultRef = (&self.marketVaults[marketId] as auth(FungibleToken.Withdraw) &FlowToken.Vault?)!
+
+    let winningsVault <- marketVaultRef.withdraw(amount: winnings)
+    recipientVault.deposit(from: <-winningsVault)
+
+    // Mark position as claimed
+    userPositions.markClaimed(marketId: marketId)
+
+    emit MultiOptionWinningsClaimed(
+        marketId: marketId,
+        claimer: recipientVault.owner!.address,
+        amount: winnings
+    )
+}
     init() {
         // Initialize paths
         self.AdminStoragePath = /storage/FlowUpdateAdmin

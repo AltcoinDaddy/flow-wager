@@ -1,28 +1,9 @@
 import "FlowWagerV2"
 import "FlowToken"
 
-/// Transaction to register a new user in FlowWagerV2
-/// Creates and initializes:
-/// - UserProfile resource (stores user information)
-/// - UserPositions resource (stores user's betting positions)
-/// - UserStatsResource (stores user's statistics)
-///
-/// Pre-conditions validate all input parameters before execution
-///
-/// Parameters:
-/// - username: Unique username (must be 1-50 characters)
-/// - displayName: Display name (must be 1-50 characters)
-/// - bio: User biography (max 500 characters)
-/// - profileImageUrl: URL to user's profile image (max 500 characters)
-
 transaction(username: String, displayName: String, bio: String, profileImageUrl: String) {
-
-
     prepare(signer: auth(BorrowValue, SaveValue, PublishCapability, StorageCapabilities) &Account) {
-
-        // ==========================================
-        // STEP 1: Register user in contract
-        // ==========================================
+        // Register user in contract
         FlowWagerV2.registerUser(
             userAddress: signer.address,
             username: username,
@@ -31,9 +12,7 @@ transaction(username: String, displayName: String, bio: String, profileImageUrl:
             profileImageUrl: profileImageUrl
         )
 
-        // ==========================================
-        // STEP 2: Create and save UserProfile resource
-        // ==========================================
+        // Create and save UserProfile resource
         let userProfile <- FlowWagerV2.createUserProfile(
             userAddress: signer.address,
             username: username,
@@ -43,31 +22,24 @@ transaction(username: String, displayName: String, bio: String, profileImageUrl:
         )
         signer.storage.save(<-userProfile, to: FlowWagerV2.UserProfileStoragePath)
 
-        // Create and publish UserProfile public capability
         let userProfileCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserProfilePublic}>(
             FlowWagerV2.UserProfileStoragePath
         )
         signer.capabilities.publish(userProfileCap, at: FlowWagerV2.UserProfilePublicPath)
 
-        // ==========================================
-        // STEP 3: Create and save UserPositions resource
-        // ==========================================
+        // Create and save UserPositions resource
         let userPositions <- FlowWagerV2.createUserPositions()
         signer.storage.save(<-userPositions, to: FlowWagerV2.UserPositionsStoragePath)
 
-        // Create and publish UserPositions public capability
         let userPositionsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserPositionsPublic}>(
             FlowWagerV2.UserPositionsStoragePath
         )
         signer.capabilities.publish(userPositionsCap, at: FlowWagerV2.UserPositionsPublicPath)
 
-        // ==========================================
-        // STEP 4: Create and save UserStatsResource
-        // ==========================================
+        // Create and save UserStatsResource
         let userStats <- FlowWagerV2.createUserStatsResource()
         signer.storage.save(<-userStats, to: FlowWagerV2.UserStatsStoragePath)
 
-        // Create and publish UserStats public capability
         let userStatsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserStatsPublic}>(
             FlowWagerV2.UserStatsStoragePath
         )

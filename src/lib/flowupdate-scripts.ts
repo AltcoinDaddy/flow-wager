@@ -248,13 +248,20 @@ export const getMarketQuery = () => `
 `;
 
 /**
- * Get all active markets
+ * Get all active markets - FIXED: Convert dictionary to array
  */
 export const getActiveMarketsQuery = () => `
   import FlowUpdate from ${getFlowUpdateAddress()}
 
   access(all) fun main(): [FlowUpdate.MultiOptionMarket] {
-      return FlowUpdate.getActiveMarkets()
+      let activeMarketsDict = FlowUpdate.getActiveMarkets()
+      var markets: [FlowUpdate.MultiOptionMarket] = []
+
+      for marketId in activeMarketsDict.keys {
+          markets.append(activeMarketsDict[marketId]!)
+      }
+
+      return markets
   }
 `;
 
@@ -265,7 +272,17 @@ export const getMarketsByCreatorQuery = () => `
   import FlowUpdate from ${getFlowUpdateAddress()}
 
   access(all) fun main(creator: Address): [FlowUpdate.MultiOptionMarket] {
-      return FlowUpdate.getMarketsByCreator(creator: creator)
+      let allMarketsDict = FlowUpdate.getActiveMarkets()
+      var creatorMarkets: [FlowUpdate.MultiOptionMarket] = []
+
+      for marketId in allMarketsDict.keys {
+          let market = allMarketsDict[marketId]!
+          if market.creator == creator {
+              creatorMarkets.append(market)
+          }
+      }
+
+      return creatorMarkets
   }
 `;
 
@@ -311,12 +328,12 @@ export const getClaimableWinningsQuery = () => `
 `;
 
 /**
- * Get contract statistics
+ * Get contract statistics - FIXED: Return {String: AnyStruct} not FlowUpdate.ContractStats
  */
 export const getContractStatsQuery = () => `
   import FlowUpdate from ${getFlowUpdateAddress()}
 
-  access(all) fun main(): FlowUpdate.ContractStats {
+  access(all) fun main(): {String: AnyStruct} {
       return FlowUpdate.getContractStats()
   }
 `;
@@ -376,6 +393,45 @@ export const getMarketPoolQuery = () => `
   }
 `;
 
+export const getPlatformStats = () => `
+  import FlowUpdate from ${getFlowUpdateAddress()}
+
+  // Script to get FlowUpdate contract statistics
+  access(all) fun main(): {String: AnyStruct} {
+      return FlowUpdate.getContractStats()
+  }
+
+  `;
+
+export const getAllMarketsQuery = () => `
+   import FlowUpdate from ${getFlowUpdateAddress()}
+
+  access(all) fun main(): [FlowUpdate.MultiOptionMarket] {
+
+      // Fetch the contract-level statistics to determine the range of market IDs.
+      let stats = FlowUpdate.getContractStats()
+      let nextId = stats["nextMarketId"] as! UInt64? ?? panic("Could not read nextMarketId")
+
+      // Initialize an array to store the market data.
+      let allMarkets: [FlowUpdate.MultiOptionMarket] = []
+
+      // Loop through all possible market IDs.
+      // Market IDs start at 1. The loop continues up to the next available ID.
+      var marketId: UInt64 = 1
+      while marketId < nextId {
+          // Attempt to fetch the market for the current ID.
+          // We use an optional binding  to safely handle cases
+          // where a market might not exist for a given ID, preventing panics.
+          if let market = FlowUpdate.getMarket(marketId: marketId) {
+              allMarkets.append(market)
+          }
+          marketId = marketId + 1
+      }
+
+      return allMarkets
+  }
+  `;
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -395,6 +451,7 @@ export const getScript = (scriptName: string): (() => string) | null => {
     getMarketEvidence: getMarketEvidenceQuery,
     isMarketResolved: isMarketResolvedQuery,
     getMarketPool: getMarketPoolQuery,
+    getMarkets: getAllMarketsQuery,
   };
 
   return scripts[scriptName] || null;
@@ -403,7 +460,9 @@ export const getScript = (scriptName: string): (() => string) | null => {
 /**
  * Get a transaction script by name (for dynamic loading)
  */
-export const getTransaction = (transactionName: string): (() => string) | null => {
+export const getTransaction = (
+  transactionName: string,
+): (() => string) | null => {
   const transactions: { [key: string]: () => string } = {
     createMultiOptionMarket: createMultiOptionMarketTransaction,
     placeBet: placeBetTransaction,

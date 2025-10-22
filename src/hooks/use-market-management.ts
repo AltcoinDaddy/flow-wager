@@ -1,50 +1,91 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client"
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import * as fcl from '@onflow/fcl';
-import flowConfig from '@/lib/flow/config';
-import { Market, MarketCategory, MarketStatus, PlatformStats } from '@/types/market';
-import { 
-  getAllMarkets,
+import { useState, useEffect, useMemo, useCallback } from "react";
+import flowConfig from "@/lib/flow/config";
+import {
+  Market,
+  MarketCategory,
+  MarketStatus,
+  PlatformStats,
+} from "@/types/market";
+import {
+  getAllMarketsQuery as getAllMarkets,
   getPlatformStats,
-} from '@/lib/flow-wager-scripts';
+} from "@/lib/flowupdate-scripts";
+import { useFlowUpdate } from "./useFlowUpdate";
+import * as fcl from "@onflow/fcl";
+import { transformMarketsData } from "@/lib/data/markets";
 
 export function useMarketManagement() {
+  // Initialize Flow configuration
+  const initConfig = useCallback(async () => {
+    try {
+      flowConfig();
+
+      // Debug: Log configuration status
+      console.log("Flow configuration initialized:", {
+        network: process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet",
+        flowWagerContract: process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT,
+        accessNode: process.env.NEXT_PUBLIC_FLOW_ACCESS_API,
+        discoveryWallet: process.env.NEXT_PUBLIC_FLOW_DISCOVERY_WALLET,
+      });
+    } catch (error) {
+      console.error("Failed to initialize Flow configuration:", error);
+      throw error;
+    }
+  }, []);
+
   // State with proper types
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(
+    null,
+  );
 
   // Filter states with proper types - default to 'active' instead of 'all'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('active');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("active");
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'ending' | 'volume' | 'popular'>('newest');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | MarketCategory>('all');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | MarketStatus>('all');
+  const [sortBy, setSortBy] = useState<
+    "newest" | "ending" | "volume" | "popular"
+  >("newest");
+  const [selectedCategory, setSelectedCategory] = useState<
+    "all" | MarketCategory
+  >("all");
+  const [selectedStatus, setSelectedStatus] = useState<"all" | MarketStatus>(
+    "all",
+  );
 
-  // Initialize Flow configuration
-  const initConfig = async () => {
-    try {
-      flowConfig();
-      
-      // Debug: Log configuration status
-      console.log('Flow configuration initialized:', {
-        network: process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet',
-        flowWagerContract: process.env.NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT,
-        accessNode: process.env.NEXT_PUBLIC_FLOW_ACCESS_API,
-        discoveryWallet: process.env.NEXT_PUBLIC_FLOW_DISCOVERY_WALLET
-      });
-    } catch (error) {
-      console.error('Failed to initialize Flow configuration:', error);
-      throw error;
-    }
-  };
+  // Use the FlowUpdate hook for multi-option markets
+  const {
+    activeMarkets: multiOptionMarkets,
+    userMarkets,
+    selectedMarket: flowUpdateSelectedMarket,
+    userPositions,
+    claimableWinnings,
+    stats: contractStats,
+    loading: flowUpdateLoading,
+    error: flowUpdateError,
+    transactionInProgress,
+    fetchActiveMarkets: fetchMultiOptionMarkets,
+    fetchUserMarkets,
+    fetchUserPositions,
+    fetchClaimableWinnings,
+    fetchContractStats,
+    createMarket: createMultiOptionMarket,
+    placeBet,
+    placeBatchBets,
+    resolveMarket,
+    claimWinnings,
+    submitEvidence,
+    refetch: refetchFlowUpdate,
+  } = useFlowUpdate({ autoFetch: false }); // Disable auto-fetch, we'll manage it
 
   // Fetch markets from smart contract
-  const fetchMarkets = async () => {
+  const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -53,78 +94,62 @@ export function useMarketManagement() {
       await initConfig();
 
       // Fetch all markets using your script
-      const getAllMarketsScript = await getAllMarkets();
+      const getAllMarketsScript = getAllMarkets();
       const contractMarkets = await fcl.query({
         cadence: getAllMarketsScript,
       });
 
-      console.log('Raw contract markets:', contractMarkets);
+      const transformedMarkets: Market[] = transformMarketsData(
+        contractMarkets || [],
+      );
 
-      // Transform contract data to Market interface
-      const transformedMarkets: Market[] = contractMarkets?.map((market: any) => ({
-        id: market.id.toString(),
-        title: market.title,
-        description: market.description,
-        category: parseInt(market.category.rawValue),
-        optionA: market.optionA,
-        optionB: market.optionB,
-        creator: market.creator,
-        createdAt: market.createdAt.toString(),
-        endTime: market.endTime.toString(),
-        minBet: market.minBet.toString(),
-        maxBet: market.maxBet.toString(),
-        status: parseInt(market.status.rawValue),
-        outcome: market.outcome ? parseInt(market.outcome.rawValue) : undefined,
-        resolved: market.resolved,
-        totalOptionAShares: market.totalOptionAShares.toString(),
-        totalOptionBShares: market.totalOptionBShares.toString(),
-        totalPool: market.totalPool.toString(),
-        imageUrl: market.imageUrl || ""
-      })) || [];
+      console.log("Transformed markets:", transformedMarkets);
 
-      console.log('Transformed markets:', transformedMarkets);
       setMarkets(transformedMarkets);
 
       // Fetch platform stats using your script
-      const getPlatformStatsScript = await getPlatformStats();
+      const getPlatformStatsScript = getPlatformStats();
       const stats = await fcl.query({
         cadence: getPlatformStatsScript,
       });
 
-      console.log('Raw platform stats:', stats);
+      console.log("Raw platform stats:", stats);
 
       setPlatformStats({
         totalMarkets: parseInt(stats.totalMarkets.toString()),
         activeMarkets: parseInt(stats.activeMarkets.toString()),
         totalUsers: parseInt(stats.totalUsers.toString()),
         totalVolume: stats.totalVolume.toString(),
-        totalFees: stats.totalFees.toString()
+        totalFees: stats.totalFees.toString(),
       });
-
     } catch (err) {
-      console.error('Error fetching markets from smart contract:', err);
-      
+      console.error("Error fetching markets from smart contract:", err);
+
       // Enhanced error handling
       if (err instanceof Error) {
-        if (err.message.includes('accessNode.api')) {
-          setError('Flow network configuration error. Please check environment variables.');
-        } else if (err.message.includes('script not found')) {
-          setError('Contract script error. Please verify contract deployment.');
-        } else if (err.message.includes('location')) {
-          setError('Contract address error. Please check NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT.');
+        if (err.message.includes("accessNode.api")) {
+          setError(
+            "Flow network configuration error. Please check environment variables.",
+          );
+        } else if (err.message.includes("script not found")) {
+          setError("Contract script error. Please verify contract deployment.");
+        } else if (err.message.includes("location")) {
+          setError(
+            "Contract address error. Please check NEXT_PUBLIC_FLOWWAGER_TESTNET_CONTRACT.",
+          );
         } else {
           setError(`Blockchain error: ${err.message}`);
         }
       } else {
-        setError('Failed to fetch markets from blockchain');
+        setError("Failed to fetch markets from blockchain");
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [initConfig]);
 
   // Fetch active markets only (more efficient for dashboard)
-  const fetchActiveMarkets = async () => {
+  const fetchActiveMarkets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -132,43 +157,47 @@ export function useMarketManagement() {
       await initConfig();
 
       // Use getActiveMarkets for better performance if you only need active markets
-      const { getActiveMarkets } = await import('@/lib/flow-wager-scripts');
+      const { getActiveMarkets } = await import("@/lib/flow-wager-scripts");
       const getActiveMarketsScript = await getActiveMarkets();
-      
+
       const contractMarkets = await fcl.query({
         cadence: getActiveMarketsScript,
       });
 
-      const transformedMarkets: Market[] = contractMarkets?.map((market: any) => ({
-        id: market.id.toString(),
-        title: market.title,
-        description: market.description,
-        category: parseInt(market.category.rawValue),
-        optionA: market.optionA,
-        optionB: market.optionB,
-        creator: market.creator,
-        createdAt: market.createdAt.toString(),
-        endTime: market.endTime.toString(),
-        minBet: market.minBet.toString(),
-        maxBet: market.maxBet.toString(),
-        status: parseInt(market.status.rawValue),
-        outcome: market.outcome ? parseInt(market.outcome.rawValue) : undefined,
-        resolved: market.resolved,
-        totalOptionAShares: market.totalOptionAShares.toString(),
-        totalOptionBShares: market.totalOptionBShares.toString(),
-        totalPool: market.totalPool.toString(),
-        imageUrl: market.imageUrl || ""
-      })) || [];
+      const transformedMarkets: Market[] =
+        contractMarkets?.map((market: any) => ({
+          id: market.id.toString(),
+          title: market.title,
+          description: market.description,
+          category: parseInt(market.category.rawValue),
+          optionA: market.optionA,
+          optionB: market.optionB,
+          creator: market.creator,
+          createdAt: market.createdAt.toString(),
+          endTime: market.endTime.toString(),
+          minBet: market.minBet.toString(),
+          maxBet: market.maxBet.toString(),
+          status: parseInt(market.status.rawValue),
+          outcome: market.outcome
+            ? parseInt(market.outcome.rawValue)
+            : undefined,
+          resolved: market.resolved,
+          totalOptionAShares: market.totalOptionAShares.toString(),
+          totalOptionBShares: market.totalOptionBShares.toString(),
+          totalPool: market.totalPool.toString(),
+          imageUrl: market.imageUrl || "",
+        })) || [];
 
       setMarkets(transformedMarkets);
-
     } catch (err) {
-      console.error('Error fetching active markets:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch active markets');
+      console.error("Error fetching active markets:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch active markets",
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }, [initConfig]);
 
   // Filter and sort markets
   const filteredAndSortedMarkets = useMemo(() => {
@@ -177,67 +206,83 @@ export function useMarketManagement() {
 
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(market =>
-        market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        market.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        market.optionA.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        market.optionB.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(
+        (market) =>
+          market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          market.description
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          market.optionA.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          market.optionB.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
 
     // Tab filter - Updated logic
     switch (activeTab) {
-      case 'active':
+      case "active":
         // Markets that are currently active (not ended and not resolved)
-        filtered = filtered.filter(market => 
-          market.status === MarketStatus.Active && 
-          parseFloat(market.endTime) > now
+        filtered = filtered.filter(
+          (market) =>
+            market.status === MarketStatus.Active &&
+            parseFloat(market.endTime) > now,
         );
         break;
-      case 'pending':
+      case "pending":
         // Markets that have ended but not yet resolved
-        filtered = filtered.filter(market => 
-          market.status === MarketStatus.Active && 
-          parseFloat(market.endTime) <= now
+        filtered = filtered.filter(
+          (market) =>
+            market.status === MarketStatus.Active &&
+            parseFloat(market.endTime) <= now,
         );
         break;
-      case 'resolved':
+      case "resolved":
         // Markets that have been resolved
-        filtered = filtered.filter(market => market.status === MarketStatus.Resolved);
+        filtered = filtered.filter(
+          (market) => market.status === MarketStatus.Resolved,
+        );
         break;
-      case 'trending':
+      case "trending":
         // Popular active markets (currently running with volume)
-        filtered = filtered.filter(market => 
-          market.status === MarketStatus.Active && 
-          parseFloat(market.endTime) > now &&
-          parseFloat(market.totalPool) > 0
-        ).sort((a, b) => parseFloat(b.totalPool) - parseFloat(a.totalPool));
+        filtered = filtered
+          .filter(
+            (market) =>
+              market.status === MarketStatus.Active &&
+              parseFloat(market.endTime) > now &&
+              parseFloat(market.totalPool) > 0,
+          )
+          .sort((a, b) => parseFloat(b.totalPool) - parseFloat(a.totalPool));
         break;
     }
 
     // Category filter
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(market => market.category === selectedCategory);
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter(
+        (market) => market.category === selectedCategory,
+      );
     }
 
     // Status filter
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(market => market.status === selectedStatus);
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter((market) => market.status === selectedStatus);
     }
 
     // Sort (skip for trending as it's already sorted by volume)
-    if (activeTab !== 'trending') {
+    if (activeTab !== "trending") {
       filtered.sort((a, b) => {
         switch (sortBy) {
-          case 'newest':
+          case "newest":
             return parseFloat(b.createdAt) - parseFloat(a.createdAt);
-          case 'ending':
+          case "ending":
             return parseFloat(a.endTime) - parseFloat(b.endTime);
-          case 'volume':
+          case "volume":
             return parseFloat(b.totalPool) - parseFloat(a.totalPool);
-          case 'popular':
-            const aShares = parseFloat(a.totalOptionAShares) + parseFloat(a.totalOptionBShares);
-            const bShares = parseFloat(b.totalOptionAShares) + parseFloat(b.totalOptionBShares);
+          case "popular":
+            const aShares =
+              parseFloat(a.totalOptionAShares) +
+              parseFloat(a.totalOptionBShares);
+            const bShares =
+              parseFloat(b.totalOptionAShares) +
+              parseFloat(b.totalOptionBShares);
             return bShares - aShares;
           default:
             return 0;
@@ -246,86 +291,112 @@ export function useMarketManagement() {
     }
 
     return filtered;
-  }, [markets, searchQuery, activeTab, selectedCategory, selectedStatus, sortBy]);
+  }, [
+    markets,
+    searchQuery,
+    activeTab,
+    selectedCategory,
+    selectedStatus,
+    sortBy,
+  ]);
 
   // Calculate market counts - Updated logic
   const marketCounts = useMemo(() => {
     const now = Date.now() / 1000;
-    
+
     return {
-      active: markets.filter(m => 
-        m.status === MarketStatus.Active && 
-        parseFloat(m.endTime) > now
+      active: markets.filter(
+        (m) => m.status === MarketStatus.Active && parseFloat(m.endTime) > now,
       ).length,
-      pending: markets.filter(m => 
-        m.status === MarketStatus.Active && 
-        parseFloat(m.endTime) <= now
+      pending: markets.filter(
+        (m) => m.status === MarketStatus.Active && parseFloat(m.endTime) <= now,
       ).length,
-      resolved: markets.filter(m => m.status === MarketStatus.Resolved).length,
-      trending: markets.filter(m => 
-        m.status === MarketStatus.Active && 
-        parseFloat(m.endTime) > now &&
-        parseFloat(m.totalPool) > 0
-      ).length
+      resolved: markets.filter((m) => m.status === MarketStatus.Resolved)
+        .length,
+      trending: markets.filter(
+        (m) =>
+          m.status === MarketStatus.Active &&
+          parseFloat(m.endTime) > now &&
+          parseFloat(m.totalPool) > 0,
+      ).length,
     };
   }, [markets]);
 
   // Calculate market stats
   const marketStats = useMemo(() => {
     const now = Date.now() / 1000;
-    const activeMarkets = markets.filter(m => 
-      m.status === MarketStatus.Active && 
-      parseFloat(m.endTime) > now
+    const activeMarkets = markets.filter(
+      (m) => m.status === MarketStatus.Active && parseFloat(m.endTime) > now,
     );
-    const totalVolume = markets.reduce((sum, m) => sum + parseFloat(m.totalPool || '0'), 0);
+    const totalVolume = markets.reduce(
+      (sum, m) => sum + parseFloat(m.totalPool || "0"),
+      0,
+    );
     const avgVolume = markets.length > 0 ? totalVolume / markets.length : 0;
-    
-    const pendingMarkets = markets.filter(m => 
-      m.status === MarketStatus.Active && 
-      parseFloat(m.endTime) <= now
+
+    const pendingMarkets = markets.filter(
+      (m) => m.status === MarketStatus.Active && parseFloat(m.endTime) <= now,
     ).length;
 
     return {
       active: activeMarkets.length,
       totalVolume,
       avgVolume,
-      endingSoon: pendingMarkets // Now represents pending markets
+      endingSoon: pendingMarkets, // Now represents pending markets
     };
   }, [markets]);
 
   // Type-safe filter handlers
-  const handleCategoryChange = (category: 'all' | MarketCategory) => {
+  const handleCategoryChange = (category: "all" | MarketCategory) => {
     setSelectedCategory(category);
   };
 
-  const handleStatusChange = (status: 'all' | MarketStatus) => {
+  const handleStatusChange = (status: "all" | MarketStatus) => {
     setSelectedStatus(status);
   };
 
   // Reset filters
   const handleResetFilters = () => {
-    setSearchQuery('');
-    setSelectedCategory('all');
-    setSelectedStatus('all');
-    setSortBy('newest');
-    setActiveTab('active'); // Default to active instead of all
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setSelectedStatus("all");
+    setSortBy("newest");
+    setActiveTab("active"); // Default to active instead of all
   };
+
+  // Combined refetch function
+  const refetch = useCallback(async () => {
+    await Promise.all([
+      fetchMarkets(),
+      fetchMultiOptionMarkets(),
+      fetchContractStats(),
+    ]);
+  }, [fetchMarkets, fetchMultiOptionMarkets, fetchContractStats]);
 
   // Fetch data on mount and setup interval for real-time updates
   useEffect(() => {
-    fetchMarkets();
-  }, []);
+    refetch();
+  }, [refetch]);
 
   return {
-    // Data
+    // Data - Binary Markets (FlowWager)
     markets,
     filteredAndSortedMarkets,
     marketStats,
     marketCounts,
     platformStats,
-    loading,
-    error,
-    
+    loading: loading || flowUpdateLoading,
+    error: error || flowUpdateError,
+
+    // Data - Multi-Option Markets (FlowUpdate)
+    multiOptionMarkets,
+    userMarkets,
+    selectedFlowUpdateMarket: flowUpdateSelectedMarket,
+    userPositions,
+    claimableWinnings,
+    contractStats,
+    transactionInProgress,
+
     // Filter states
     searchQuery,
     activeTab,
@@ -333,7 +404,7 @@ export function useMarketManagement() {
     sortBy,
     selectedCategory,
     selectedStatus,
-    
+
     // Filter setters
     setSearchQuery,
     setActiveTab,
@@ -341,10 +412,24 @@ export function useMarketManagement() {
     setSortBy,
     handleCategoryChange,
     handleStatusChange,
-    
-    // Actions
+
+    // Binary Market Actions (FlowWager)
     refetch: fetchMarkets,
-    fetchActiveMarkets, // New method for better performance
-    handleResetFilters
+    fetchActiveMarkets,
+    handleResetFilters,
+
+    // Multi-Option Market Actions (FlowUpdate)
+    fetchMultiOptionMarkets,
+    fetchUserMarkets,
+    fetchUserPositions,
+    fetchClaimableWinnings,
+    fetchContractStats,
+    createMultiOptionMarket,
+    placeBet,
+    placeBatchBets,
+    resolveMarket,
+    claimWinnings,
+    submitEvidence,
+    refetchAll: refetch, // Combined refetch
   };
 }
