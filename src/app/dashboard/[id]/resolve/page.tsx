@@ -2,10 +2,18 @@
 
 import { MarketError } from "@/components/market/market-error";
 import { MarketLoading } from "@/components/market/market-loading";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -13,14 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { usePoints } from "@/hooks/usePoints";
 import {
   getAllMarkets,
   getMarketEvidence,
@@ -28,23 +30,20 @@ import {
 } from "@/lib/flow-wager-scripts";
 import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
-import { usePoints } from "@/hooks/usePoints";
+import { MarketCategoryLabels } from "@/types/market";
+import { getStatusColor } from "@/utils";
 import * as fcl from "@onflow/fcl";
 import {
+  Award,
   CheckCircle,
+  Crown,
+  FileText,
   Loader2,
   RefreshCw,
-  Award,
-  FileText,
-  Calendar,
   Trophy,
-  Crown,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { getStatusColor } from "@/utils";
-import { MarketCategoryLabels } from "@/types/market";
 
 interface Market {
   id: string;
@@ -78,7 +77,7 @@ export default function UserResolvePage() {
   const [evidence, setEvidence] = useState("");
   const [requestedOutcome, setRequestedOutcome] = useState<"0" | "1" | "">("");
   const [existingEvidence, setExistingEvidence] = useState<Evidence | null>(
-    null
+    null,
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -107,7 +106,7 @@ export default function UserResolvePage() {
       const formattedMarkets: Market[] = (Array.isArray(result) ? result : [])
         .filter(
           (market: any) =>
-            market?.creator === userAddress && market.resolved !== true
+            market?.creator === userAddress && market.resolved !== true,
         )
         .map((marketObj: any) => {
           const market = marketObj.market ?? marketObj;
@@ -196,7 +195,7 @@ export default function UserResolvePage() {
               requestedOutcome === "0" ? market.optionA : market.optionB,
             evidenceLength: evidence.length,
           },
-          parseInt(marketId)
+          parseInt(marketId),
         );
       }
 
@@ -206,7 +205,7 @@ export default function UserResolvePage() {
       setRequestedOutcome("");
       setExistingEvidence(null);
       setSubmitSuccess(
-        "Evidence submitted successfully! You earned 75 FlowWager Points!"
+        "Evidence submitted successfully! You earned 75 FlowWager Points!",
       );
       setTimeout(() => setSubmitSuccess(null), 3000);
     } catch (err: any) {
@@ -427,7 +426,7 @@ export default function UserResolvePage() {
                           <p className="text-gray-400">Status</p>
                           <p
                             className={`text-white font-medium ${getStatusColor(
-                              Number(market.status)
+                              Number(market.status),
                             )}`}
                           >
                             {

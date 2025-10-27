@@ -1156,6 +1156,101 @@ access(all) contract FlowWagerV2 {
                return <- create UserStatsResource()
            }
 
+           access(all) fun purchaseShares(
+                    marketId: UInt64,
+                    optionIndex: UInt8,
+                    payment: @FlowToken.Vault,
+                   bettorAddress: Address,
+                   userPositions: &UserPositions
+           ) {
+           let betAmount = payment.balance
+
+                   // 1. Validate the bet
+                   self.validateBet(marketId: marketId, optionIndex: optionIndex, betAmount: betAmount)
+
+                   // 2. Deposit the  into the correct market vault
+                   self.depositToMarketVault(
+                       marketId: marketId,
+                       vault: <-payment,
+                       optionIndex: optionIndex,
+                       betAmount: betAmount
+                   )
+
+                   // 3. Record the bet in contract tracking
+                   self.recordBet(
+                       marketId: marketId,
+                       bettorAddress: bettorAddress,
+                       optionIndex: optionIndex,
+                       betAmount: betAmount
+                   )
+
+                   // 4. Create and save the UserPosition data
+                   var newOptionShares: [UFix64] = []
+                   let market = self.markets[marketId]! // We know market exists from validateBet
+                   var i = 0
+                   while i < market.options.length {
+                       newOptionShares.append(0.0)
+                       i = i + 1
+                   }
+                   newOptionShares[Int(optionIndex)] = betAmount
+
+                   let newPosition = UserPosition(
+                       marketId: marketId,
+                       optionShares: newOptionShares,
+                       totalInvested: betAmount,
+                       claimed: false
+                   )
+
+                   userPositions.addPosition(newPosition)
+
+     }
+
+
+     // =====================================
+         // --- ADD THIS FUNCTION TO YOUR CONTRACT ---
+         // =====================================
+
+         /// Allows a user to claim their winnings from a resolved, won market
+         access(all) fun claimWinnings(
+                 marketId: UInt64,
+                 claimerAddress: Address,
+                 userPositions: &UserPositions
+             ): @FlowToken.Vault {
+
+                 // 1. Get the user's position
+                 let position = userPositions.getPosition(marketId: marketId)
+                     ?? panic("User has no position in this market")
+
+                 // 2. Calculate winnings. This will panic if:
+                 //    - Market is not resolved
+                 //    - User did not bet on the winning option
+                 //    - User has already claimed
+                 let payoutAmount = self.calculateWinnings(
+                     marketId: marketId,
+                     userPosition: position
+                 )
+
+                 assert(payoutAmount > 0.0, message: "Payout amount is zero")
+
+                 // 3. Get the market's vault with Withdraw authorization
+                 let marketVaultRef = &self.marketVaults[marketId] as auth(FungibleToken.Withdraw) &FlowToken.Vault?
+                     ?? panic("Market vault not found")
+
+                 assert(marketVaultRef!.balance >= payoutAmount, message: "Market vault has insufficient funds for payout")
+
+                 // 4. Withdraw funds
+                 let winningsVault <- marketVaultRef!.withdraw(amount: payoutAmount) as! @FlowToken.Vault
+
+                 // 5. Mark as claimed and update stats
+                 userPositions.markClaimed(marketId: marketId)
+                 self.updateUserStatsAfterWin(user: claimerAddress, payout: payoutAmount, invested: position.totalInvested)
+
+                 emit WinningsClaimed(marketId: marketId, claimer: claimerAddress, amount: payoutAmount)
+
+                 return <-winningsVault
+             }
+
+
     init() {
         // Storage paths
         self.UserProfileStoragePath = /storage/FlowWagerV2UserProfile

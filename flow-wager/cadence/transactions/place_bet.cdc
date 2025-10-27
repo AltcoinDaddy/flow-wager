@@ -1,36 +1,47 @@
-import "FlowWagerV2"
-import "FungibleToken"
-import "FlowToken"
+import FungibleToken from "FungibleToken"   // Replace with FungibleToken address
+import FlowToken from "FlowToken"           // Replace with FlowToken address
+import FlowWagerV2 from "FlowWagerV2"         // Replace with your FlowWagerV2 address
 
+// This transaction allows a user to place a bet on a market
 transaction(marketId: UInt64, optionIndex: UInt8, betAmount: UFix64) {
-    let betVault: @FlowToken.Vault
-    let signerAddress: Address
 
-    prepare(signer: auth(Storage, BorrowValue) &Account) {
-        self.signerAddress = signer.address
+let bettorAddress: Address
+    let paymentVault: @FlowToken.Vault
+    let userPositionsRef: &FlowWagerV2.UserPositions
 
-        // Borrow and withdraw from user's Flow vault
-        let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-            from: /storage/flowTokenVault
-        ) ?? panic("Could not borrow FlowToken vault")
+    prepare(signer: auth(Storage) &Account) {
+        self.bettorAddress = signer.address
 
-        self.betVault <- vault.withdraw(amount: betAmount) as! @FlowToken.Vault
 
-        // Ensure user has UserPositions initialized
-        if !signer.storage.check<@FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath) {
-            let userPositions <- FlowWagerV2.createUserPositions()
-            signer.storage.save(<-userPositions, to: FlowWagerV2.UserPositionsStoragePath)
 
-            let userPositionsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserPositionsPublic}>(
-                FlowWagerV2.UserPositionsStoragePath
-            )
-            signer.capabilities.publish(userPositionsCap, at: FlowWagerV2.UserPositionsPublicPath)
-        }
+        // 2. Get the user's main FLOW vault
+
+        // --- THIS IS THE FIX ---
+        // We must borrow the reference and explicitly authorize it with the 'Withdraw' entitlement
+        let mainVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+            ?? panic("Could not borrow authorized FlowToken vault from /storage/flowTokenVault.")
+
+        // 3. Withdraw the bet amount (this will now work)
+        assert(mainVault.balance >= betAmount, message: "Insufficient FLOW balance to place this bet")
+        self.paymentVault <- mainVault.withdraw(amount: betAmount) as! @FlowToken.Vault
+
+        // 4. Get the user's UserPositions resource
+        // This borrow doesn't need special auth because we're just passing the reference,
+        // and the contract will call the public 'addPosition' function.
+        self.userPositionsRef = signer.storage.borrow<&FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath)
+            ?? panic("Could not borrow UserPositions resource. Has the user set up their account?")
     }
 
     execute {
-        // This requires a public placeBet function in FlowWagerV2
-        // Currently not exposed in the contract
-        panic("placeBet function not available - requires contract update")
+        // 5. Call the main contract function to purchase the shares
+        FlowWagerV2.purchaseShares(
+            marketId: marketId,
+            optionIndex: optionIndex,
+            payment: <-self.paymentVault,
+            bettorAddress: self.bettorAddress,
+            userPositions: self.userPositionsRef
+        )
+
+        log("Bet placed successfully! Market: ".concat(marketId.toString()).concat(", Option: ").concat(optionIndex.toString()).concat(", Amount: ").concat(betAmount.toString()))
     }
 }
