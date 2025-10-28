@@ -13,12 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Card,
   CardContent,
@@ -26,64 +21,40 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   placeBetTransaction as buyShares,
   createUserAccountTransaction,
   getUserProfile as getUserAccount,
 } from "@/lib/flow-wager-scripts";
 import flowConfig from "@/lib/flow/config";
+import { PointsManager } from "@/lib/points-system";
 import { useAuth } from "@/providers/auth-provider";
-import { useForteActions } from "@/hooks/useForteActions";
 import type { Market } from "@/types/market";
-import {
-  addBetToHistory,
-  getCookie,
-  setCookie,
-  type BetInfo,
-  getUserBetHistory,
-} from "@/utils/cookies";
+import { addBetToHistory, type BetInfo } from "@/utils/cookies";
 import * as fcl from "@onflow/fcl";
 import {
+  AlertCircle,
   Calculator,
   Loader2,
   LogIn,
   UserPlus,
   Wallet,
   Zap,
-  Bot,
-  Clock,
-  Timer,
-  ChevronDown,
-  ChevronRight,
-  Info,
-  AlertCircle,
-  Settings,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { PointsManager, type ActivityDetails } from "@/lib/points-system";
 
 interface BetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  market: Market;
-  initialSide?: "optionA" | "optionB";
+  market: Market; // Should be the V2 Market type
+  initialOptionIndex?: number | null; // Use index
   onBetSuccess?: () => void;
 }
 
+// UserAccountStatus Interface
 interface UserAccountStatus {
   exists: boolean;
   isCreating: boolean;
@@ -91,46 +62,26 @@ interface UserAccountStatus {
   showCreateForm: boolean;
 }
 
-interface AutomationSettings {
-  enabled: boolean;
-  type: "immediate" | "conditional" | "scheduled";
-  conditions: {
-    minOdds?: number;
-    maxOdds?: number;
-    priceThreshold?: number;
-    timeWindow?: { start: string; end: string };
-    maxSlippage?: number;
-    stopLoss?: number;
-  };
-  autoRebet: boolean;
-  rebetSettings: {
-    maxAttempts: number;
-    delayBetween: number;
-  };
-}
+// Helper to sum shares
+const sumShares = (shares: string[]): number => {
+  return shares.reduce((acc, share) => acc + parseFloat(share || "0"), 0);
+};
 
 export function BetDialog({
   open,
   onOpenChange,
   market,
-  initialSide = "optionA",
+  initialOptionIndex = 0,
   onBetSuccess,
 }: BetDialogProps) {
   const { user, balance, refreshBalance, login: logIn } = useAuth();
-  const {
-    isInitialized: forteInitialized,
-    isLoading: forteLoading,
-    createConditionalBet,
-    createAdvancedBetConditions,
-    initialize: initializeForte,
-  } = useForteActions();
 
-  const [side, setSide] = useState<"optionA" | "optionB">(initialSide);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(
+    initialOptionIndex,
+  );
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("immediate");
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const [userAccount, setUserAccount] = useState<UserAccountStatus>({
     exists: false,
@@ -143,56 +94,61 @@ export function BetDialog({
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
 
-  // Automation settings
-  const [automation, setAutomation] = useState<AutomationSettings>({
-    enabled: false,
-    type: "immediate",
-    conditions: {},
-    autoRebet: false,
-    rebetSettings: {
-      maxAttempts: 3,
-      delayBetween: 60,
-    },
-  });
-
   // Calculate market percentages and prices
-  const totalShares =
-    parseFloat(market.totalOptionAShares) +
-    parseFloat(market.totalOptionBShares);
-  const optionAPercentage =
-    totalShares > 0
-      ? (parseFloat(market.totalOptionAShares) / totalShares) * 100
-      : 50;
-  const optionBPercentage = 100 - optionAPercentage;
+  const totalSharesValue = useMemo(
+    () => sumShares(market.totalShares || []),
+    [market.totalShares],
+  );
 
-  const optionAPrice = optionAPercentage / 100;
-  const optionBPrice = optionBPercentage / 100;
+  const optionPercentages = useMemo(() => {
+    if (!market.options || !market.totalShares || totalSharesValue <= 0) {
+      const numOptions = market.options?.length || 1;
+      return Array(numOptions).fill(100 / numOptions);
+    }
+    return market.totalShares.map(
+      (share) => (parseFloat(share || "0") / totalSharesValue) * 100,
+    );
+  }, [market.options, market.totalShares, totalSharesValue]);
 
-  const currentPrice = side === "optionA" ? optionAPrice : optionBPrice;
+  const optionPrices = useMemo(
+    () => optionPercentages.map((p) => p / 100),
+    [optionPercentages],
+  );
+  const optionOdds = useMemo(
+    () => optionPrices.map((p) => (p > 0 ? 1 / p : Infinity)),
+    [optionPrices],
+  );
 
-  // Calculate current odds
-  const optionAOdds = optionAPrice > 0 ? 1 / optionAPrice : 1;
-  const optionBOdds = optionBPrice > 0 ? 1 / optionBPrice : 1;
-  const currentOdds = side === "optionA" ? optionAOdds : optionBOdds;
+  const currentPrice = useMemo(
+    () =>
+      selectedOptionIndex !== null ? optionPrices[selectedOptionIndex] : 0,
+    [selectedOptionIndex, optionPrices],
+  );
+  const currentOdds = useMemo(
+    () =>
+      selectedOptionIndex !== null ? optionOdds[selectedOptionIndex] : Infinity,
+    [selectedOptionIndex, optionOdds],
+  );
+  const selectedOptionName = useMemo(
+    () =>
+      selectedOptionIndex !== null
+        ? market.options[selectedOptionIndex]
+        : "N/A",
+    [selectedOptionIndex, market.options],
+  );
+  const leadingOptionIndex = useMemo(() => {
+    // For market preview styling
+    if (!optionPercentages || optionPercentages.length === 0) return -1;
+    return optionPercentages.indexOf(Math.max(...optionPercentages));
+  }, [optionPercentages]);
 
   useEffect(() => {
     if (open) {
-      setSide(initialSide);
+      setSelectedOptionIndex(initialOptionIndex ?? 0);
       setAmount("");
       setError(null);
-      setAutomation({
-        enabled: false,
-        type: "immediate",
-        conditions: {},
-        autoRebet: false,
-        rebetSettings: {
-          maxAttempts: 3,
-          delayBetween: 60,
-        },
-      });
-      setActiveTab("immediate");
     }
-  }, [open, initialSide]);
+  }, [open, initialOptionIndex]);
 
   useEffect(() => {
     const initConfig = async () => {
@@ -299,27 +255,38 @@ export function BetDialog({
   };
 
   const placeBet = async () => {
-    if (!user?.addr || !amount || !isValidAmount) return;
-
-    // Check if this is an automated bet
-    if (automation.enabled && automation.type !== "immediate") {
-      return placeAutomatedBet();
+    // 1. Validations
+    if (
+      selectedOptionIndex === null ||
+      selectedOptionIndex < 0 ||
+      selectedOptionIndex >= market.options.length
+    ) {
+      setError("Please select an option to bet on.");
+      toast.error("Please select an option to bet on.");
+      return;
+    }
+    if (!user?.addr || !amount || !isValidAmount) {
+      setError("Invalid amount or user not logged in."); // More specific error
+      return;
     }
 
+    // 2. Set loading
     setIsLoading(true);
     setError(null);
 
     try {
+      // 3. Get V2 transaction script
       await flowConfig();
-      const buySharesScript = await buyShares();
+      const placeBetScript = await buyShares(); // V2 script name
       const authorization = fcl.currentUser().authorization;
 
+      // 4. Execute transaction
       const txId = await fcl.mutate({
-        cadence: buySharesScript,
+        cadence: placeBetScript,
         args: (arg: any, t: any) => [
-          arg(market.id, t.String),
-          arg(amount, t.UFix64),
-          arg(side === "optionA", t.Bool),
+          arg(market.id, t.UInt64), // Market ID as UInt64 string
+          arg(selectedOptionIndex, t.UInt8), // Selected option index as UInt8
+          arg(amount, t.UFix64), // Bet amount as UFix64 string
         ],
         proposer: authorization,
         payer: authorization,
@@ -327,245 +294,177 @@ export function BetDialog({
         limit: 1000,
       });
 
+      // 5. Handle transaction status
       toast.loading("Placing bet...");
       const result = await fcl.tx(txId).onceSealed();
       toast.dismiss();
 
-      if (result.status === 4) {
+      if (result.status === 4 && result.errorMessage === "") {
+        // Success
         toast.success("Bet placed successfully!");
 
-        // Add to bet history
+        // 6. Update Bet History
         const betInfo: BetInfo = {
           marketId: market.id,
           marketTitle: market.title,
-          side: side,
+          optionIndex: selectedOptionIndex,
+          optionName: market.options[selectedOptionIndex],
           amount: parseFloat(amount),
-          shares: parseFloat(amount) / currentPrice,
+          shares: currentPrice > 0 ? parseFloat(amount) / currentPrice : 0,
           timestamp: Date.now(),
           transactionId: txId,
-          optionName: side === "optionA" ? market.optionA : market.optionB,
         };
-        addBetToHistory(user.addr, betInfo);
+        addBetToHistory(user.addr, betInfo); // Ensure addBetToHistory handles V2 format
 
-        // Award points for betting
+        // 7. Award points (optional)
         try {
-          await PointsManager.awardPoints(user.addr, "PLACE_BET", {
-            betAmount: parseFloat(amount),
-            marketTitle: market.title,
-            marketId: parseInt(market.id),
-          });
+          await PointsManager.awardPoints(
+            `${user?.addr}`,
+            "PLACE_BET",
+            {
+              marketId: parseInt(market.id),
+              betAmount: parseFloat(amount),
+              marketTitle: market.title,
+              marketCategory: market.category?.toString() || "unknown",
+              outcome: market.options[selectedOptionIndex],
+              transactionId: txId,
+            },
+            parseInt(market.id),
+          );
+          console.log("✅ Betting points awarded successfully");
         } catch (pointsError) {
-          console.error("Error awarding points:", pointsError);
+          console.error("❌ Error awarding betting points:", pointsError);
         }
 
+        // 8. Refresh balance & close
         await refreshBalance();
         onBetSuccess?.();
         onOpenChange(false);
       } else {
-        throw new Error("Transaction failed");
+        // Handle Transaction Failure
+        console.error("Transaction failed:", result);
+        const fclError =
+          result.errorMessage ||
+          `Transaction failed with status ${result.status}`;
+        let userFriendlyError = "Transaction failed. Please try again.";
+        if (fclError.includes("panic: Market is not active"))
+          userFriendlyError = "Betting is closed for this market.";
+        if (fclError.includes("panic: Bet below minimum"))
+          userFriendlyError = `Bet amount must be at least ${market.minBet} FLOW.`;
+        if (fclError.includes("panic: Bet exceeds maximum"))
+          userFriendlyError = `Bet amount cannot exceed ${market.maxBet} FLOW.`;
+        if (
+          fclError.includes("panic: insufficient balance") ||
+          fclError.includes("withdraw")
+        )
+          userFriendlyError = "Insufficient FLOW balance.";
+        if (fclError.includes("Could not borrow UserPositions resource"))
+          userFriendlyError =
+            "Account setup incomplete. Please ensure your profile is created.";
+        throw new Error(userFriendlyError);
       }
     } catch (error: any) {
-      console.error("Bet placement failed:", error);
-
-      let errorMessage = "Failed to place bet. Please try again.";
-      if (error?.message) {
-        if (error.message.includes("insufficient balance")) {
-          errorMessage = "Insufficient balance to place this bet.";
-        } else if (error.message.includes("market ended")) {
-          errorMessage = "This market has already ended.";
-        } else if (error.message.includes("market resolved")) {
-          errorMessage = "This market has already been resolved.";
-        }
-      }
-
+      // Catch errors from mutate/tx or thrown errors
+      console.error("Bet placement process failed:", error);
+      const errorMessage =
+        error.message || "Failed to place bet. Please try again.";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Reset loading state regardless of outcome
     }
   };
 
-  const placeAutomatedBet = async () => {
-    if (!forteInitialized) {
-      toast.error("Forte Actions not initialized. Please initialize first.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const conditions = createAdvancedBetConditions({
-        minOdds: automation.conditions.minOdds,
-        maxOdds: automation.conditions.maxOdds,
-        priceThreshold: automation.conditions.priceThreshold,
-        timeWindow: automation.conditions.timeWindow
-          ? {
-              start: new Date(automation.conditions.timeWindow.start).getTime(),
-              end: new Date(automation.conditions.timeWindow.end).getTime(),
-            }
-          : undefined,
-        maxSlippage: automation.conditions.maxSlippage,
-        stopLoss: automation.conditions.stopLoss,
-        autoRebet: automation.autoRebet,
-        rebetConditions: automation.autoRebet
-          ? automation.rebetSettings
-          : undefined,
-      });
-
-      const result = await createConditionalBet({
-        marketId: market.id,
-        amount: amount,
-        prediction: side === "optionA",
-        conditions,
-      });
-
-      if (result.success) {
-        toast.success("Automated bet scheduled successfully!");
-        onBetSuccess?.();
-        onOpenChange(false);
-      } else {
-        throw new Error(result.error || "Failed to create automated bet");
-      }
-    } catch (error: any) {
-      console.error("Automated bet failed:", error);
-      setError(error.message || "Failed to create automated bet");
-      toast.error(error.message || "Failed to create automated bet");
-    } finally {
-      setIsLoading(false);
-    }
+  const formatCurrency = (value: string | number): string => {
+    const num = typeof value === "string" ? parseFloat(value || "0") : value;
+    if (isNaN(num)) return "0.00";
+    if (num === Infinity) return "∞"; // Handle infinite odds
+    return num.toFixed(2);
   };
 
-  const handleAutomationChange = (field: string, value: any) => {
-    setAutomation((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleConditionChange = (field: string, value: any) => {
-    setAutomation((prev) => ({
-      ...prev,
-      conditions: {
-        ...prev.conditions,
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleTimeWindowChange = (field: "start" | "end", value: string) => {
-    setAutomation((prev) => ({
-      ...prev,
-      conditions: {
-        ...prev.conditions,
-        timeWindow: {
-          ...prev.conditions.timeWindow,
-          start:
-            field === "start" ? value : prev.conditions.timeWindow?.start || "",
-          end: field === "end" ? value : prev.conditions.timeWindow?.end || "",
-        },
-      },
-    }));
-  };
-
-  const formatCurrency = (value: string | number) => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-    return isNaN(num) ? "0.00" : num.toFixed(2);
-  };
-
-  const minBet = parseFloat(market.minBet);
-  const maxBet = parseFloat(market.maxBet);
+  const minBet = parseFloat(market.minBet || "0");
+  const maxBet = parseFloat(market.maxBet || "Infinity"); // Use Infinity if maxBet is huge/not restricted
   const currentAmount = parseFloat(amount || "0");
   const userBalanceNum = parseFloat(balance || "0");
+
+  // Validation check for amount input
   const isValidAmount =
+    currentAmount > 0 &&
     currentAmount >= minBet &&
     currentAmount <= maxBet &&
-    currentAmount > 0 &&
     currentAmount <= userBalanceNum;
 
-  const quickAmounts = [
-    minBet.toString(),
-    (minBet * 5).toString(),
-    (minBet * 10).toString(),
-    Math.min(maxBet, userBalanceNum).toString(),
-  ].filter(
-    (amt, index, arr) =>
-      arr.indexOf(amt) === index && parseFloat(amt) <= userBalanceNum,
-  );
+  // Generate quick amount suggestions
+  const quickAmounts = useMemo(() => {
+    const amounts = [
+      minBet,
+      Math.min(maxBet, userBalanceNum, minBet * 5),
+      Math.min(maxBet, userBalanceNum, minBet * 10),
+      Math.min(maxBet, userBalanceNum * 0.25),
+      Math.min(maxBet, userBalanceNum * 0.5),
+      Math.min(maxBet, userBalanceNum),
+    ]
+      .map((a) => Math.max(minBet, a))
+      .map((a) => Math.min(maxBet, a))
+      .map((a) => parseFloat(a.toFixed(2)))
+      .filter((a) => a <= userBalanceNum && a >= minBet); // Ensure >= minBet
 
+    return Array.from(new Set(amounts))
+      .sort((a, b) => a - b)
+      .map((a) => a.toString());
+  }, [minBet, maxBet, userBalanceNum]);
+
+  // Calculate potential payout
   const getEstimatedPayout = () => {
-    if (!amount) return "0.00";
+    if (!amount || selectedOptionIndex === null || currentOdds === Infinity)
+      return "0.00";
     return (parseFloat(amount) * currentOdds).toFixed(2);
-  };
-
-  const getBetTypeIcon = () => {
-    switch (automation.type) {
-      case "conditional":
-        return <Bot className="h-4 w-4" />;
-      case "scheduled":
-        return <Clock className="h-4 w-4" />;
-      default:
-        return <Zap className="h-4 w-4" />;
-    }
-  };
-
-  const getBetTypeDescription = () => {
-    switch (automation.type) {
-      case "conditional":
-        return "Bet will execute when conditions are met";
-      case "scheduled":
-        return "Bet will execute at specified time";
-      default:
-        return "Bet will execute immediately";
-    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-gradient-to-br from-[#0A0C14] via-[#1A1F2C] to-[#151923] border border-gray-800/50 max-w-2xl w-full mx-auto backdrop-blur-xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="space-y-3 pb-4 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-[#9b87f5]/10 rounded-lg">
-                <Zap className="h-5 w-5 text-[#9b87f5]" />
-              </div>
-              <DialogTitle className="text-xl text-white">
-                Place Your Bet
-              </DialogTitle>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-[#9b87f5]/10 rounded-lg">
+              <Zap className="h-5 w-5 text-[#9b87f5]" />
             </div>
-            {forteInitialized && (
-              <Badge variant="secondary" className="text-xs">
-                <Bot className="h-3 w-3 mr-1" />
-                Automation Ready
-              </Badge>
-            )}
+            <DialogTitle className="text-xl text-white">
+              Place Your Bet
+            </DialogTitle>
           </div>
-
           {/* Market Preview */}
           <div className="bg-gradient-to-r from-[#1A1F2C]/80 to-[#151923]/80 rounded-xl p-3 border border-gray-800/30">
             <h3 className="font-semibold text-white mb-1 text-sm line-clamp-1">
               {market.title}
             </h3>
-            <p className="text-xs text-gray-400 line-clamp-1 mb-2">
-              {market.description}
-            </p>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-gray-500">Current Odds</div>
-              <div className="flex space-x-3 text-xs">
-                <span className="text-[#9b87f5]">
-                  {market.optionA}: {formatCurrency(optionAOdds)}x
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mb-2">
+              {(market.options || []).slice(0, 3).map((opt, idx) => (
+                <span
+                  key={idx}
+                  className={
+                    idx === selectedOptionIndex
+                      ? "text-[#9b87f5] font-medium"
+                      : "text-gray-400"
+                  }
+                >
+                  {opt.length > 15 ? opt.substring(0, 12) + "..." : opt}:{" "}
+                  {formatCurrency(optionOdds[idx] ?? Infinity)}x
                 </span>
-                <span className="text-gray-400">
-                  {market.optionB}: {formatCurrency(optionBOdds)}x
-                </span>
-              </div>
+              ))}
+              {market.options.length > 3 && (
+                <span className="text-gray-500">...</span>
+              )}
             </div>
-            <Progress value={optionAPercentage} className="h-1.5 bg-gray-800">
+            {/* Optional: Simple visualization */}
+            <div className="w-full bg-gray-800 rounded-full h-1.5">
               <div
-                className="h-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] transition-all duration-300 rounded-full"
-                style={{ width: `${optionAPercentage}%` }}
+                className="h-full bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] rounded-full transition-all duration-300"
+                style={{
+                  width: `${optionPercentages[selectedOptionIndex ?? leadingOptionIndex] ?? 0}%`,
+                }} // Show selected or leading %
               />
-            </Progress>
+            </div>
           </div>
         </DialogHeader>
 
@@ -648,561 +547,126 @@ export function BetDialog({
                 </Card>
               ) : (
                 <>
-                  {/* Betting Type Selector */}
-                  <Tabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    className="w-full"
-                  >
-                    <TabsList className="grid w-full grid-cols-3 bg-[#1A1F2C] border-gray-800">
-                      <TabsTrigger
-                        value="immediate"
-                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
-                        onClick={() =>
-                          handleAutomationChange("type", "immediate")
-                        }
-                      >
-                        <Zap className="h-4 w-4 mr-2" />
-                        Immediate
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="conditional"
-                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
-                        disabled={!forteInitialized}
-                        onClick={() =>
-                          handleAutomationChange("type", "conditional")
-                        }
-                      >
-                        <Bot className="h-4 w-4 mr-2" />
-                        Conditional
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="scheduled"
-                        className="data-[state=active]:bg-[#9b87f5] data-[state=active]:text-white"
-                        disabled={!forteInitialized}
-                        onClick={() =>
-                          handleAutomationChange("type", "scheduled")
-                        }
-                      >
-                        <Clock className="h-4 w-4 mr-2" />
-                        Scheduled
-                      </TabsTrigger>
-                    </TabsList>
-
-                    {!forteInitialized && (
-                      <Alert className="mt-2">
-                        <Info className="h-4 w-4" />
-                        <AlertDescription className="flex items-center justify-between">
-                          <div>
-                            <span>
-                              Initialize Forte Actions to use automation
-                              features
-                            </span>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              🧪 Demo Mode - All automation features work with
-                              mock transactions
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={initializeForte}
-                            disabled={forteLoading}
-                            className="ml-2"
-                          >
-                            {forteLoading ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              "Initialize"
-                            )}
-                          </Button>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {forteInitialized && (
-                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                        🧪 Demo Mode Active - Automation features are working
-                        with mock transactions
-                      </div>
-                    )}
-
-                    <TabsContent value="immediate" className="space-y-4 mt-4">
-                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
-                        <CardContent className="p-4">
-                          <p className="text-sm text-gray-400 mb-3">
-                            Place your bet immediately at current market prices
-                          </p>
-
-                          {/* Bet Amount and Side Selection - Immediate */}
-                          <div className="space-y-4">
-                            {/* Side Selection */}
-                            <div>
-                              <Label className="text-gray-300 text-sm font-medium mb-2 block">
-                                Choose Your Prediction
-                              </Label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <Button
-                                  variant={
-                                    side === "optionA" ? "default" : "outline"
-                                  }
-                                  onClick={() => setSide("optionA")}
-                                  className={`p-3 h-auto ${
-                                    side === "optionA"
-                                      ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white"
-                                      : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C]"
-                                  }`}
-                                >
-                                  <div className="text-center">
-                                    <div className="font-medium text-sm">
-                                      {market.optionA}
-                                    </div>
-                                    <div className="text-xs opacity-80">
-                                      {formatCurrency(optionAOdds)}x odds
-                                    </div>
-                                  </div>
-                                </Button>
-                                <Button
-                                  variant={
-                                    side === "optionB" ? "default" : "outline"
-                                  }
-                                  onClick={() => setSide("optionB")}
-                                  className={`p-3 h-auto ${
-                                    side === "optionB"
-                                      ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white"
-                                      : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C]"
-                                  }`}
-                                >
-                                  <div className="text-center">
-                                    <div className="font-medium text-sm">
-                                      {market.optionB}
-                                    </div>
-                                    <div className="text-xs opacity-80">
-                                      {formatCurrency(optionBOdds)}x odds
-                                    </div>
-                                  </div>
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Amount Input */}
-                            <div>
-                              <Label
-                                htmlFor="amount"
-                                className="text-gray-300 text-sm font-medium mb-2 block"
-                              >
-                                Bet Amount (FLOW)
-                              </Label>
-                              <Input
-                                id="amount"
-                                type="number"
-                                step="0.01"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                placeholder="0.00"
-                                className="bg-[#0A0C14] border-gray-700 text-white h-12 text-lg"
-                              />
-                              <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                <span>
-                                  Balance: {formatCurrency(balance)} FLOW
-                                </span>
-                                <span>
-                                  Min: {formatCurrency(market.minBet)} | Max:{" "}
-                                  {formatCurrency(market.maxBet)}
-                                </span>
-                              </div>
-
-                              {/* Quick Amount Buttons */}
-                              {quickAmounts.length > 0 && (
-                                <div className="flex gap-2 mt-2">
-                                  {quickAmounts.map((quickAmount) => (
-                                    <Button
-                                      key={quickAmount}
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setAmount(quickAmount)}
-                                      className="text-xs border-gray-700 text-gray-400 hover:text-white hover:border-[#9b87f5]"
-                                    >
-                                      {formatCurrency(quickAmount)}
-                                    </Button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="conditional" className="space-y-4 mt-4">
-                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
-                        <CardContent className="p-4">
-                          <p className="text-sm text-gray-400 mb-3">
-                            Set conditions for when your bet should be placed
-                            automatically
-                          </p>
-
-                          <div className="space-y-4">
-                            {/* Basic Bet Setup */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-gray-300 text-sm">
-                                  Prediction
-                                </Label>
-                                <Select
-                                  value={side}
-                                  onValueChange={(
-                                    value: "optionA" | "optionB",
-                                  ) => setSide(value)}
-                                >
-                                  <SelectTrigger className="bg-[#0A0C14] border-gray-700 text-white">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="optionA">
-                                      {market.optionA}
-                                    </SelectItem>
-                                    <SelectItem value="optionB">
-                                      {market.optionB}
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label className="text-gray-300 text-sm">
-                                  Amount (FLOW)
-                                </Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={amount}
-                                  onChange={(e) => setAmount(e.target.value)}
-                                  placeholder="0.00"
-                                  className="bg-[#0A0C14] border-gray-700 text-white"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Odds Conditions */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <Label className="text-gray-300 text-sm">
-                                  Min Odds
-                                </Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={automation.conditions.minOdds || ""}
-                                  onChange={(e) =>
-                                    handleConditionChange(
-                                      "minOdds",
-                                      e.target.value
-                                        ? parseFloat(e.target.value)
-                                        : undefined,
-                                    )
-                                  }
-                                  placeholder="1.50"
-                                  className="bg-[#0A0C14] border-gray-700 text-white"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-gray-300 text-sm">
-                                  Max Odds
-                                </Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  value={automation.conditions.maxOdds || ""}
-                                  onChange={(e) =>
-                                    handleConditionChange(
-                                      "maxOdds",
-                                      e.target.value
-                                        ? parseFloat(e.target.value)
-                                        : undefined,
-                                    )
-                                  }
-                                  placeholder="5.00"
-                                  className="bg-[#0A0C14] border-gray-700 text-white"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Advanced Settings Collapsible */}
-                            <Collapsible
-                              open={showAdvancedSettings}
-                              onOpenChange={setShowAdvancedSettings}
+                  <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
+                    <CardContent className="p-4 space-y-4">
+                      {/* Option Selection (Multi-Option Grid) */}
+                      <div>
+                        <Label className="text-gray-300 text-sm font-medium mb-2 block">
+                          Choose Prediction
+                        </Label>
+                        <div
+                          className={`grid grid-cols-${Math.min(market.options.length, 3)} gap-2`}
+                        >
+                          {(market.options || []).map((option, index) => (
+                            <Button
+                              key={index}
+                              variant={
+                                selectedOptionIndex === index
+                                  ? "default"
+                                  : "outline"
+                              }
+                              onClick={() => setSelectedOptionIndex(index)}
+                              className={`p-3 h-auto justify-start text-left text-xs sm:text-sm ${
+                                selectedOptionIndex === index
+                                  ? "bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] text-white border-[#9b87f5]/50 ring-2 ring-[#9b87f5]/30"
+                                  : "border-gray-700 text-gray-300 hover:bg-[#1A1F2C] hover:border-gray-600"
+                              }`}
                             >
-                              <CollapsibleTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className="w-full justify-between text-gray-400 hover:text-white"
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <Settings className="h-4 w-4" />
-                                    Advanced Settings
-                                  </span>
-                                  {showAdvancedSettings ? (
-                                    <ChevronDown className="h-4 w-4" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4" />
+                              <div>
+                                <div className="font-medium truncate">
+                                  {option}
+                                </div>
+                                <div className="text-xs opacity-80">
+                                  {formatCurrency(
+                                    optionOdds[index] ?? Infinity,
                                   )}
-                                </Button>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="space-y-4">
-                                {/* Time Window */}
-                                <div>
-                                  <Label className="text-gray-300 text-sm mb-2 block">
-                                    Time Window (Optional)
-                                  </Label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <Label className="text-xs text-gray-400">
-                                        Start Time
-                                      </Label>
-                                      <Input
-                                        type="datetime-local"
-                                        value={
-                                          automation.conditions.timeWindow
-                                            ?.start || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleTimeWindowChange(
-                                            "start",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="bg-[#0A0C14] border-gray-700 text-white text-sm"
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs text-gray-400">
-                                        End Time
-                                      </Label>
-                                      <Input
-                                        type="datetime-local"
-                                        value={
-                                          automation.conditions.timeWindow
-                                            ?.end || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleTimeWindowChange(
-                                            "end",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="bg-[#0A0C14] border-gray-700 text-white text-sm"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Risk Management */}
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label className="text-gray-300 text-sm">
-                                      Max Slippage (%)
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      step="0.1"
-                                      value={
-                                        automation.conditions.maxSlippage || ""
-                                      }
-                                      onChange={(e) =>
-                                        handleConditionChange(
-                                          "maxSlippage",
-                                          e.target.value
-                                            ? parseFloat(e.target.value)
-                                            : undefined,
-                                        )
-                                      }
-                                      placeholder="5.0"
-                                      className="bg-[#0A0C14] border-gray-700 text-white"
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className="text-gray-300 text-sm">
-                                      Stop Loss (%)
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      step="0.1"
-                                      value={
-                                        automation.conditions.stopLoss || ""
-                                      }
-                                      onChange={(e) =>
-                                        handleConditionChange(
-                                          "stopLoss",
-                                          e.target.value
-                                            ? parseFloat(e.target.value)
-                                            : undefined,
-                                        )
-                                      }
-                                      placeholder="10.0"
-                                      className="bg-[#0A0C14] border-gray-700 text-white"
-                                    />
-                                  </div>
-                                </div>
-
-                                {/* Auto-Rebet */}
-                                <div className="space-y-3">
-                                  <div className="flex items-center space-x-2">
-                                    <Switch
-                                      id="auto-rebet"
-                                      checked={automation.autoRebet}
-                                      onCheckedChange={(checked) =>
-                                        handleAutomationChange(
-                                          "autoRebet",
-                                          checked,
-                                        )
-                                      }
-                                    />
-                                    <Label
-                                      htmlFor="auto-rebet"
-                                      className="text-gray-300 text-sm"
-                                    >
-                                      Enable auto-rebet on failure
-                                    </Label>
-                                  </div>
-                                  {automation.autoRebet && (
-                                    <div className="grid grid-cols-2 gap-4 pl-6">
-                                      <div>
-                                        <Label className="text-gray-300 text-sm">
-                                          Max Attempts
-                                        </Label>
-                                        <Slider
-                                          value={[
-                                            automation.rebetSettings
-                                              .maxAttempts,
-                                          ]}
-                                          onValueChange={([value]) =>
-                                            setAutomation((prev) => ({
-                                              ...prev,
-                                              rebetSettings: {
-                                                ...prev.rebetSettings,
-                                                maxAttempts: value,
-                                              },
-                                            }))
-                                          }
-                                          max={10}
-                                          min={1}
-                                          step={1}
-                                          className="mt-2"
-                                        />
-                                        <div className="text-xs text-gray-400 text-center mt-1">
-                                          {automation.rebetSettings.maxAttempts}{" "}
-                                          attempts
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <Label className="text-gray-300 text-sm">
-                                          Delay (seconds)
-                                        </Label>
-                                        <Slider
-                                          value={[
-                                            automation.rebetSettings
-                                              .delayBetween,
-                                          ]}
-                                          onValueChange={([value]) =>
-                                            setAutomation((prev) => ({
-                                              ...prev,
-                                              rebetSettings: {
-                                                ...prev.rebetSettings,
-                                                delayBetween: value,
-                                              },
-                                            }))
-                                          }
-                                          max={300}
-                                          min={10}
-                                          step={10}
-                                          className="mt-2"
-                                        />
-                                        <div className="text-xs text-gray-400 text-center mt-1">
-                                          {
-                                            automation.rebetSettings
-                                              .delayBetween
-                                          }
-                                          s delay
-                                        </div>
-                                      </div>
-                                    </div>
+                                  x (
+                                  {formatCurrency(
+                                    optionPercentages[index] ?? 0,
                                   )}
+                                  %)
                                 </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
 
-                    <TabsContent value="scheduled" className="space-y-4 mt-4">
-                      <Card className="bg-[#1A1F2C]/50 border-gray-800/50">
-                        <CardContent className="p-4">
-                          <div className="text-center py-8">
-                            <Timer className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-400">
-                              Scheduled betting coming soon
-                            </p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              Schedule bets to execute at specific times
-                            </p>
+                      {/* Amount Input */}
+                      <div>
+                        <Label htmlFor="amount-immediate">
+                          Bet Amount (FLOW)
+                        </Label>
+                        <Input
+                          id="amount-immediate"
+                          type="number"
+                          step="0.01"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="bg-[#0A0C14] border-gray-700 text-white h-12 text-lg"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>Bal: {formatCurrency(balance)}</span>
+                          <span>
+                            Min: {formatCurrency(market.minBet)} | Max:{" "}
+                            {formatCurrency(market.maxBet)}
+                          </span>
+                        </div>
+                        {/* Quick Amount Buttons */}
+                        {quickAmounts.length > 0 && (
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {quickAmounts.map((quickAmount) => (
+                              <Button
+                                key={quickAmount}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAmount(quickAmount)}
+                                className="border-gray-700 text-white hover:border-[#9b87f5]/50 text-xs h-8 bg-purple-700 hover:bg-purple-600"
+                              >
+                                {formatCurrency(quickAmount)}
+                              </Button>
+                            ))}
                           </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
                   {/* Bet Summary */}
-                  {amount && isValidAmount && (
+                  {amount && isValidAmount && selectedOptionIndex !== null && (
                     <Card className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 border border-gray-800/50">
                       <CardContent className="p-4">
                         <div className="flex items-center space-x-2 mb-3">
-                          <Calculator className="h-4 w-4 text-[#9b87f5]" />
-                          <span className="text-sm font-medium text-gray-300">
-                            Bet Summary
-                          </span>
+                          {" "}
+                          <Calculator /> Bet Summary{" "}
                         </div>
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Betting on:</span>
-                            <Badge className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
-                              {side === "optionA"
-                                ? market.optionA
-                                : market.optionB}
-                            </Badge>
+                          <div className="flex justify-between">
+                            {" "}
+                            <span>Betting on:</span>{" "}
+                            <Badge>{selectedOptionName}</Badge>{" "}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Amount:</span>
-                            <span className="text-white font-medium">
-                              {formatCurrency(amount)} FLOW
-                            </span>
+                          <div className="flex justify-between">
+                            {" "}
+                            <span>Amount:</span>{" "}
+                            <span>{formatCurrency(amount)} FLOW</span>{" "}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Current Odds:</span>
-                            <span className="text-white font-medium">
-                              {formatCurrency(currentOdds)}x
-                            </span>
+                          <div className="flex justify-between">
+                            {" "}
+                            <span>Odds:</span>{" "}
+                            <span>{formatCurrency(currentOdds)}x</span>{" "}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">
-                              Potential Payout:
-                            </span>
-                            <span className="text-green-400 font-medium">
+                          <div className="flex justify-between">
+                            {" "}
+                            <span>Payout:</span>{" "}
+                            <span className="text-green-400">
                               {getEstimatedPayout()} FLOW
-                            </span>
+                            </span>{" "}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Execution:</span>
-                            <div className="flex items-center gap-1 text-white font-medium">
-                              {getBetTypeIcon()}
-                              <span className="capitalize">
-                                {automation.type}
-                              </span>
-                            </div>
-                          </div>
+                          {/* Execution removed */}
                         </div>
-                        <div className="mt-3 p-2 bg-[#9b87f5]/10 rounded text-xs text-gray-400">
-                          {getBetTypeDescription()}
-                        </div>
+                        {/* Description removed */}
                       </CardContent>
                     </Card>
                   )}
@@ -1237,7 +701,7 @@ export function BetDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-12"
+            className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-10"
             disabled={isLoading || userAccount.isCreating}
           >
             Cancel
@@ -1245,31 +709,18 @@ export function BetDialog({
           {user && userAccount.exists ? (
             <Button
               onClick={placeBet}
-              disabled={
-                !amount ||
-                !isValidAmount ||
-                isLoading ||
-                (automation.type !== "immediate" && !forteInitialized)
-              }
-              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200 disabled:opacity-50"
+              disabled={!amount || !isValidAmount || isLoading}
+              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-10 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200 disabled:opacity-50"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {automation.type === "immediate"
-                    ? "Placing Bet..."
-                    : "Creating Automation..."}
+                  Placing Bet...
                 </>
               ) : (
                 <>
-                  {getBetTypeIcon()}
-                  <span className="ml-2">
-                    {automation.type === "immediate"
-                      ? "Place Bet"
-                      : automation.type === "conditional"
-                        ? "Create Conditional Bet"
-                        : "Schedule Bet"}
-                  </span>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Place Bet
                 </>
               )}
             </Button>
@@ -1277,7 +728,7 @@ export function BetDialog({
             <Button
               onClick={connectWallet}
               disabled={isLoading || userAccount.isCreating}
-              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-12 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200"
+              className="flex-1 bg-gradient-to-r from-[#9b87f5] to-[#8b5cf6] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white h-10 font-semibold shadow-lg shadow-[#9b87f5]/25 hover:shadow-[#9b87f5]/40 transition-all duration-200"
             >
               <LogIn className="h-4 w-4 mr-2" />
               Connect Wallet

@@ -1,7 +1,7 @@
 export const setCookie = (
   name: string,
   value: string,
-  days: number = 365
+  days: number = 365,
 ): void => {
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
@@ -21,8 +21,9 @@ export const getCookie = (name: string): string | null => {
 
 export interface BetInfo {
   marketId: string;
-  side: "optionA" | "optionB";
+  side?: "optionA" | "optionB";
   amount: number;
+  optionIndex?: number;
   shares: number;
   timestamp: number;
   transactionId: string;

@@ -24,7 +24,7 @@ import {
 import flowConfig from "@/lib/flow/config";
 import { useAuth } from "@/providers/auth-provider";
 import type { Market, MarketStatus } from "@/types/market";
-import { generateShortNameFromWallet } from "@/utils";
+// import { generateShortNameFromWallet } from "@/utils";
 import * as fcl from "@onflow/fcl";
 import {
   Activity,
@@ -135,7 +135,7 @@ function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
   let totalPnL = 0;
   positions.forEach((pos) => {
     const market = allMarkets.find(
-      (m) => m.id.toString() === pos.marketId.toString()
+      (m) => m.id.toString() === pos.marketId.toString(),
     );
     if (market && market.resolved) {
       let payout = 0;
@@ -162,13 +162,13 @@ function calculatePnL(positions: UserPosition[], allMarkets: Market[]): number {
 
 function calculateWinRate(
   positions: UserPosition[],
-  allMarkets: Market[]
+  allMarkets: Market[],
 ): number {
   let wins = 0;
   let resolved = 0;
   positions.forEach((pos) => {
     const market = allMarkets.find(
-      (m) => m.id.toString() === pos.marketId.toString()
+      (m) => m.id.toString() === pos.marketId.toString(),
     );
     if (market && market.resolved) {
       resolved++;
@@ -347,7 +347,7 @@ export default function UserDashboardPage() {
       };
       setData(fallbackData);
       setError(
-        "Unable to fetch all user data. Some features may not be available yet."
+        "Unable to fetch all user data. Some features may not be available yet.",
       );
     } finally {
       setLoading(false);
@@ -414,7 +414,7 @@ export default function UserDashboardPage() {
           status: pos.status?.rawValue ?? "Unknown",
           claimableAmount: pos.claimableAmount?.toString() ?? "0",
           claimed: pos.claimed ?? false,
-        })
+        }),
       );
       setAllPositions(positions);
     } catch (err) {
@@ -645,7 +645,7 @@ export default function UserDashboardPage() {
                       {supabaseUser?.joined_at
                         ? new Date(supabaseUser.joined_at).toLocaleDateString()
                         : new Date(
-                            parseInt(data?.profile.joinDate || "0") * 1000
+                            parseInt(data?.profile.joinDate || "0") * 1000,
                           ).toLocaleDateString()}
                     </span>
                   </div>
@@ -900,7 +900,7 @@ export default function UserDashboardPage() {
                 <tbody>
                   {data.claimableWinnings.map((win: any) => {
                     const market = allMarkets.find(
-                      (m) => m.id.toString() === win.marketId.toString()
+                      (m) => m.id.toString() === win.marketId.toString(),
                     );
                     return (
                       <tr
@@ -948,7 +948,7 @@ export default function UserDashboardPage() {
 
                                 const market = allMarkets.find(
                                   (m) =>
-                                    m.id.toString() === win.marketId.toString()
+                                    m.id.toString() === win.marketId.toString(),
                                 );
                                 await awardPoints(
                                   "WIN_BET",
@@ -959,11 +959,11 @@ export default function UserDashboardPage() {
                                       `Market #${win.marketId}`,
                                     winnings: parseFloat(win.amount),
                                   },
-                                  win.marketId
+                                  win.marketId,
                                 );
 
                                 setClaimSuccess(
-                                  "Winnings claimed successfully!"
+                                  "Winnings claimed successfully!",
                                 );
                                 setTimeout(() => setClaimSuccess(null), 2000);
                                 await fetchUserData();
@@ -971,7 +971,7 @@ export default function UserDashboardPage() {
                                 await fetchAllPositions(userAddress);
                               } catch (err: any) {
                                 setClaimError(
-                                  err.message || "Failed to claim winnings"
+                                  err.message || "Failed to claim winnings",
                                 );
                               } finally {
                                 setClaimingMarketId(null);
@@ -1352,7 +1352,7 @@ export default function UserDashboardPage() {
                             <div className="flex items-center space-x-2 mt-1">
                               <span
                                 className={`text-sm ${getActivityColor(
-                                  activity.type
+                                  activity.type,
                                 )}`}
                               >
                                 Created market
@@ -1514,7 +1514,7 @@ export default function UserDashboardPage() {
                             <p className="text-gray-400">Ends</p>
                             <p className="text-white font-medium">
                               {new Date(
-                                parseFloat(trade.endTime) * 1000
+                                parseFloat(trade.endTime) * 1000,
                               ).toLocaleString()}
                             </p>
                           </div>

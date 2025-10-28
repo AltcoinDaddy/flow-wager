@@ -1,7 +1,7 @@
-import * as fcl from "@onflow/fcl";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  getFlowWagerAddress,
   getFlowTokenAddress,
+  getFlowWagerAddress,
   getFungibleTokenAddress,
 } from "./flow-wager-scripts";
 

@@ -13,6 +13,13 @@ export const getFlowTokenAddress = () => {
     : process.env.NEXT_PUBLIC_FLOW_TESTNET_TOKEN || "0x7e60df042a9c0868";
 };
 
+export const getFlowUpdateAddress = () => {
+  const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+  return network === "mainnet"
+    ? process.env.NEXT_PUBLIC_FLOWUPDATE_ADDRESS || "0x24225e374dfffb2b"
+    : process.env.NEXT_PUBLIC_FLOWUPDATE_ADDRESS || "0x24225e374dfffb2b";
+};
+
 export const getFungibleTokenAddress = () => {
   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
   return network === "mainnet"
@@ -22,329 +29,118 @@ export const getFungibleTokenAddress = () => {
         "0x9a0766d93b6608b7";
 };
 
+export const getFlowWagerV2Address = () => {
+  const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+  return network === "mainnet"
+    ? process.env.NEXT_PUBLIC_FLOWWAGER_V2_CONTRACT_ADDRESS ||
+        "0x27fc2c971e60cf00"
+    : process.env.NEXT_PUBLIC_FLOWWAGER_V2_CONTRACT_ADDRESS ||
+        "0x27fc2c971e60cf00";
+};
+
+const sumHelper = `
+  access(all) fun sum(numbers: [UFix64]): UFix64 {
+    var total: UFix64 = 0.0
+    for num in numbers {
+        total = total + num
+    }
+    return total
+  }
+`;
+
+// // --- ADDRESS HELPER FUNCTIONS ---
+// // (Ensure these point to the correct V2 contract addresses in your .env)
+
+// export const getFlowTokenAddress = () => {
+//   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+//   return network === "mainnet"
+//     ? process.env.NEXT_PUBLIC_FLOW_MAINNET_TOKEN || "0x1654653399040a61" // Example Mainnet
+//     : process.env.NEXT_PUBLIC_FLOW_TESTNET_TOKEN || "0x7e60df042a9c0868"; // Example Testnet
+// };
+
+// export const getFungibleTokenAddress = () => {
+//   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+//   return network === "mainnet"
+//     ? process.env.NEXT_PUBLIC_FLOW_FUNGIBLE_MAINNET_TOKEN ||
+//         "0xf233dcee88fe0abe" // Example Mainnet
+//     : process.env.NEXT_PUBLIC_FLOW_FUNGIBLE_TESTNET_TOKEN ||
+//         "0x9a0766d93b6608b7"; // Example Testnet
+// };
+
+// export const getFlowWagerV2Address = () => {
+//   const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || "testnet";
+//   // IMPORTANT: Use V2-specific environment variables if you have them
+//   return network === "mainnet"
+//     ? process.env.NEXT_PUBLIC_FLOWWAGER_V2_MAINNET_CONTRACT // Replace if needed
+//     : process.env.NEXT_PUBLIC_FLOWWAGER_V2_TESTNET_CONTRACT || // Replace if needed
+//         "0x512a5459cb3a2b20"; // <-- REPLACE WITH YOUR ACTUAL DEPLOYED V2 ADDRESS
+// };
+
+// // --- CADENCE HELPER FUNCTIONS ---
+// const sumHelper = `
+//   access(all) fun sum(numbers: [UFix64]): UFix64 {
+//     var total: UFix64 = 0.0
+//     for num in numbers {
+//         total = total + num
+//     }
+//     return total
+//   }
+// `;
+
+// --- V2 CADENCE SCRIPTS OBJECT ---
+
 const CADENCE_SCRIPTS = {
-  getAllPendingMarkets: `
-    import FlowWager from ${getFlowWagerAddress()}
-     access(all) struct PendingMarketDetails {
-    access(all) let market: FlowWager.Market
-    access(all) let evidence: FlowWager.ResolutionEvidence?
-    access(all) let totalVolume: UFix64
-    access(all) let participantCount: UInt64
-    access(all) let daysSinceEnded: UFix64
-    access(all) let hasEvidence: Bool
-    
-    init(
-        market: FlowWager.Market,
-        evidence: FlowWager.ResolutionEvidence?,
-        totalVolume: UFix64,
-        participantCount: UInt64,
-        daysSinceEnded: UFix64,
-        hasEvidence: Bool
-    ) {
-        self.market = market
-        self.evidence = evidence
-        self.totalVolume = totalVolume
-        self.participantCount = participantCount
-        self.daysSinceEnded = daysSinceEnded
-        self.hasEvidence = hasEvidence
-    }
-}
-        access(all) fun main(creatorAddress: Address): [PendingMarketDetails] {
-    let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
-    let pendingMarkets: [PendingMarketDetails] = []
-    let currentTime = getCurrentBlock().timestamp
-    
-    for market in creatorMarkets {
-        // Check if market is in pending resolution status
-        if market.status == FlowWager.MarketStatus.PendingResolution {
-            // Get evidence if it exists
-            let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-            
-            // Calculate total volume
-            let totalVolume = market.totalOptionAShares + market.totalOptionBShares
-            
-            // Calculate days since market ended
-            let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
-            let daysSinceEnded = secondsSinceEnded / 86400.0 // Convert seconds to days
-            
-            // Get actual participant count from contract's marketParticipants mapping
-            let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
-            
-            pendingMarkets.append(PendingMarketDetails(
-                market: market,
-                evidence: evidence,
-                totalVolume: totalVolume,
-                participantCount: participantCount,
-                daysSinceEnded: daysSinceEnded,
-                hasEvidence: evidence != nil
-            ))
-        }
-    }
-    
-    return pendingMarkets
-}
-    `,
-  getUserTrades: `
-    import FlowWager from ${getFlowWagerAddress()}
-    import FlowToken from ${getFlowTokenAddress()}
-import FungibleToken from  ${getFungibleTokenAddress()}
+  // --- QUERIES (Scripts) ---
 
-access(all) struct TradeDetails {
-    access(all) let marketId: UInt64
-    access(all) let marketTitle: String
-    access(all) let marketDescription: String
-    access(all) let optionA: String
-    access(all) let optionB: String
-    access(all) let optionAShares: UFix64
-    access(all) let optionBShares: UFix64
-    access(all) let totalInvested: UFix64
-    access(all) let averagePrice: UFix64
-    access(all) let endTime: UFix64
-    access(all) let currentValue: UFix64
-    access(all) let profitLoss: Fix64
+  getAllMarkets: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    init(
-        marketId: UInt64,
-        marketTitle: String,
-        marketDescription: String,
-        optionA: String,
-        optionB: String,
-        optionAShares: UFix64,
-        optionBShares: UFix64,
-        totalInvested: UFix64,
-        averagePrice: UFix64,
-        endTime: UFix64,
-        currentValue: UFix64,
-        profitLoss: Fix64
-    ) {
-        self.marketId = marketId
-        self.marketTitle = marketTitle
-        self.marketDescription = marketDescription
-        self.optionA = optionA
-        self.optionB = optionB
-        self.optionAShares = optionAShares
-        self.optionBShares = optionBShares
-        self.totalInvested = totalInvested
-        self.averagePrice = averagePrice
-        self.endTime = endTime
-        self.currentValue = currentValue
-        self.profitLoss = profitLoss
-    }
-}
-
-access(all) struct UserTrades {
-    access(all) let activeTrades: [TradeDetails]
-    access(all) let totalDeposited: UFix64
-
-    init(activeTrades: [TradeDetails], totalDeposited: UFix64) {
-        self.activeTrades = activeTrades
-        self.totalDeposited = totalDeposited
-    }
-}
-
-access(all) fun calculateCurrentValue(
-    position: FlowWager.UserPosition,
-    market: FlowWager.Market
-): UFix64 {
-    let totalShares = position.optionAShares + position.optionBShares
-    if totalShares == 0.0 {
-        return 0.0
-    }
-    
-    let totalMarketShares = market.totalOptionAShares + market.totalOptionBShares
-    if totalMarketShares == 0.0 {
-        return position.totalInvested
-    }
-    
-    let shareRatio = totalShares / totalMarketShares
-    let distributablePool = market.totalPool * (1.0 - (FlowWager.platformFeePercentage / 100.0))
-    
-    return distributablePool * shareRatio
-}
-
-access(all) fun main(userAddress: Address): UserTrades {
-    let positionsDict = FlowWager.getUserPositions(address: userAddress)
-    var activeTrades: [TradeDetails] = []
-    var totalDeposited: UFix64 = 0.0
-    
-    for marketId in positionsDict.keys {
-        if let market = FlowWager.getMarketById(marketId: marketId) {
-            if market.status == FlowWager.MarketStatus.Active {
-                let position = positionsDict[marketId]!
-                
-                let currentValue = calculateCurrentValue(position: position, market: market)
-                let profitLoss = Fix64(currentValue) - Fix64(position.totalInvested)
-                
-                activeTrades.append(TradeDetails(
-                    marketId: marketId,
-                    marketTitle: market.title,
-                    marketDescription: market.description,
-                    optionA: market.optionA,
-                    optionB: market.optionB,
-                    optionAShares: position.optionAShares,
-                    optionBShares: position.optionBShares,
-                    totalInvested: position.totalInvested,
-                    averagePrice: position.averagePrice,
-                    endTime: market.endTime,
-                    currentValue: currentValue,
-                    profitLoss: profitLoss
-                ))
-            }
-            // Sum totalInvested for all positions (active or not)
-            totalDeposited = totalDeposited + positionsDict[marketId]!.totalInvested
-        }
-    }
-    
-    return UserTrades(activeTrades: activeTrades, totalDeposited: totalDeposited)
-}
-  `,
-
-  getActiveUserPositions: `
-    import FlowWager from ${getFlowWagerAddress()}
-    import FlowToken from ${getFlowTokenAddress()}
-    import FungibleToken from ${getFungibleTokenAddress()}
-
-    access(all) struct PositionDetails {
-        access(all) let marketId: UInt64
-        access(all) let marketTitle: String
-        access(all) let optionAShares: UFix64
-        access(all) let optionBShares: UFix64
-        access(all) let totalInvested: UFix64
-        access(all) let currentValue: UFix64
-        access(all) let pnl: Fix64
-        access(all) let pnlPercentage: Fix64
-        access(all) let status: FlowWager.MarketStatus
-        access(all) let outcome: UInt8?
-
-        init(
-            marketId: UInt64,
-            marketTitle: String,
-            optionAShares: UFix64,
-            optionBShares: UFix64,
-            totalInvested: UFix64,
-            currentValue: UFix64,
-            pnl: Fix64,
-            pnlPercentage: Fix64,
-            status: FlowWager.MarketStatus,
-            outcome: UInt8?
-        ) {
-            self.marketId = marketId
-            self.marketTitle = marketTitle
-            self.optionAShares = optionAShares
-            self.optionBShares = optionBShares
-            self.totalInvested = totalInvested
-            self.currentValue = currentValue
-            self.pnl = pnl
-            self.pnlPercentage = pnlPercentage
-            self.status = status
-            self.outcome = outcome
-        }
-    }
-
-    access(all) fun calculateCurrentValue(
-        position: FlowWager.UserPosition,
-        market: FlowWager.Market,
-        claimableWinnings: {UInt64: UFix64}
-    ): UFix64 {
-        let totalShares = position.optionAShares + position.optionBShares
-        if totalShares == 0.0 {
-            return 0.0
-        }
-        
-        if market.resolved {
-            return claimableWinnings[market.id] ?? 0.0
-        }
-        
-        let totalMarketShares = market.totalOptionAShares + market.totalOptionBShares
-        if totalMarketShares == 0.0 {
-            return position.totalInvested
-        }
-        
-        let shareRatio = totalShares / totalMarketShares
-        let distributablePool = market.totalPool * (1.0 - (FlowWager.platformFeePercentage / 100.0))
-        
-        return distributablePool * shareRatio
-    }
-
-    access(all) fun main(userAddress: Address): [PositionDetails] {
-        let positionsDict = FlowWager.getUserPositions(address: userAddress)
-        let claimableWinningsRaw = FlowWager.getClaimableWinnings(address: userAddress)
-        let claimableWinnings: {UInt64: UFix64} = {}
-        for cw in claimableWinningsRaw {
-            claimableWinnings[cw.marketId] = cw.amount
-        }
-        
-        var positionDetails: [PositionDetails] = []
-        
-        for marketId in positionsDict.keys {
-            if let market = FlowWager.getMarketById(marketId: marketId) {
-                let position = positionsDict[marketId]!
-                let currentValue = calculateCurrentValue(
-                    position: position,
-                    market: market,
-                    claimableWinnings: claimableWinnings
-                )
-                let pnl = Fix64(currentValue) - Fix64(position.totalInvested)
-                let pnlPercentage = position.totalInvested > 0.0 
-                    ? (pnl / Fix64(position.totalInvested)) * 100.0 
-                    : 0.0
-                
-                positionDetails.append(PositionDetails(
-                    marketId: marketId,
-                    marketTitle: market.title,
-                    optionAShares: position.optionAShares,
-                    optionBShares: position.optionBShares,
-                    totalInvested: position.totalInvested,
-                    currentValue: currentValue,
-                    pnl: pnl,
-                    pnlPercentage: pnlPercentage,
-                    status: market.status,
-                    outcome: market.outcome
-                ))
-            }
-        }
-        
-        return positionDetails
+    access(all) fun main(): [FlowWagerV2.Market] {
+        return FlowWagerV2.getAllMarkets()
     }
   `,
 
   getActiveMarkets: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    access(all) fun main(): [FlowWager.Market] {
-        return FlowWager.getActiveMarkets()
-    }
-  `,
-
-  getAllMarkets: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-    access(all) fun main(): [FlowWager.Market] {
-        return FlowWager.getAllMarkets()
+    access(all) fun main(): [FlowWagerV2.Market] {
+        let allMarkets = FlowWagerV2.getAllMarkets()
+        var activeMarkets: [FlowWagerV2.Market] = []
+        let currentTime = getCurrentBlock().timestamp
+        for market in allMarkets {
+            // Active status and end time in the future
+            if market.status == FlowWagerV2.MarketStatus.Active && market.endTime > currentTime {
+                activeMarkets.append(market)
+            }
+        }
+        return activeMarkets
     }
   `,
 
   getMarketById: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    access(all) fun main(marketId: UInt64): FlowWager.Market? {
-        return FlowWager.getMarketById(marketId: marketId)
+    access(all) fun main(marketId: UInt64): FlowWagerV2.Market? {
+        // Use the contract's public getter
+        return FlowWagerV2.getMarketById(marketId: marketId)
     }
   `,
 
   getMarketByCreator: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    access(all) fun main(creator: Address): [FlowWager.Market] {
-      return FlowWager.getMarketsByCreator(creator: creator)
+    access(all) fun main(creator: Address): [FlowWagerV2.Market] {
+      // Use the contract's public getter
+      return FlowWagerV2.getMarketsByCreator(creator: creator)
     }
   `,
 
   getPlatformStats: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    access(all) fun main(): FlowWager.PlatformStats {
-        return FlowWager.getPlatformStats()
+    access(all) fun main(): FlowWagerV2.PlatformStats {
+        // Use the contract's public getter
+        return FlowWagerV2.getPlatformStats()
     }
   `,
 
@@ -354,1010 +150,910 @@ access(all) fun main(userAddress: Address): UserTrades {
 
     access(all) fun main(address: Address): UFix64 {
         let account = getAccount(address)
-        let vaultRef = account.capabilities.get<&FlowToken.Vault>(/public/flowTokenBalance)
-            .borrow()
-            ?? panic("Could not borrow Vault reference")
+
+        // Borrow the capability restricted to ONLY the FungibleToken.Balance interface
+        let vaultRef = account.capabilities.borrow<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+            ?? panic("Could not borrow Balance reference to the Vault at /public/flowTokenBalance. Ensure the capability is published and accessible.")
+
+        // Access the balance field available through the interface
         return vaultRef.balance
     }
+
   `,
 
   getUserProfile: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-access(all) fun main(address: Address): &{FlowWager.UserProfilePublic}? {
-    return FlowWager.getUserProfile(address: address)
-}
+    // Borrows the public capability for user profile
+    access(all) fun main(address: Address): &{FlowWagerV2.UserProfilePublic}? {
+      let account = getAccount(address)
+      // Attempt to borrow the capability using the correct public path
+      return account.capabilities.borrow<&{FlowWagerV2.UserProfilePublic}>(
+          FlowWagerV2.UserProfilePublicPath
+      ) // Returns nil if capability doesn't exist or isn't borrowable
+    }
+  `,
+
+  // Gets *all* user positions by borrowing the public capability
+  getUserPositions: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+
+    access(all) fun main(userAddress: Address): {UInt64: FlowWagerV2.UserPosition}? {
+        let account = getAccount(userAddress)
+        // Borrow the public capability for the UserPositions resource using the correct path
+        let positionsCap = account.capabilities.borrow<&{FlowWagerV2.UserPositionsPublic}>(
+            FlowWagerV2.UserPositionsPublicPath
+        )
+
+        if positionsCap == nil {
+            log("UserPositionsPublic capability not found or borrowable for address: ".concat(userAddress.toString()))
+            return nil // Return nil if capability doesn't exist or isn't set up
+        }
+
+        // Call the public function on the borrowed capability
+        return positionsCap!.getAllPositions()
+    }
   `,
 
   getPendingMarkets: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    access(all) fun main(): [FlowWager.Market] {
-        return FlowWager.getPendingResolutionMarkets()
-    }
-  `,
-
-  getPendingMarketsWithEvidence: `
-  import FlowWager from ${getFlowWagerAddress()}
-
-  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
-      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
-      let pendingWithEvidence: [FlowWager.Market] = []
-      
-      for market in creatorMarkets {
-          if market.status == FlowWager.MarketStatus.PendingResolution {
-              if FlowWager.getResolutionEvidence(marketId: market.id) != nil {
-                  pendingWithEvidence.append(market)
-              }
-          }
-      }
-      
-      return pendingWithEvidence
-  }
-`,
-
-  getUserPositions: `
-  import FlowWager from ${getFlowWagerAddress()}
-  import FlowToken from ${getFlowTokenAddress()}
-  import FungibleToken from ${getFungibleTokenAddress()}
-
-  access(all) struct PositionDetails {
-      access(all) let marketId: UInt64
-      access(all) let marketTitle: String
-      access(all) let marketDescription: String
-      access(all) let optionA: String
-      access(all) let optionB: String
-      access(all) let optionAShares: UFix64
-      access(all) let optionBShares: UFix64
-      access(all) let totalInvested: UFix64
-      access(all) let averagePrice: UFix64
-      access(all) let endTime: UFix64
-      access(all) let status: FlowWager.MarketStatus
-      access(all) let currentValue: UFix64
-      access(all) let profitLoss: Fix64
-      access(all) let claimableAmount: UFix64
-      access(all) let claimed: Bool
-
-      init(
-          marketId: UInt64,
-          marketTitle: String,
-          marketDescription: String,
-          optionA: String,
-          optionB: String,
-          optionAShares: UFix64,
-          optionBShares: UFix64,
-          totalInvested: UFix64,
-          averagePrice: UFix64,
-          endTime: UFix64,
-          status: FlowWager.MarketStatus,
-          currentValue: UFix64,
-          profitLoss: Fix64,
-          claimableAmount: UFix64,
-          claimed: Bool
-      ) {
-          self.marketId = marketId
-          self.marketTitle = marketTitle
-          self.marketDescription = marketDescription
-          self.optionA = optionA
-          self.optionB = optionB
-          self.optionAShares = optionAShares
-          self.optionBShares = optionBShares
-          self.totalInvested = totalInvested
-          self.averagePrice = averagePrice
-          self.endTime = endTime
-          self.status = status
-          self.currentValue = currentValue
-          self.profitLoss = profitLoss
-          self.claimableAmount = claimableAmount
-          self.claimed = claimed
-      }
-  }
-
-  access(all) fun calculateCurrentValue(
-      position: FlowWager.UserPosition,
-      market: FlowWager.Market,
-      claimableWinnings: {UInt64: UFix64}
-  ): UFix64 {
-      let totalShares = position.optionAShares + position.optionBShares
-      if totalShares == 0.0 {
-          return 0.0
-      }
-      
-      if market.resolved {
-          return claimableWinnings[market.id] ?? 0.0
-      }
-      
-      let totalMarketShares = market.totalOptionAShares + market.totalOptionBShares
-      if totalMarketShares == 0.0 {
-          return position.totalInvested
-      }
-      
-      let shareRatio = totalShares / totalMarketShares
-      let distributablePool = market.totalPool * (1.0 - (FlowWager.platformFeePercentage / 100.0))
-      
-      return distributablePool * shareRatio
-  }
-
-  access(all) fun main(userAddress: Address): [PositionDetails] {
-      let positionsDict = FlowWager.getUserPositions(address: userAddress)
-      let claimableWinningsRaw = FlowWager.getClaimableWinnings(address: userAddress)
-      let claimableWinnings: {UInt64: UFix64} = {}
-      for cw in claimableWinningsRaw {
-          claimableWinnings[cw.marketId] = cw.amount
-      }
-      
-      var positionDetails: [PositionDetails] = []
-      
-      for marketId in positionsDict.keys {
-          if let market = FlowWager.getMarketById(marketId: marketId) {
-              let position = positionsDict[marketId]!
-              
-              let currentValue = calculateCurrentValue(
-                  position: position,
-                  market: market,
-                  claimableWinnings: claimableWinnings
-              )
-              let profitLoss = Fix64(currentValue) - Fix64(position.totalInvested)
-              let claimableAmount = market.resolved && !position.claimed
-                  ? claimableWinnings[marketId] ?? 0.0
-                  : 0.0
-              
-              positionDetails.append(PositionDetails(
-                  marketId: marketId,
-                  marketTitle: market.title,
-                  marketDescription: market.description,
-                  optionA: market.optionA,
-                  optionB: market.optionB,
-                  optionAShares: position.optionAShares,
-                  optionBShares: position.optionBShares,
-                  totalInvested: position.totalInvested,
-                  averagePrice: position.averagePrice,
-                  endTime: market.endTime,
-                  status: market.status,
-                  currentValue: currentValue,
-                  profitLoss: profitLoss,
-                  claimableAmount: claimableAmount,
-                  claimed: position.claimed
-              ))
-          }
-      }
-      
-      return positionDetails
-  }
-`,
-
-  getUserDashboardData: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-access(all) struct UserDashboard {
-    access(all) let profile: &{FlowWager.UserProfilePublic}?
-    access(all) let stats: FlowWager.UserStats?
-    access(all) let positions: {UInt64: FlowWager.UserPosition}
-    access(all) let claimableWinnings: [FlowWager.ClaimableWinnings]
-    access(all) let isRegistered: Bool
-    access(all) let totalMarketsCreated: UInt64
-    access(all) let createdMarkets: [FlowWager.Market]
-    
-    init(
-        profile: &{FlowWager.UserProfilePublic}?,
-        stats: FlowWager.UserStats?,
-        positions: {UInt64: FlowWager.UserPosition},
-        claimableWinnings: [FlowWager.ClaimableWinnings],
-        isRegistered: Bool,
-        totalMarketsCreated: UInt64,
-        createdMarkets: [FlowWager.Market]
-    ) {
-        self.profile = profile
-        self.stats = stats
-        self.positions = positions
-        self.claimableWinnings = claimableWinnings
-        self.isRegistered = isRegistered
-        self.totalMarketsCreated = totalMarketsCreated
-        self.createdMarkets = createdMarkets
-    }
-}
-
-access(all) fun main(userAddress: Address): UserDashboard {
-    // Get user profile (returns a reference, not the resource itself)
-    let profile = FlowWager.getUserProfile(address: userAddress)
-    
-    // Get user stats
-    let stats = FlowWager.getUserStats(address: userAddress)
-    
-    // Get user positions (with error handling for unregistered users)
-    var positions: {UInt64: FlowWager.UserPosition} = {}
-    if stats != nil {
-        positions = FlowWager.getUserPositions(address: userAddress)
-    }
-    
-    // Get claimable winnings
-    let claimableWinnings = FlowWager.getClaimableWinnings(address: userAddress)
-    
-    // Check if user is registered
-    let isRegistered = stats != nil && profile != nil
-    
-    // Get markets created by this user
-    let createdMarkets = FlowWager.getMarketsByCreator(creator: userAddress)
-    let totalMarketsCreated = UInt64(createdMarkets.length)
-    
-    return UserDashboard(
-        profile: profile,
-        stats: stats,
-        positions: positions,
-        claimableWinnings: claimableWinnings,
-        isRegistered: isRegistered,
-        totalMarketsCreated: totalMarketsCreated,
-        createdMarkets: createdMarkets
-    )
-}
-  `,
-
-  activeUserPositions: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-    access(all) struct ActivePosition {
-        access(all) let marketId: UInt64
-        access(all) let marketTitle: String
-        access(all) let optionAShares: UFix64
-        access(all) let optionBShares: UFix64
-        access(all) let totalInvested: UFix64
-
-        init(
-            marketId: UInt64,
-            marketTitle: String,
-            optionAShares: UFix64,
-            optionBShares: UFix64,
-            totalInvested: UFix64
-        ) {
-            self.marketId = marketId
-            self.marketTitle = marketTitle
-            self.optionAShares = optionAShares
-            self.optionBShares = optionBShares
-            self.totalInvested = totalInvested
-        }
-    }
-
-    access(all) fun main(userAddress: Address): [ActivePosition] {
-        let positionsDict = FlowWager.getUserPositions(address: userAddress)
-        var activePositions: [ActivePosition] = []
-        for marketId in positionsDict.keys {
-            if let market = FlowWager.getMarketById(marketId: marketId) {
-                if market.status == FlowWager.MarketStatus.Active {
-                    let position = positionsDict[marketId]!
-                    activePositions.append(ActivePosition(
-                        marketId: marketId,
-                        marketTitle: market.title,
-                        optionAShares: position.optionAShares,
-                        optionBShares: position.optionBShares,
-                        totalInvested: position.totalInvested
-                    ))
-                }
+    access(all) fun main(): [FlowWagerV2.Market] {
+        let allMarkets = FlowWagerV2.getAllMarkets()
+        var pendingMarkets: [FlowWagerV2.Market] = []
+        let currentTime = getCurrentBlock().timestamp
+        for market in allMarkets {
+            // Markets explicitly marked as PendingResolution OR
+            // Active markets whose end time has passed but haven't been resolved/cancelled yet
+            if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                pendingMarkets.append(market)
             }
         }
-        return activePositions
+        return pendingMarkets
     }
   `,
 
+  // Calculates claimable winnings for a user by iterating positions
   getClaimableWinnings: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+    import FungibleToken from ${getFungibleTokenAddress()} // For type reference
 
-    access(all) fun main(address: Address): [FlowWager.ClaimableWinnings] {
-        return FlowWager.getClaimableWinnings(address: address)
+    access(all) fun main(address: Address): [FlowWagerV2.ClaimableWinnings] {
+        let acct = getAccount(address)
+        // Borrow the public capability to access user's positions
+        let positionsCap = acct.capabilities.borrow<&{FlowWagerV2.UserPositionsPublic}>(
+            FlowWagerV2.UserPositionsPublicPath
+        )
+
+        // If the user doesn't have the resource/capability, they have no winnings
+        if positionsCap == nil {
+            log("User positions capability not found or borrowable.")
+            return []
+        }
+
+        let positions = positionsCap!.getAllPositions()
+        var winnings: [FlowWagerV2.ClaimableWinnings] = []
+
+        for position in positions.values {
+            // Use a helper function that safely attempts the calculation
+            let amount = self.safeCalculateWinnings(marketId: position.marketId, userPosition: position)
+            // Only add if calculation succeeded and amount is positive
+            if amount != nil && amount! > 0.0 {
+                winnings.append(FlowWagerV2.ClaimableWinnings(marketId: position.marketId, amount: amount!))
+            }
+        }
+        return winnings
+    }
+
+    // Helper function to safely calculate winnings, returning nil on expected errors
+    access(self) fun safeCalculateWinnings(marketId: UInt64, userPosition: FlowWagerV2.UserPosition): UFix64? {
+        // Basic checks before calling the potentially panicking contract function
+        if userPosition.claimed { return nil } // Already claimed
+
+        let market = FlowWagerV2.getMarketById(marketId: marketId)
+        // Market must exist, be resolved, and have a winning option defined
+        if market == nil || !market!.resolved || market!.winningOption == nil { return nil }
+        // User must have bet on the winning option (shares > 0)
+        // Accessing optionShares requires index check if array length varies (though fixed in V2)
+        let winningIndex = Int(market!.winningOption!)
+        if winningIndex >= userPosition.optionShares.length || userPosition.optionShares[winningIndex] == 0.0 { return nil }
+
+        // Attempt the main calculation using the contract's public function within a try-catch equivalent
+        var calculatedAmount: UFix64 = 0.0
+        var error: String? = nil
+        let success = panic( // 'panic' here is used to simulate try-catch behavior in Cadence scripts
+             try {
+                calculatedAmount = FlowWagerV2.calculateWinnings(marketId: marketId, userPosition: userPosition)
+                return true // Indicate success
+             } catch e {
+                error = e.message // Capture error message if panic occurs
+                return false // Indicate failure
+             }
+        )
+
+        if success {
+            return calculatedAmount
+        } else {
+             // Log unexpected errors, but return nil for expected ones caught by calculateWinnings asserts
+             if error != nil
+                 && !error!.contains("Market is not resolved")
+                 && !error!.contains("No winning option set")
+                 && !error!.contains("Winnings already claimed")
+                 && !error!.contains("User did not bet on winning option") {
+                log("Unexpected error in calculateWinnings for market ".concat(marketId.toString()).concat(": ").concat(error!))
+             }
+            // Return nil if calculation failed for expected reasons or unexpectedly
+            return nil
+        }
     }
   `,
+
+  // Checks if user has necessary resources/capabilities set up
+  checkUserRegistered: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+
+    access(all) fun main(userAddress: Address): {String: AnyStruct} {
+        // 1. Check contract state (userStats exists?)
+        // Uses the public getUserStats which returns UserStats? (nil if not found)
+        let userStats = FlowWagerV2.getUserStats(user: userAddress)
+        let isRegisteredInContract = userStats != nil
+
+        let account = getAccount(userAddress)
+
+        // 2. Check for resource capabilities by attempting to borrow them
+        let profileCap = account.capabilities.borrow<&{FlowWagerV2.UserProfilePublic}>(FlowWagerV2.UserProfilePublicPath)
+        let hasUserProfile = profileCap != nil
+
+        let positionsCap = account.capabilities.borrow<&{FlowWagerV2.UserPositionsPublic}>(FlowWagerV2.UserPositionsPublicPath)
+        let hasUserPositions = positionsCap != nil
+
+        let statsResourceCap = account.capabilities.borrow<&{FlowWagerV2.UserStatsPublic}>(FlowWagerV2.UserStatsPublicPath)
+        let hasUserStatsResource = statsResourceCap != nil
+
+        // 3. Get profile details if possible from borrowed capability
+        var username: String? = nil
+        var displayName: String? = nil
+        var joinedAt: UFix64? = nil
+        if hasUserProfile {
+             // Safely access fields via the borrowed capability reference
+             username = profileCap?.getUsername()
+             displayName = profileCap?.getDisplayName()
+             joinedAt = profileCap?.joinedAt
+        }
+
+        // 4. Determine overall registration status
+        // User is considered fully set up if registered in contract AND has all necessary resources/capabilities
+        let isFullyRegistered = isRegisteredInContract && hasUserProfile && hasUserPositions && hasUserStatsResource
+
+        // 5. Return structured result
+        return {
+            "address": userAddress,
+            "isRegisteredInContract": isRegisteredInContract, // Based on getUserStats
+            "hasUserProfile": hasUserProfile,               // Based on capability borrow
+            "hasUserPositions": hasUserPositions,           // Based on capability borrow
+            "hasUserStatsResource": hasUserStatsResource,     // Based on capability borrow
+            "isFullyRegistered": isFullyRegistered,         // Combination check
+            "username": username,                         // From profile capability
+            "displayName": displayName,                     // From profile capability
+            "joinedAt": joinedAt,                         // From profile capability
+            "userStats": userStats                        // The actual stats struct (or nil)
+        }
+    }
+  `,
+
+  // Gets detailed position info including calculated value/PnL
+  getUserPositionsDetails: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+    import FungibleToken from ${getFungibleTokenAddress()} // For UFix64 type
+
+    ${sumHelper} // Include helper function definition
+
+    // Structure to hold detailed info for one position
+    access(all) struct PositionDetails {
+        access(all) let marketId: UInt64
+        access(all) let marketTitle: String? // Optional: Included if market fetched
+        access(all) let options: [String]? // Optional: Included if market fetched
+        access(all) let optionShares: [UFix64]
+        access(all) let totalInvested: UFix64
+        access(all) let averagePrice: UFix64
+        access(all) let claimed: Bool
+        access(all) let createdAt: UFix64
+        access(all) let status: FlowWagerV2.MarketStatus? // Optional: Included if market fetched
+        access(all) let winningOption: UInt8? // Optional: Included if market fetched
+        access(all) let currentValue: UFix64 // Calculated
+        access(all) let profitLoss: Fix64 // Calculated
+        access(all) let claimableAmount: UFix64 // Calculated
+
+        init(
+            position: FlowWagerV2.UserPosition,
+            marketData: FlowWagerV2.Market? // Pass optional market data fetched by the script
+        ) {
+            // Assign basic position data
+            self.marketId = position.marketId
+            self.optionShares = position.optionShares
+            self.totalInvested = position.totalInvested
+            self.averagePrice = position.averagePrice
+            self.claimed = position.claimed
+            self.createdAt = position.createdAt
+
+            // Assign optional market data
+            self.marketTitle = marketData?.title
+            self.options = marketData?.options
+            self.status = marketData?.status
+            self.winningOption = marketData?.winningOption
+
+            // --- Calculate Derived Values ---
+            var cv: UFix64 = 0.0 // Current Value
+            var ca: UFix64 = 0.0 // Claimable Amount
+            var pl: Fix64 = Fix64(0.0) // Profit/Loss
+
+            // Only perform calculations if market data is available
+            if marketData != nil {
+                let market = marketData!
+                let userTotalShares = sum(numbers: position.optionShares)
+
+                if market.resolved {
+                    // Check if user won and hasn't claimed
+                    if market.winningOption != nil && !position.claimed {
+                        let winIndex = Int(market.winningOption!)
+                        // Check if winIndex is valid for the position's shares array
+                        if winIndex < position.optionShares.length && position.optionShares[winIndex] > 0.0 {
+                            // Safely attempt calculation using helper
+                            let calculatedWinnings = FlowWagerV2.safeCalculateWinningsHelper(marketId: market.id, userPosition: position)
+                            if calculatedWinnings != nil {
+                                cv = calculatedWinnings!
+                                ca = calculatedWinnings!
+                            }
+                        }
+                    }
+                    // If lost, claimed, or market error, cv and ca remain 0.0
+                } else if market.status == FlowWagerV2.MarketStatus.Active {
+                    // Use pool share logic for active markets
+                    let marketTotalShares = sum(numbers: market.totalShares)
+                    if marketTotalShares > 0.0 && userTotalShares > 0.0 {
+                        let shareRatio = UFix64(userTotalShares) / UFix64(marketTotalShares)
+                        let feePercentage = FlowWagerV2.platformFeePercentage // Access contract state
+                        let distributablePool = market.totalPool * (1.0 - (feePercentage / 100.0))
+                        cv = distributablePool * shareRatio
+                    } else if userTotalShares > 0.0 {
+                        // If market pool is empty but user has shares, value is investment
+                        cv = position.totalInvested
+                    }
+                    // Else value is 0 if user has no shares in an active market pool
+                }
+                // If Pending, Cancelled, or other non-active/non-resolved states, current value defaults to 0.0
+            } else {
+                // Fallback if market data couldn't be fetched (e.g., market deleted?)
+                // Set value to 0 as we can't determine its worth without market state.
+                cv = 0.0
+                log("Warning: Market data not found for position on market ".concat(position.marketId.toString()))
+            }
+
+            self.currentValue = cv
+            // Calculate profit/loss AFTER determining currentValue
+            pl = Fix64(cv) - Fix64(position.totalInvested)
+            self.profitLoss = pl
+            self.claimableAmount = ca // Set based on resolved calculation (will be 0 otherwise)
+        }
+    }
+
+     // Add the safe calculation helper function from getClaimableWinnings script
+     // It needs to be marked access(all) if PositionDetails is access(all) and calls it
+     access(all) fun safeCalculateWinningsHelper(marketId: UInt64, userPosition: FlowWagerV2.UserPosition): UFix64? {
+        if userPosition.claimed { return nil }
+        let market = FlowWagerV2.getMarketById(marketId: marketId)
+        if market == nil || !market!.resolved || market!.winningOption == nil { return nil }
+        let winningIndex = Int(market!.winningOption!)
+        if winningIndex >= userPosition.optionShares.length || userPosition.optionShares[winningIndex] == 0.0 { return nil }
+
+        var calculatedAmount: UFix64 = 0.0; var error: String? = nil
+        let success = panic( try { calculatedAmount = FlowWagerV2.calculateWinnings(marketId: marketId, userPosition: userPosition); return true } catch e { error = e.message; return false } )
+        if success { return calculatedAmount } else { if error != nil { log("safeCalculateWinningsHelper Error: ".concat(error!)) }; return nil }
+     }
+
+
+    access(all) fun main(userAddress: Address): [PositionDetails] {
+        let account = getAccount(userAddress)
+        // Borrow the public capability for user positions
+        let positionsCap = account.capabilities.borrow<&{FlowWagerV2.UserPositionsPublic}>(
+            FlowWagerV2.UserPositionsPublicPath
+        )
+        // Return empty array if user has no positions resource/capability
+        if positionsCap == nil {
+            log("User positions capability not found for ".concat(userAddress.toString()))
+            return []
+        }
+
+        let positionsDict = positionsCap!.getAllPositions()
+        var positionDetails: [PositionDetails] = []
+
+        // Iterate through the user's positions
+        for position in positionsDict.values {
+            // Fetch corresponding market data required for calculations
+            let market = FlowWagerV2.getMarketById(marketId: position.marketId)
+            // Create PositionDetails struct, passing the position and fetched market data (or nil)
+            positionDetails.append(PositionDetails(position: position, marketData: market))
+        }
+
+        return positionDetails
+    }
+  `,
+
+  getContractInfo: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+
+    access(all) fun main(): {String: AnyStruct} {
+        // Return public state variables as AnyStruct dictionary
+        return {
+            "deployerAddress": FlowWagerV2.deployerAddress,
+            "adminAddress": FlowWagerV2.adminAddress,
+            "platformFeePercentage": FlowWagerV2.platformFeePercentage,
+            "marketCreationFee": FlowWagerV2.marketCreationFee,
+            "paused": FlowWagerV2.paused,
+            "nextMarketId": FlowWagerV2.nextMarketId,
+            "maxMarkets": FlowWagerV2.maxMarkets,
+            "maxPositionsPerUser": FlowWagerV2.maxPositionsPerUser,
+            "totalPlatformFees": FlowWagerV2.totalPlatformFees,
+            "totalVolumeTraded": FlowWagerV2.totalVolumeTraded
+        }
+    }
+  `,
+
+  getUserDashboardData: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+    import FungibleToken from ${getFungibleTokenAddress()} // For type reference
+
+    // Structure for the returned dashboard data
+    access(all) struct UserDashboard {
+        access(all) let profile: &{FlowWagerV2.UserProfilePublic}? // Reference to public profile
+        access(all) let stats: FlowWagerV2.UserStats? // The stats struct from contract state
+        access(all) let positions: {UInt64: FlowWagerV2.UserPosition} // All user positions
+        access(all) let claimableWinnings: [FlowWagerV2.ClaimableWinnings] // Calculated winnings
+        access(all) let isRegistered: Bool // Overall registration check
+        access(all) let createdMarkets: [FlowWagerV2.Market] // Markets created by user
+
+        init(
+            profile: &{FlowWagerV2.UserProfilePublic}?,
+            stats: FlowWagerV2.UserStats?,
+            positions: {UInt64: FlowWagerV2.UserPosition},
+            claimableWinnings: [FlowWagerV2.ClaimableWinnings],
+            isRegistered: Bool,
+            createdMarkets: [FlowWagerV2.Market]
+        ) {
+            self.profile = profile
+            self.stats = stats
+            self.positions = positions
+            self.claimableWinnings = claimableWinnings
+            self.isRegistered = isRegistered
+            self.createdMarkets = createdMarkets
+        }
+    }
+
+     // Helper function from getClaimableWinnings script - needs access(all) here
+     access(all) fun safeCalculateWinnings(marketId: UInt64, userPosition: FlowWagerV2.UserPosition): UFix64? {
+        if userPosition.claimed { return nil }
+        let market = FlowWagerV2.getMarketById(marketId: marketId)
+        if market == nil || !market!.resolved || market!.winningOption == nil { return nil }
+        let winningIndex = Int(market!.winningOption!)
+        if winningIndex >= userPosition.optionShares.length || userPosition.optionShares[winningIndex] == 0.0 { return nil }
+
+        var calculatedAmount: UFix64 = 0.0; var error: String? = nil
+        let success = panic( try { calculatedAmount = FlowWagerV2.calculateWinnings(marketId: marketId, userPosition: userPosition); return true } catch e { error = e.message; return false } )
+        if success { return calculatedAmount } else { if error != nil { log("safeCalculateWinnings Error in Dashboard Script: ".concat(error!)) }; return nil }
+     }
+
+    access(all) fun main(userAddress: Address): UserDashboard {
+        let account = getAccount(userAddress)
+
+        // 1. Get Profile Reference (borrow safely)
+        let profile = account.capabilities.borrow<&{FlowWagerV2.UserProfilePublic}>(FlowWagerV2.UserProfilePublicPath)
+
+        // 2. Get Stats from Contract State
+        let stats = FlowWagerV2.getUserStats(user: userAddress)
+
+        // 3. Get All Positions (borrow safely)
+        var positions: {UInt64: FlowWagerV2.UserPosition} = {}
+        let positionsCap = account.capabilities.borrow<&{FlowWagerV2.UserPositionsPublic}>(FlowWagerV2.UserPositionsPublicPath)
+        if positionsCap != nil {
+            positions = positionsCap!.getAllPositions()
+        }
+
+        // 4. Calculate Claimable Winnings (using helper)
+        var claimableWinnings: [FlowWagerV2.ClaimableWinnings] = []
+        for position in positions.values {
+            // Call the helper defined within this script's scope
+            let amount = self.safeCalculateWinnings(marketId: position.marketId, userPosition: position)
+            if amount != nil && amount! > 0.0 {
+                claimableWinnings.append(FlowWagerV2.ClaimableWinnings(marketId: position.marketId, amount: amount!))
+            }
+        }
+
+        // 5. Check Registration Status (Presence of all key components)
+        let isRegistered = profile != nil && stats != nil && positionsCap != nil
+
+        // 6. Get Created Markets
+        let createdMarkets = FlowWagerV2.getMarketsByCreator(creator: userAddress)
+
+        // 7. Construct and Return Dashboard Data
+        return UserDashboard(
+            profile: profile,
+            stats: stats,
+            positions: positions,
+            claimableWinnings: claimableWinnings,
+            isRegistered: isRegistered,
+            createdMarkets: createdMarkets
+        )
+    }
+  `,
+
+  // --- MUTATIONS (Transactions) ---
 
   createUserAccount: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+    import FungibleToken from ${getFungibleTokenAddress()}
     import FlowToken from ${getFlowTokenAddress()}
 
-  transaction(username: String, displayName: String, bio: String, profileImageUrl: String) {
-    prepare(signer: auth(BorrowValue, SaveValue, PublishCapability, StorageCapabilities ) &Account) {
-        // Create user account in contract
-        FlowWager.createUserAccount(
-            userAddress: signer.address,
-            username: username,
-            displayName: displayName
-        )
-        
-        // Create and save UserProfile resource
-        let userProfile <- FlowWager.createUserProfile(
-            userAddress: signer.address,
-            username: username,
-            displayName: displayName,
-            bio: bio,
-            profileImageUrl: profileImageUrl
-        )
-        signer.storage.save(<-userProfile, to: FlowWager.UserProfileStoragePath)
-        
-        // Create UserProfile capability
-        let userProfileCap = signer.capabilities.storage.issue<&{FlowWager.UserProfilePublic}>(
-            FlowWager.UserProfileStoragePath
-        )
-        signer.capabilities.publish(userProfileCap, at: FlowWager.UserProfilePublicPath)
-        
-        // Create and save UserPositions resource
-        let userPositions <- FlowWager.createUserPositions()
-        signer.storage.save(<-userPositions, to: FlowWager.UserPositionsStoragePath)
-        
-        // Create UserPositions capability
-        let userPositionsCap = signer.capabilities.storage.issue<&{FlowWager.UserPositionsPublic}>(
-            FlowWager.UserPositionsStoragePath
-        )
-        signer.capabilities.publish(userPositionsCap, at: FlowWager.UserPositionsPublicPath)
-        
-        // Create and save UserStats resource
-        let userStats <- FlowWager.createUserStatsResource()
-        signer.storage.save(<-userStats, to: FlowWager.UserStatsStoragePath)
-        
-        // Create UserStats capability
-        let userStatsCap = signer.capabilities.storage.issue<&{FlowWager.UserStatsPublic}>(
-            FlowWager.UserStatsStoragePath
-        )
-        signer.capabilities.publish(userStatsCap, at: FlowWager.UserStatsPublicPath)
-        
-        log("User account setup completed for: ".concat(username))
+    transaction(username: String, displayName: String, bio: String, profileImageUrl: String) {
+        prepare(signer: auth(BorrowValue, SaveValue, PublishCapability, StorageCapabilities) &Account) {
+
+            // ==========================================
+            // STEP 1: Register user in contract
+            // ==========================================
+            FlowWagerV2.registerUser(
+                userAddress: signer.address,
+                username: username,
+                displayName: displayName,
+                bio: bio,
+                profileImageUrl: profileImageUrl
+            )
+
+            // ==========================================
+            // STEP 2: Create and save UserProfile resource
+            // ==========================================
+            let userProfile <- FlowWagerV2.createUserProfile(
+                userAddress: signer.address,
+                username: username,
+                displayName: displayName,
+                bio: bio,
+                profileImageUrl: profileImageUrl
+            )
+            signer.storage.save(<-userProfile, to: FlowWagerV2.UserProfileStoragePath)
+
+            // Create and publish UserProfile public capability
+            let userProfileCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserProfilePublic}>(
+                FlowWagerV2.UserProfileStoragePath
+            )
+            signer.capabilities.publish(userProfileCap, at: FlowWagerV2.UserProfilePublicPath)
+
+            // ==========================================
+            // STEP 3: Create and save UserPositions resource
+            // ==========================================
+            let userPositions <- FlowWagerV2.createUserPositions()
+            signer.storage.save(<-userPositions, to: FlowWagerV2.UserPositionsStoragePath)
+
+            // Create and publish UserPositions public capability
+            let userPositionsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserPositionsPublic}>(
+                FlowWagerV2.UserPositionsStoragePath
+            )
+            signer.capabilities.publish(userPositionsCap, at: FlowWagerV2.UserPositionsPublicPath)
+
+            // ==========================================
+            // STEP 4: Create and save UserStatsResource
+            // ==========================================
+            let userStats <- FlowWagerV2.createUserStatsResource()
+            signer.storage.save(<-userStats, to: FlowWagerV2.UserStatsStoragePath)
+
+            // Create and publish UserStats public capability
+            let userStatsCap = signer.capabilities.storage.issue<&{FlowWagerV2.UserStatsPublic}>(
+                FlowWagerV2.UserStatsStoragePath
+            )
+            signer.capabilities.publish(userStatsCap, at: FlowWagerV2.UserStatsPublicPath)
+
+            log("User account setup completed for: ".concat(username))
+        }
+
+        execute {
+            log("User registration transaction executed successfully")
+        }
     }
-}
   `,
 
   createMarket: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
-   transaction(
-    title: String,
-    description: String,
-    categoryRaw: UInt8,
-    optionA: String,
-    optionB: String,
-    endTime: UFix64,
-    minBet: UFix64,
-    maxBet: UFix64,
-    imageUrl: String
-) {
-    let flowVault: @FlowToken.Vault?
-    let category: FlowWager.MarketCategory
-    let signerAddress: Address
-    let isDeployer: Bool
-    
-    prepare(signer: auth(BorrowValue) &Account) {
-        // Store the category and signer address for use in execute
-        self.category = FlowWager.MarketCategory(rawValue: categoryRaw)!
-        self.signerAddress = signer.address
-        
-        // Check if signer is the deployer (gets contract deployer address)
-        let deployerAddress = FlowWager.deployerAddress
-        self.isDeployer = signer.address == deployerAddress
-        
-        // Only prepare creation fee if user is NOT the deployer
-        if !self.isDeployer {
-            let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-                from: /storage/flowTokenVault
-            ) ?? panic("Could not borrow FlowToken vault")
-            
-            // Get the current market creation fee from contract
-            let marketCreationFee = FlowWager.marketCreationFee
-            self.flowVault <- vault.withdraw(amount: marketCreationFee) as! @FlowToken.Vault
-            
-            log("Creation fee of ".concat(marketCreationFee.toString()).concat(" FLOW will be charged"))
-        } else {
-            self.flowVault <- nil
-            log("No creation fee required for deployer")
+    transaction(
+        title: String,
+        description: String,
+        categoryRaw: UInt8,
+        options: [String],
+        endTime: UFix64,
+        minBet: UFix64,
+        maxBet: UFix64,
+        imageUrl: String
+    ) {
+        let flowVault: @FlowToken.Vault?
+        let signerAddress: Address
+        let isDeployer: Bool
+
+        prepare(signer: auth(BorrowValue, StorageCapabilities) &Account) {
+            self.signerAddress = signer.address
+
+            let deployerAddress = FlowWagerV2.deployerAddress
+            self.isDeployer = signer.address == deployerAddress
+
+            // Only prepare creation fee if user is NOT the deployer
+            if !self.isDeployer {
+                let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+                    from: /storage/flowTokenVault
+                ) ?? panic("Could not borrow FlowToken vault")
+
+                let marketCreationFee = FlowWagerV2.marketCreationFee
+                self.flowVault <- vault.withdraw(amount: marketCreationFee) as! @FlowToken.Vault
+
+                log("Creation fee of ".concat(marketCreationFee.toString()).concat(" FLOW will be charged"))
+            } else {
+                self.flowVault <- nil
+                log("No creation fee required for deployer")
+            }
+        }
+
+        execute {
+            let marketId = FlowWagerV2.createMarket(
+                title: title,
+                description: description,
+                category: FlowWagerV2.MarketCategory(rawValue: categoryRaw)!,
+                options: options,
+                endTime: endTime,
+                minBet: minBet,
+                maxBet: maxBet,
+                imageUrl: imageUrl,
+                creationFeeVault: <-self.flowVault,
+                address: self.signerAddress
+            )
+
+            log("Market created with ID: ".concat(marketId.toString()))
+            log("Total options: ".concat(UInt8(options.length).toString()))
         }
     }
-    
-    execute {
-        let marketId = FlowWager.createMarket(
-            title: title,
-            description: description,
-            category: self.category,
-            optionA: optionA,
-            optionB: optionB,
-            endTime: endTime,
-            minBet: minBet,
-            maxBet: maxBet,
-            imageUrl: imageUrl,
-            creationFeeVault: <-self.flowVault,
-            address: self.signerAddress
-        )
-        
-        log("Market created with ID: ".concat(marketId.toString()))
-    }
-}
+
   `,
-
-  checkUserRegistered: `
-  import FlowWager from ${getFlowWagerAddress()}
-
-access(all) fun main(userAddress: Address): {String: AnyStruct} {
-    // Check if user is registered in the contract
-    let userStats = FlowWager.getUserStats(address: userAddress)
-    let isRegisteredInContract = userStats != nil
-    
-    // Check if user has UserProfile resource
-    let account = getAccount(userAddress)
-    let userProfile = account.capabilities.get<&{FlowWager.UserProfilePublic}>(
-        FlowWager.UserProfilePublicPath
-    ).borrow()
-    let hasUserProfile = userProfile != nil
-    
-    // Check if user has UserPositions resource
-    let userPositions = account.capabilities.get<&{FlowWager.UserPositionsPublic}>(
-        FlowWager.UserPositionsPublicPath
-    ).borrow()
-    let hasUserPositions = userPositions != nil
-    
-    // Check if user has UserStats resource
-    let userStatsResource = account.capabilities.get<&{FlowWager.UserStatsPublic}>(
-        FlowWager.UserStatsPublicPath
-    ).borrow()
-    let hasUserStatsResource = userStatsResource != nil
-    
-    // Get user profile details if available
-    var username: String? = nil
-    var displayName: String? = nil
-    var joinedAt: UFix64? = nil
-    
-    if let profile = userProfile {
-        username = profile.getUsername()
-        displayName = profile.getDisplayName()
-        joinedAt = profile.joinedAt
-    }
-    
-    // Determine overall registration status
-    let isFullyRegistered = isRegisteredInContract && hasUserProfile && hasUserPositions && hasUserStatsResource
-    
-    return {
-        "address": userAddress,
-        "isRegisteredInContract": isRegisteredInContract,
-        "hasUserProfile": hasUserProfile,
-        "hasUserPositions": hasUserPositions,
-        "hasUserStatsResource": hasUserStatsResource,
-        "isFullyRegistered": isFullyRegistered,
-        "username": username,
-        "displayName": displayName,
-        "joinedAt": joinedAt,
-        "userStats": userStats
-    }
-}
-
-// Simple version - just returns boolean
-access(all) fun isUserRegistered(userAddress: Address): Bool {
-    let userStats = FlowWager.getUserStats(address: userAddress)
-    let account = getAccount(userAddress)
-    let userProfile = account.capabilities.get<&{FlowWager.UserProfilePublic}>(
-        FlowWager.UserProfilePublicPath
-    ).borrow()
-    
-    return userStats != nil && userProfile != nil
-}`,
 
   placeBet: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
-     transaction(marketId: UInt64, option: UInt8, betAmount: UFix64) {
-        let betVault: @FlowToken.Vault
-        let userPositionsCap: Capability<&FlowWager.UserPositions>
-        let signerAddress: Address
+    // Transaction to place a bet (purchase shares) in V2
+    transaction(marketId: UInt64, optionIndex: UInt8, betAmount: UFix64) {
 
-        prepare(signer: auth(Storage, Capabilities, BorrowValue) &Account) {
-            self.signerAddress = signer.address
-            // Borrow FlowToken vault
-            let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-                from: /storage/flowTokenVault
-            ) ?? panic("Could not borrow FlowToken vault")
-            
-            // Withdraw the bet amount
-            self.betVault <- vault.withdraw(amount: betAmount) as! @FlowToken.Vault
+        let paymentVault: @FlowToken.Vault // Vault holding the FLOW for the bet
+        let userPositionsRef: &FlowWagerV2.UserPositions // Reference to user's position resource
 
-            // Initialize UserPositions if not present
-            if !signer.storage.check<@FlowWager.UserPositions>(from: FlowWager.UserPositionsStoragePath) {
-                let userPositions <- FlowWager.createUserPositions()
-                signer.storage.save(<-userPositions, to: FlowWager.UserPositionsStoragePath)
-                signer.capabilities.publish(
-                    signer.capabilities.storage.issue<&{FlowWager.UserPositionsPublic}>(FlowWager.UserPositionsStoragePath),
-                    at: FlowWager.UserPositionsPublicPath
-                )
-            }
+        prepare(signer: auth(Storage) &Account) {
+            // 1. Check if user has UserPositions resource set up and borrow a mutable reference
+            self.userPositionsRef = signer.storage.borrow<&FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath)
+                ?? panic("Could not borrow UserPositions resource. Please ensure account is set up.")
+             log("UserPositions resource borrowed successfully.")
 
-            // Get UserPositions capability from storage path
-            let storageCap = signer.capabilities.storage.issue<&FlowWager.UserPositions>(FlowWager.UserPositionsStoragePath)
-            self.userPositionsCap = storageCap
-            
-            // Verify UserPositions exists and check position limit
-            let userPositionsRef = signer.storage.borrow<&FlowWager.UserPositions>(
-                from: FlowWager.UserPositionsStoragePath
-            ) ?? panic("User positions resource not found for account")
-            
-            if !userPositionsRef.positions.containsKey(marketId) {
-                assert(
-                    UInt64(userPositionsRef.positions.length) < FlowWager.maxPositionsPerUser,
-                    message: "User has reached the maximum number of distinct market positions"
-                )
-            }
+            // 2. Get the user's main FLOW vault with withdraw auth
+            let mainVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow authorized FlowToken vault from /storage/flowTokenVault.")
+             log("Main FLOW vault borrowed.")
+
+            // 3. Withdraw the bet amount
+            assert(mainVault.balance >= betAmount, message: "Insufficient FLOW balance (".concat(mainVault.balance.toString()).concat(") for bet (").concat(betAmount.toString()).concat(" FLOW)"))
+            self.paymentVault <- mainVault.withdraw(amount: betAmount) as! @FlowToken.Vault
+             log("Payment vault prepared with amount: ".concat(betAmount.toString()))
         }
 
         execute {
-            // Create new position
-            let newPosition = FlowWager.UserPosition(
+             log("Calling FlowWagerV2.purchaseShares...")
+            // 4. Call the V2 purchaseShares function in the contract
+            FlowWagerV2.purchaseShares(
                 marketId: marketId,
-                optionAShares: option == FlowWager.MarketOutcome.OptionA.rawValue ? betAmount : 0.0,
-                optionBShares: option == FlowWager.MarketOutcome.OptionB.rawValue ? betAmount : 0.0,
-                totalInvested: betAmount,
-                claimed: false
+                optionIndex: optionIndex,
+                payment: <-self.paymentVault,
+                bettorAddress: signer.address,
+                userPositions: self.userPositionsRef
             )
 
-            // Call placeBet with capability and position
-            FlowWager.placeBet(
-                userAddress: self.signerAddress,
-                marketId: marketId,
-                option: option,
-                betVault: <-self.betVault,
-                userPositionsCap: self.userPositionsCap,
-                newPosition: newPosition
-            )
-
-            log("Bet placed successfully on market ".concat(marketId.toString()))
-            log("Bet amount: ".concat(betAmount.toString()).concat(" FLOW"))
-            log("Option selected: ".concat(option.toString()))
+            log("Bet placed successfully! Market: ".concat(marketId.toString()).concat(", Option Index: ").concat(optionIndex.toString()).concat(", Amount: ").concat(betAmount.toString()))
         }
     }
   `,
 
-  getMarketEvidence: `
-    import FlowWager from ${getFlowWagerAddress()}
-
-access(all) fun main(marketId: UInt64): AnyStruct {
-    // First check if the market exists
-    let market = FlowWager.getMarketById(marketId: marketId)
-    if market == nil {
-        return {
-            "success": false,
-            "error": "Market with ID ".concat(marketId.toString()).concat(" does not exist"),
-            "evidence": nil,
-            "marketInfo": nil
-        }
-    }
-    
-    // Get the resolution evidence
-    let evidence = FlowWager.getResolutionEvidence(marketId: marketId)
-    
-    return {
-        "success": true,
-        "error": nil,
-        "evidence": evidence,
-        "marketInfo": {
-            "id": market!.id,
-            "title": market!.title,
-            "status": market!.status,
-            "resolved": market!.resolved,
-            "endTime": market!.endTime,
-            "creator": market!.creator
-        }
-    }
-}
-    `,
   resolveMarket: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    transaction(marketId: UInt64, outcome: UInt8, justification: String) {
-        prepare(signer: auth(Storage, Capabilities) &Account) {
-            FlowWager.resolveMarket(
-                marketId: marketId,
-                outcome: outcome,
-                justification: justification
-            )
+    // Transaction for ADMIN to resolve a V2 market
+    transaction(marketId: UInt64, winningOptionIndex: UInt8, justification: String) {
+        let adminRef: &FlowWagerV2.Admin
+
+        prepare(signer: auth(Storage) Account) {
+            // Borrow the Admin resource from the signer's (admin's) storage
+            self.adminRef = signer.storage.borrow<&FlowWagerV2.Admin>(from: FlowWagerV2.AdminStoragePath)
+                ?? panic("Could not borrow Admin resource. Signer is not admin or resource path is incorrect: ".concat(FlowWagerV2.AdminStoragePath.toString()))
+             log("Admin resource borrowed.")
         }
 
         execute {
-            log("Market resolved successfully!")
-            log("Market ID: ".concat(marketId.toString()))
-            log("Outcome: ".concat(outcome.toString()))
-            log("Justification: ".concat(justification))
+             log("Calling resolveMarket on Admin resource...")
+            // Call the resolveMarket function *on the borrowed Admin resource*
+            self.adminRef.resolveMarket(
+                marketId: marketId,
+                winningOptionIndex: winningOptionIndex,
+                justification: justification
+            )
+
+            log("Admin resolved Market ".concat(marketId.toString()).concat(". Winning Option Index: ").concat(winningOptionIndex.toString()))
         }
     }
   `,
 
   claimWinnings: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
-/// Transaction for a user to claim their winnings from a resolved market
-/// @param marketId: The ID of the market to claim winnings from
-transaction(marketId: UInt64) {
-    let userPositionsCap: Capability<&FlowWager.UserPositions>
-    let flowReceiver: &{FungibleToken.Receiver}
-    let signerAddress: Address
-    
-    prepare(signer: auth(Storage) &Account) {
-        // Store the signer's address for use in execute
-        self.signerAddress = signer.address
-        
-        // Get the UserPositions capability using Cadence 1.0 API
-        self.userPositionsCap = signer.capabilities.get<&FlowWager.UserPositions>(FlowWager.UserPositionsPublicPath)
-        
-        // Ensure the capability is valid
-        if !self.userPositionsCap.check() {
-            panic("UserPositions capability is not valid. User may not be properly initialized.")
-        }
-        
-        // Get the Flow token receiver capability using Cadence 1.0 API
-        self.flowReceiver = signer.capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-            .borrow()
-            ?? panic("Could not borrow Flow token receiver capability")
-    }
-    
-    execute {
-        // Claim the winnings
-        let winningsVault <- FlowWager.claimWinnings(
-            marketId: marketId,
-            claimerAddress: self.signerAddress,
-            userPositionsCap: self.userPositionsCap
-        )
-        
-        // Deposit the winnings into the user's Flow vault
-        self.flowReceiver.deposit(from: <-winningsVault)
-        
-        log("Successfully claimed winnings for market ID: ".concat(marketId.toString()))
-    }
-}
-  `,
+    // Transaction for a user to claim V2 winnings for a specific market
+    transaction(marketId: UInt64) {
 
-  submitResolutionEvidence: `
-  import FlowWager from ${getFlowWagerAddress()}
+        let userPositionsRef: &FlowWagerV2.UserPositions
+        // Reference to the user's FLOW vault receiver (needs deposit auth)
+        let flowReceiverRef: &{FungibleToken.Receiver}
 
-  transaction(marketId: UInt64, evidence: String, requestedOutcome: UInt8) {
-      prepare(signer: auth(Storage, Capabilities) &Account) {
-          FlowWager.submitResolutionEvidence(
-              address: signer.address,
-              marketId: marketId,
-              evidence: evidence,
-              requestedOutcome: requestedOutcome
-          )
-      }
+        prepare(signer: auth(Storage) Account) {
+            // 1. Borrow the UserPositions resource reference from the signer's storage
+            self.userPositionsRef = signer.storage.borrow<&FlowWagerV2.UserPositions>(
+                from: FlowWagerV2.UserPositionsStoragePath
+            ) ?? panic("Could not borrow UserPositions resource. Account may not be set up.")
+             log("UserPositions resource borrowed.")
 
-      execute {
-          log("Evidence submitted successfully")
-      }
-  }
-`,
-
-  withdrawPlatformFees: `
-    import FlowWager from ${getFlowWagerAddress()}
-    import FlowToken from ${getFlowTokenAddress()}
-    import FungibleToken from ${getFungibleTokenAddress()}
-
-    transaction(amount: UFix64) {
-        prepare(signer: auth(Storage, Capabilities) &Account) {
-            let admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
-                ?? panic("Could not borrow Admin resource")
-            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-                ?? panic("Could not borrow reference to FlowToken Vault")
-            
-            let fees <- admin.withdrawPlatformFees(amount: amount)
-            vaultRef.deposit(from: <-fees)
+            // 2. Borrow the Flow token receiver reference with deposit authorization
+            self.flowReceiverRef = signer.storage.borrow<auth(FungibleToken.Receiver) &FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow authorized Flow token receiver reference from /storage/flowTokenVault.")
+             log("Authorized FlowToken receiver reference borrowed.")
         }
 
         execute {
-            log("Platform fees withdrawn successfully")
+             log("Calling FlowWagerV2.claimWinnings for market ID: ".concat(marketId.toString()))
+            // 3. Call the contract's V2 claimWinnings function
+            let winningsVault <- FlowWagerV2.claimWinnings(
+                marketId: marketId,
+                claimerAddress: signer.address,
+                userPositions: self.userPositionsRef // Pass the direct reference
+            )
+
+            let amount = winningsVault.balance
+             log("Winnings vault received from contract with balance: ".concat(amount.toString()))
+
+            // 4. Deposit the winnings into the user's vault
+            self.flowReceiverRef.deposit(from: <-winningsVault)
+             log("Winnings deposited successfully into user's vault.")
+
+            log("Successfully claimed ".concat(amount.toString()).concat(" FLOW from market ").concat(marketId.toString()))
+        }
+    }
+  `,
+
+  submitResolutionEvidence: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+
+    // Transaction for market CREATOR to submit V2 evidence for resolution
+    transaction(marketId: UInt64, evidence: String, requestedWinningOption: UInt8) {
+
+        prepare(signer: auth(Storage) Account) { // auth(Storage) likely not needed but harmless
+            // Pre-checks (Optional but recommended)
+            let market = FlowWagerV2.getMarketById(marketId: marketId)
+                ?? panic("Market ".concat(marketId.toString()).concat(" does not exist."))
+            assert(market.creator == signer.address, message: "Only the market creator can submit evidence.")
+            assert(!market.resolved, message: "Market is already resolved.")
+            assert(Int(requestedWinningOption) < market.options.length, message: "Invalid requested winning option index.")
+             log("Pre-checks passed for submitting evidence.")
+        }
+
+        execute {
+             log("Calling FlowWagerV2.submitEvidence...")
+            // Call the V2 submitEvidence function in the contract
+            FlowWagerV2.submitEvidence(
+                marketId: marketId,
+                evidence: evidence,
+                requestedWinningOption: requestedWinningOption,
+                creatorAddress: signer.address
+            )
+
+            log("Evidence submitted successfully for market ID: ".concat(marketId.toString()))
+        }
+    }
+  `,
+
+  withdrawPlatformFees: `
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
+    import FlowToken from ${getFlowTokenAddress()}
+    import FungibleToken from ${getFungibleTokenAddress()}
+
+    // Transaction for ADMIN to withdraw specific amount of fees
+    transaction(amount: UFix64) {
+        let adminRef: &FlowWagerV2.Admin
+        let vaultReceiverRef: &{FungibleToken.Receiver}
+
+        prepare(signer: auth(Storage) Account) {
+            self.adminRef = signer.storage.borrow<&FlowWagerV2.Admin>(from: FlowWagerV2.AdminStoragePath)
+                ?? panic("Could not borrow Admin resource")
+             log("Admin resource borrowed.")
+
+            self.vaultReceiverRef = signer.storage.borrow<auth(FungibleToken.Receiver) &FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow authorized FlowToken Vault Receiver reference")
+             log("Vault receiver borrowed.")
+        }
+
+        execute {
+             log("Calling withdrawPlatformFees on Admin resource...")
+            let feesVault <- self.adminRef.withdrawPlatformFees(amount: amount)
+            let withdrawnAmount = feesVault.balance
+             log("Fees vault received with amount: ".concat(withdrawnAmount.toString()))
+
+            self.vaultReceiverRef.deposit(from: <-feesVault)
+             log("Fees deposited to admin vault.")
+            log(withdrawnAmount.toString().concat(" platform fees withdrawn successfully"))
         }
     }
   `,
 
   withdrawAllPlatformFees: `
-    import FlowWager from ${getFlowWagerAddress()}
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
+    // Transaction for ADMIN to withdraw ALL available platform fees
     transaction {
-        prepare(signer: auth(Storage, Capabilities) &Account) {
-            let admin = signer.storage.borrow<&FlowWager.Admin>(from: FlowWager.AdminStoragePath)
+        let adminRef: &FlowWagerV2.Admin
+        let vaultReceiverRef: &{FungibleToken.Receiver}
+
+        prepare(signer: auth(Storage) Account) {
+            self.adminRef = signer.storage.borrow<&FlowWagerV2.Admin>(from: FlowWagerV2.AdminStoragePath)
                 ?? panic("Could not borrow Admin resource")
-            let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-                ?? panic("Could not borrow reference to FlowToken Vault")
-            
-            let fees <- admin.withdrawAllPlatformFees()
-            vaultRef.deposit(from: <-fees)
+             log("Admin resource borrowed.")
+
+            self.vaultReceiverRef = signer.storage.borrow<auth(FungibleToken.Receiver) &FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("Could not borrow authorized FlowToken Vault Receiver reference")
+             log("Vault receiver borrowed.")
         }
 
         execute {
-            log("All platform fees withdrawn successfully")
+             log("Calling withdrawAllPlatformFees on Admin resource...")
+            let feesVault <- self.adminRef.withdrawAllPlatformFees()
+            let amount = feesVault.balance
+             log("Fees vault received with amount: ".concat(amount.toString()))
+
+            self.vaultReceiverRef.deposit(from: <-feesVault)
+             log("Fees deposited to admin's vault.")
+            log("All available platform fees (".concat(amount.toString()).concat(") withdrawn successfully"))
         }
     }
   `,
 
-  getPendingMarketDetails: `
-  import FlowWager from ${getFlowWagerAddress()}
+  // --- SCRIPTS REMOVED or ADAPTED ---
 
-  access(all) struct PendingMarketDetails {
-      access(all) let market: FlowWager.Market
-      access(all) let evidence: FlowWager.ResolutionEvidence?
-      access(all) let totalVolume: UFix64
-      access(all) let participantCount: UInt64
-      access(all) let daysSinceEnded: UFix64
-      access(all) let hasEvidence: Bool
-      
-      init(
-          market: FlowWager.Market,
-          evidence: FlowWager.ResolutionEvidence?,
-          totalVolume: UFix64,
-          participantCount: UInt64,
-          daysSinceEnded: UFix64,
-          hasEvidence: Bool
-      ) {
-          self.market = market
-          self.evidence = evidence
-          self.totalVolume = totalVolume
-          self.participantCount = participantCount
-          self.daysSinceEnded = daysSinceEnded
-          self.hasEvidence = hasEvidence
-      }
-  }
+  getPendingMarketDetails: ` // Simplified as evidence isn't public
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-  access(all) fun main(creatorAddress: Address): [PendingMarketDetails] {
-      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
-      let pendingMarkets: [PendingMarketDetails] = []
-      let currentTime = getCurrentBlock().timestamp
-      
-      for market in creatorMarkets {
-          if market.status == FlowWager.MarketStatus.PendingResolution {
-              let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-              
-              let totalVolume = market.totalOptionAShares + market.totalOptionBShares
-              
-              let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
-              let daysSinceEnded = secondsSinceEnded / 86400.0
-              
-              let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
-              
-              pendingMarkets.append(PendingMarketDetails(
-                  market: market,
-                  evidence: evidence,
-                  totalVolume: totalVolume,
-                  participantCount: participantCount,
-                  daysSinceEnded: daysSinceEnded,
-                  hasEvidence: evidence != nil
-              ))
-          }
-      }
-      
-      return pendingMarkets
-  }
-`,
-
-  getPendingMarketsBasic: `
-  import FlowWager from ${getFlowWagerAddress()}
-
-  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
-      let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
-      let pendingMarkets: [FlowWager.Market] = []
-      
-      for market in creatorMarkets {
-          if market.status == FlowWager.MarketStatus.PendingResolution {
-              pendingMarkets.append(market)
-          }
-      }
-      
-      return pendingMarkets
-  }
-`,
-
-  getPendingMarketsWithoutEvidence: `
-  import FlowWager from ${getFlowWagerAddress()}
-
-  access(all) struct PendingMarketDetails {
-    access(all) let market: FlowWager.Market
-    access(all) let evidence: FlowWager.ResolutionEvidence?
-    access(all) let totalVolume: UFix64
-    access(all) let participantCount: UInt64
-    access(all) let daysSinceEnded: UFix64
-    access(all) let hasEvidence: Bool
-    
-    init(
-        market: FlowWager.Market,
-        evidence: FlowWager.ResolutionEvidence?,
-        totalVolume: UFix64,
-        participantCount: UInt64,
-        daysSinceEnded: UFix64,
-        hasEvidence: Bool
-    ) {
-        self.market = market
-        self.evidence = evidence
-        self.totalVolume = totalVolume
-        self.participantCount = participantCount
-        self.daysSinceEnded = daysSinceEnded
-        self.hasEvidence = hasEvidence
-    }
-}
-
-  access(all) fun main(creatorAddress: Address): [FlowWager.Market] {
-    let creatorMarkets = FlowWager.getMarketsByCreator(creator: creatorAddress)
-    let pendingWithoutEvidence: [FlowWager.Market] = []
-    
-    for market in creatorMarkets {
-        if market.status == FlowWager.MarketStatus.PendingResolution {
-            // Check if evidence does NOT exist for this market
-            if FlowWager.getResolutionEvidence(marketId: market.id) == nil {
-                pendingWithoutEvidence.append(market)
-            }
-        }
-    }
-    
-    return pendingWithoutEvidence
-}
-`,
-
-  getAllPendingMarketsWithEvidence: `
-  import FlowWager from ${getFlowWagerAddress()}
-  
     access(all) struct PendingMarketDetails {
-    access(all) let market: FlowWager.Market
-    access(all) let evidence: FlowWager.ResolutionEvidence?
-    access(all) let totalVolume: UFix64
-    access(all) let participantCount: UInt64
-    access(all) let daysSinceEnded: UFix64
-    access(all) let hasEvidence: Bool
-    
-    init(
-        market: FlowWager.Market,
-        evidence: FlowWager.ResolutionEvidence?,
-        totalVolume: UFix64,
-        participantCount: UInt64,
-        daysSinceEnded: UFix64,
-        hasEvidence: Bool
-    ) {
-        self.market = market
-        self.evidence = evidence
-        self.totalVolume = totalVolume
-        self.participantCount = participantCount
-        self.daysSinceEnded = daysSinceEnded
-        self.hasEvidence = hasEvidence
-    }
-}
+        access(all) let market: FlowWagerV2.Market
+        access(all) let totalVolume: UFix64
+        access(all) let participantCount: UInt64
+        access(all) let daysSinceEnded: UFix64
 
-access(all) fun main(): [PendingMarketDetails] {
-    let allMarkets = FlowWager.getPendingResolutionMarkets()
-    let pendingMarkets: [PendingMarketDetails] = []
-    let currentTime = getCurrentBlock().timestamp
-    
-    for market in allMarkets {
-        let evidence = FlowWager.getResolutionEvidence(marketId: market.id)
-        if evidence != nil {
-            let totalVolume = market.totalOptionAShares + market.totalOptionBShares
+        init( market: FlowWagerV2.Market ) {
+            self.market = market
+            self.totalVolume = market.totalPool
+            self.participantCount = UInt64(FlowWagerV2.getMarketParticipants(marketId: market.id).length)
+            let currentTime = getCurrentBlock().timestamp
             let secondsSinceEnded = currentTime >= market.endTime ? currentTime - market.endTime : 0.0
-            let daysSinceEnded = secondsSinceEnded / 86400.0
-            let participantCount = FlowWager.getMarketParticipantCount(marketId: market.id)
-            
-            pendingMarkets.append(PendingMarketDetails(
-                market: market,
-                evidence: evidence,
-                totalVolume: totalVolume,
-                participantCount: participantCount,
-                daysSinceEnded: daysSinceEnded,
-                hasEvidence: true
-            ))
+            self.daysSinceEnded = secondsSinceEnded / 86400.0 // seconds in a day
         }
     }
-    
-    return pendingMarkets
-}
- `,
 
-getAllUserTrades: `
-import FlowWager from ${getFlowWagerAddress()}
-access(all) struct interface ActiveTradeInterface {
-    access(all) let marketId: UInt64
-    access(all) let marketTitle: String
-    access(all) let marketDescription: String
-    access(all) let optionA: String
-    access(all) let optionB: String
-    access(all) let optionAShares: UFix64
-    access(all) let optionBShares: UFix64
-    access(all) let totalInvested: UFix64
-    access(all) let averagePrice: UFix64
-    access(all) let endTime: UFix64
-    access(all) let currentValue: UFix64
-    access(all) let profitLoss: UFix64
-    access(all) let marketStatus: UInt8 // Added for debugging
-    access(all) let resolved: Bool // Added for debugging
-}
-
-access(all) struct ActiveTrade: ActiveTradeInterface {
-    access(all) let marketId: UInt64
-    access(all) let marketTitle: String
-    access(all) let marketDescription: String
-    access(all) let optionA: String
-    access(all) let optionB: String
-    access(all) let optionAShares: UFix64
-    access(all) let optionBShares: UFix64
-    access(all) let totalInvested: UFix64
-    access(all) let averagePrice: UFix64
-    access(all) let endTime: UFix64
-    access(all) let currentValue: UFix64
-    access(all) let profitLoss: UFix64
-    access(all) let marketStatus: UInt8
-    access(all) let resolved: Bool
-
-    init(
-        marketId: UInt64,
-        marketTitle: String,
-        marketDescription: String,
-        optionA: String,
-        optionB: String,
-        optionAShares: UFix64,
-        optionBShares: UFix64,
-        totalInvested: UFix64,
-        averagePrice: UFix64,
-        endTime: UFix64,
-        currentValue: UFix64,
-        profitLoss: UFix64,
-        marketStatus: UInt8,
-        resolved: Bool
-    ) {
-        self.marketId = marketId
-        self.marketTitle = marketTitle
-        self.marketDescription = marketDescription
-        self.optionA = optionA
-        self.optionB = optionB
-        self.optionAShares = optionAShares
-        self.optionBShares = optionBShares
-        self.totalInvested = totalInvested
-        self.averagePrice = averagePrice
-        self.endTime = endTime
-        self.currentValue = currentValue
-        self.profitLoss = profitLoss
-        self.marketStatus = marketStatus
-        self.resolved = resolved
-    }
-}
-
-access(all) fun main(userAddress: Address): {String: AnyStruct} {
-    let positions = FlowWager.getUserPositions(address: userAddress)
-    let activeTrades: [ActiveTrade] = []
-    var totalDeposited: UFix64 = 0.0
-
-    for marketId in positions.keys {
-        let position = positions[marketId]!
-        if let market = FlowWager.getMarketById(marketId: marketId) {
-            // Include Active and PendingResolution markets
-            if !market.resolved && (market.status == FlowWager.MarketStatus.Active || market.status == FlowWager.MarketStatus.PendingResolution) {
-                let totalShares = position.optionAShares + position.optionBShares
-                let currentValue = totalShares // Simplified: assumes 1:1 share value
-                let profitLoss: UFix64 = currentValue >= position.totalInvested
-                    ? currentValue - position.totalInvested
-                    : position.totalInvested - currentValue
-                activeTrades.append(ActiveTrade(
-                    marketId: marketId,
-                    marketTitle: market.title,
-                    marketDescription: market.description,
-                    optionA: market.optionA,
-                    optionB: market.optionB,
-                    optionAShares: position.optionAShares,
-                    optionBShares: position.optionBShares,
-                    totalInvested: position.totalInvested,
-                    averagePrice: position.averagePrice,
-                    endTime: market.endTime,
-                    currentValue: currentValue,
-                    profitLoss: profitLoss,
-                    marketStatus: market.status.rawValue,
-                    resolved: market.resolved
-                ))
-                totalDeposited = totalDeposited + position.totalInvested
+    access(all) fun main(creatorAddress: Address): [PendingMarketDetails] {
+        let creatorMarkets = FlowWagerV2.getMarketsByCreator(creator: creatorAddress)
+        let pendingMarkets: [PendingMarketDetails] = []
+        let currentTime = getCurrentBlock().timestamp
+        for market in creatorMarkets {
+            // Check if status is PendingResolution or Active but past end time
+             if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                pendingMarkets.append(PendingMarketDetails(market: market))
             }
         }
+        return pendingMarkets
     }
+   `,
+  getMarketEvidence: ` // Returns market info, notes evidence is private
+    import FlowWagerV2 from ${getFlowWagerV2Address()}
 
-    return {
-        "activeTrades": activeTrades as [AnyStruct],
-        "totalDeposited": totalDeposited as AnyStruct
+    access(all) fun main(marketId: UInt64): {String: AnyStruct}? {
+        let market = FlowWagerV2.getMarketById(marketId: marketId)
+        if market == nil {
+             log("Market not found: ".concat(marketId.toString()))
+             return nil
+        }
+
+        // Evidence is private to the contract state in V2
+        let evidence: FlowWagerV2.ResolutionEvidence? = nil
+
+        return {
+            "marketInfo": market!,
+            "evidence": evidence, // Will always be nil
+            "evidenceNote": "Resolution evidence is private to the contract state in FlowWagerV2."
+        }
     }
-}
-`,
-};
+   `,
+  // Simplified pending market scripts as evidence isn't public
+  getPendingMarketsBasic: `
+        import FlowWagerV2 from ${getFlowWagerV2Address()}
+        // Returns markets created by a specific address that are pending resolution
+        access(all) fun main(creatorAddress: Address): [FlowWagerV2.Market] {
+            let creatorMarkets = FlowWagerV2.getMarketsByCreator(creator: creatorAddress)
+            var pendingMarkets: [FlowWagerV2.Market] = []
+            let currentTime = getCurrentBlock().timestamp
+            for market in creatorMarkets {
+                 if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                    pendingMarkets.append(market)
+                }
+            }
+            return pendingMarkets
+        }
+    `,
+  // Scripts filtering *by* evidence are not possible. These return all pending markets for the creator.
+  getPendingMarketsWithEvidence: `
+        import FlowWagerV2 from ${getFlowWagerV2Address()}
+        // NOTE: Cannot filter by evidence presence. Returns all pending markets by creator.
+        access(all) fun main(creatorAddress: Address): [FlowWagerV2.Market] {
+            let creatorMarkets = FlowWagerV2.getMarketsByCreator(creator: creatorAddress)
+            var pendingMarkets: [FlowWagerV2.Market] = []
+            let currentTime = getCurrentBlock().timestamp
+            for market in creatorMarkets {
+                 if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                    pendingMarkets.append(market)
+                }
+            }
+            return pendingMarkets
+        }
+    `,
+  getPendingMarketsWithoutEvidence: `
+        import FlowWagerV2 from ${getFlowWagerV2Address()}
+        // NOTE: Cannot filter by evidence absence. Returns all pending markets by creator.
+        access(all) fun main(creatorAddress: Address): [FlowWagerV2.Market] {
+             let creatorMarkets = FlowWagerV2.getMarketsByCreator(creator: creatorAddress)
+            var pendingMarkets: [FlowWagerV2.Market] = []
+            let currentTime = getCurrentBlock().timestamp
+            for market in creatorMarkets {
+                 if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                    pendingMarkets.append(market)
+                }
+            }
+            return pendingMarkets
+        }
+    `,
+  // This script also cannot filter by evidence. Returns all pending markets globally.
+  getAllPendingMarketsWithEvidence: `
+        import FlowWagerV2 from ${getFlowWagerV2Address()}
+        // NOTE: Cannot filter by evidence presence. Returns all pending markets globally.
+        access(all) fun main(): [FlowWagerV2.Market] {
+             let allMarkets = FlowWagerV2.getAllMarkets()
+             var pendingMarkets: [FlowWagerV2.Market] = []
+             let currentTime = getCurrentBlock().timestamp
+             for market in allMarkets {
+                 // Check for PendingResolution status or Active status past end time and not yet resolved
+                 if market.status == FlowWagerV2.MarketStatus.PendingResolution || (market.status == FlowWagerV2.MarketStatus.Active && market.endTime <= currentTime && !market.resolved) {
+                     pendingMarkets.append(market)
+                 }
+             }
+             return pendingMarkets
+        }
+    `,
+}; // End CADENCE_SCRIPTS
 
 export class FlowWagerScripts {
   private static cache: Map<string, string> = new Map();
@@ -1434,7 +1130,21 @@ export const getAllPendingMarkets = () =>
   FlowWagerScripts.getScript("getAllPendingMarkets");
 export const getMarketEvidence = () =>
   FlowWagerScripts.getScript("getMarketEvidence");
-export const getAllUserTrades = ()=>  FlowWagerScripts.getScript("getAllUserTrades");
+export const getAllUserTrades = () =>
+  FlowWagerScripts.getScript("getAllUserTrades");
+
+// Contract info script - returns basic contract information
+export const getContractInfo = () => `
+  import FlowWager from ${getFlowWagerAddress()}
+
+  access(all) fun main(): {String: String} {
+      let info: {String: String} = {}
+      info["deployerAddress"] = FlowWager.deployerAddress.toString()
+      info["platformFeePercentage"] = FlowWager.platformFeePercentage.toString()
+      info["marketCreationFee"] = FlowWager.marketCreationFee.toString()
+      return info
+  }
+`;
 
 // export const submitResolutionEvidenceTransaction = () => FlowWagerScripts.getTransaction("submitResolutionEvidence");
 // export const checkUsernameAvailability = () =>

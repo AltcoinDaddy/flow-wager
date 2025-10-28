@@ -24,8 +24,9 @@ import { supabase } from "@/utils/supabase/client";
 interface MarketActivityProps {
   marketId: string;
   marketTitle: string;
-  optionA: string;
-  optionB: string;
+  optionA?: string;
+  optionB?: string;
+  options?: Array<any>;
 }
 
 export function MarketActivity({
