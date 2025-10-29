@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { WalletButton } from "./wallet-button";
-import { usePathname } from "next/navigation";
-import { Button } from "../ui/button";
 // import { UserAutomationSummary } from "../forte/UserAutomationSummary";
 
 export function Header() {
-  const pathname = usePathname();
+  // const pathname = usePathname();
   return (
     <header className="sticky top-0 z-50 w-full p-6">
       <div className="max-w-7xl mx-auto">
@@ -35,27 +33,7 @@ export function Header() {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Automation Summary - Hidden on small screens */}
-              {pathname === "/" ? (
-                <>
-                  
-                   <Button
-                    size="lg"
-                    className="w-full flex items-center justify-center space-x-2"
-                    style={{
-                      backgroundColor: "#9b87f5",
-                      color: "white",
-                      borderColor: "#9b87f5",
-                    }}
-                  >
-                    Coming Soon
-                  </Button>
-                </>
-              ) : (
-                <>
-                 <WalletButton />
-                </>
-              )}
+              <WalletButton />
             </div>
           </div>
         </div>

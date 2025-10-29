@@ -382,15 +382,14 @@ export function CreateMarketForm({
       const transactionId = await fcl.mutate({
         cadence: transactionScript,
         args: (arg, t) => [
-          arg(marketData.question, t.String),
-          arg(marketData.description, t.String),
-          arg(marketData.category.toString(), t.UInt8),
-          arg(marketData.options, t.Array(t.String)),
-          arg(marketData.endTime.toFixed(1), t.UFix64),
-          arg(marketData.minBet.toFixed(8), t.UFix64),
-          arg(marketData.maxBet.toFixed(8), t.UFix64),
-          arg(marketData.imageURI || "", t.String),
-          arg(null, t.Optional(t.UFix64)),
+          arg(marketData.question, t.String), // Arg 1
+          arg(marketData.description, t.String), // Arg 2
+          arg(marketData.category.toString(), t.UInt8), // Arg 3
+          arg(marketData.options, t.Array(t.String)), // Arg 4 (an array)
+          arg(marketData.endTime.toFixed(1), t.UFix64), // Arg 5
+          arg(marketData.minBet.toFixed(8), t.UFix64), // Arg 6
+          arg(marketData.maxBet.toFixed(8), t.UFix64), // Arg 7
+          arg(marketData.imageURI || "", t.String), // Arg 8
         ],
         proposer: authorization,
         payer: authorization,
