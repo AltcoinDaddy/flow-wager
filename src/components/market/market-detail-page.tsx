@@ -43,6 +43,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { getStatusColor } from "@/utils";
 
 // Helper to sum shares (can be moved to utils)
 const sumShares = (shares: string[]): number => {
@@ -83,7 +84,7 @@ export default function MarketDetailPage() {
       const interval = setInterval(() => {
         console.log("Auto-refreshing market data...");
         refreshMarketData();
-      }, 80000); // Refresh every 30 seconds
+      }, 600000); // Refresh every 10 minutes
 
       return () => clearInterval(interval);
     }
@@ -687,7 +688,7 @@ export default function MarketDetailPage() {
               <CardContent className="p-4 sm:p-6 space-y-4">
                 <Badge
                   variant="outline"
-                  className={`w-full justify-center py-2 sm:py-3 text-sm font-semibold border`}
+                  className={`w-full justify-center py-2 sm:py-3 text-sm font-semibold border ${getStatusColor(actualStatus)}`}
                 >
                   {getStatusName(actualStatus)}
                 </Badge>

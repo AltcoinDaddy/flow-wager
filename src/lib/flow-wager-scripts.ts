@@ -664,102 +664,107 @@ const CADENCE_SCRIPTS = {
     import FungibleToken from ${getFungibleTokenAddress()}
 
     transaction(
-        title: String,
-        description: String,
-        categoryRaw: UInt8,
-        options: [String],
-        endTime: UFix64,
-        minBet: UFix64,
-        maxBet: UFix64,
-        imageUrl: String
-    ) {
-        let flowVault: @FlowToken.Vault?
-        let signerAddress: Address
-        let isDeployer: Bool
+            title: String,
+            description: String,
+            categoryRaw: UInt8,
+            options: [String], // Use options array
+            endTime: UFix64,
+            minBet: UFix64,
+            maxBet: UFix64,
+            imageUrl: String
+            // 9th argument (creationFeeAmount) removed to match your 8-arg JS call
+        ) {
+            let feeVault: @FlowToken.Vault?
+            let category: FlowWagerV2.MarketCategory
+            let signerAddress: Address
 
-        prepare(signer: auth(BorrowValue, StorageCapabilities) &Account) {
-            self.signerAddress = signer.address
+            prepare(signer: auth(Storage) &Account) {
+                self.category = FlowWagerV2.MarketCategory(rawValue: categoryRaw)
+                    ?? panic("Invalid market category raw value: ".concat(categoryRaw.toString()))
+                self.signerAddress = signer.address
 
-            let deployerAddress = FlowWagerV2.deployerAddress
-            self.isDeployer = signer.address == deployerAddress
+                let feeAmount = FlowWagerV2.marketCreationFee
+                let deployerAddress = FlowWagerV2.deployerAddress
 
-            // Only prepare creation fee if user is NOT the deployer
-            if !self.isDeployer {
-                let vault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
-                    from: /storage/flowTokenVault
-                ) ?? panic("Could not borrow FlowToken vault")
+                if self.signerAddress == deployerAddress || feeAmount <= 0.0 {
+                    log("No market creation fee required.")
+                    self.feeVault <- nil
+                } else {
+                    log("Preparing market creation fee vault...")
+                    let mainVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+                        ?? panic("Could not borrow authorized FlowToken vault from /storage/flowTokenVault.")
 
-                let marketCreationFee = FlowWagerV2.marketCreationFee
-                self.flowVault <- vault.withdraw(amount: marketCreationFee) as! @FlowToken.Vault
+                    assert(mainVault.balance >= feeAmount, message: "Insufficient FLOW balance for market creation fee.")
+                    self.feeVault <- mainVault.withdraw(amount: feeAmount) as! @FlowToken.Vault
+                    log("Fee vault prepared.")
+                }
+            }
 
-                log("Creation fee of ".concat(marketCreationFee.toString()).concat(" FLOW will be charged"))
-            } else {
-                self.flowVault <- nil
-                log("No creation fee required for deployer")
+            execute {
+                log("Executing V2 market creation...")
+                // Call the V2 createMarket function in the contract
+                let marketId = FlowWagerV2.createMarket(
+                    title: title,
+                    description: description,
+                    category: self.category,
+                    options: options, // Pass the array
+                    endTime: endTime,
+                    minBet: minBet,
+                    maxBet: maxBet,
+                    imageUrl: imageUrl,
+                    creationFeeVault: <-self.feeVault,
+                    address: self.signerAddress
+                )
+                log("V2 Market created successfully with ID: ".concat(marketId.toString()))
             }
         }
-
-        execute {
-            let marketId = FlowWagerV2.createMarket(
-                title: title,
-                description: description,
-                category: FlowWagerV2.MarketCategory(rawValue: categoryRaw)!,
-                options: options,
-                endTime: endTime,
-                minBet: minBet,
-                maxBet: maxBet,
-                imageUrl: imageUrl,
-                creationFeeVault: <-self.flowVault,
-                address: self.signerAddress
-            )
-
-            log("Market created with ID: ".concat(marketId.toString()))
-            log("Total options: ".concat(UInt8(options.length).toString()))
-        }
-    }
-
-  `,
+ `,
 
   placeBet: `
     import FlowWagerV2 from ${getFlowWagerV2Address()}
     import FlowToken from ${getFlowTokenAddress()}
     import FungibleToken from ${getFungibleTokenAddress()}
 
-    // Transaction to place a bet (purchase shares) in V2
     transaction(marketId: UInt64, optionIndex: UInt8, betAmount: UFix64) {
 
-        let paymentVault: @FlowToken.Vault // Vault holding the FLOW for the bet
-        let userPositionsRef: &FlowWagerV2.UserPositions // Reference to user's position resource
+    let bettorAddress: Address
+        let paymentVault: @FlowToken.Vault
+        let userPositionsRef: &FlowWagerV2.UserPositions
 
         prepare(signer: auth(Storage) &Account) {
-            // 1. Check if user has UserPositions resource set up and borrow a mutable reference
-            self.userPositionsRef = signer.storage.borrow<&FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath)
-                ?? panic("Could not borrow UserPositions resource. Please ensure account is set up.")
-             log("UserPositions resource borrowed successfully.")
+            self.bettorAddress = signer.address
 
-            // 2. Get the user's main FLOW vault with withdraw auth
+
+
+            // 2. Get the user's main FLOW vault
+
+            // --- THIS IS THE FIX ---
+            // We must borrow the reference and explicitly authorize it with the 'Withdraw' entitlement
             let mainVault = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("Could not borrow authorized FlowToken vault from /storage/flowTokenVault.")
-             log("Main FLOW vault borrowed.")
 
-            // 3. Withdraw the bet amount
-            assert(mainVault.balance >= betAmount, message: "Insufficient FLOW balance (".concat(mainVault.balance.toString()).concat(") for bet (").concat(betAmount.toString()).concat(" FLOW)"))
+            // 3. Withdraw the bet amount (this will now work)
+            assert(mainVault.balance >= betAmount, message: "Insufficient FLOW balance to place this bet")
             self.paymentVault <- mainVault.withdraw(amount: betAmount) as! @FlowToken.Vault
-             log("Payment vault prepared with amount: ".concat(betAmount.toString()))
+
+            // 4. Get the user's UserPositions resource
+            // This borrow doesn't need special auth because we're just passing the reference,
+            // and the contract will call the public 'addPosition' function.
+            self.userPositionsRef = signer.storage.borrow<&FlowWagerV2.UserPositions>(from: FlowWagerV2.UserPositionsStoragePath)
+                ?? panic("Could not borrow UserPositions resource. Has the user set up their account?")
         }
 
         execute {
-             log("Calling FlowWagerV2.purchaseShares...")
-            // 4. Call the V2 purchaseShares function in the contract
+            // 5. Call the main contract function to purchase the shares
             FlowWagerV2.purchaseShares(
                 marketId: marketId,
                 optionIndex: optionIndex,
                 payment: <-self.paymentVault,
-                bettorAddress: signer.address,
+                bettorAddress: self.bettorAddress,
                 userPositions: self.userPositionsRef
             )
 
-            log("Bet placed successfully! Market: ".concat(marketId.toString()).concat(", Option Index: ").concat(optionIndex.toString()).concat(", Amount: ").concat(betAmount.toString()))
+            log("Bet placed successfully! Market: ".concat(marketId.toString()).concat(", Option: ").concat(optionIndex.toString()).concat(", Amount: ").concat(betAmount.toString()))
         }
     }
   `,

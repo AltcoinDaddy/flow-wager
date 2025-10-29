@@ -285,8 +285,8 @@ export function BetDialog({
         cadence: placeBetScript,
         args: (arg: any, t: any) => [
           arg(market.id, t.UInt64), // Market ID as UInt64 string
-          arg(selectedOptionIndex, t.UInt8), // Selected option index as UInt8
-          arg(amount, t.UFix64), // Bet amount as UFix64 string
+          arg(selectedOptionIndex, t.UInt8),
+          arg(Number(amount).toFixed(2), t.UFix64), // Bet amount as UFix64 string
         ],
         proposer: authorization,
         payer: authorization,
@@ -593,8 +593,11 @@ export function BetDialog({
                       </div>
 
                       {/* Amount Input */}
-                      <div>
-                        <Label htmlFor="amount-immediate">
+                      <div className="space-y-4">
+                        <Label
+                          htmlFor="amount-immediate"
+                          className="text-white"
+                        >
                           Bet Amount (FLOW)
                         </Label>
                         <Input
@@ -635,7 +638,7 @@ export function BetDialog({
 
                   {/* Bet Summary */}
                   {amount && isValidAmount && selectedOptionIndex !== null && (
-                    <Card className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 border border-gray-800/50">
+                    <Card className="bg-gradient-to-r from-[#0A0C14] to-[#1A1F2C]/50 border border-gray-800/50 text-white">
                       <CardContent className="p-4">
                         <div className="flex items-center space-x-2 mb-3">
                           {" "}
@@ -701,7 +704,7 @@ export function BetDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="flex-1 border-gray-700 text-gray-300 hover:bg-[#1A1F2C] h-10"
+            className="flex-1 border-gray-700 text-white bg-[#1A1F2C] h-10 hover:bg-[#1A1F2C] hover:text-white"
             disabled={isLoading || userAccount.isCreating}
           >
             Cancel
